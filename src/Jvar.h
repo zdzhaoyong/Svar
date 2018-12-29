@@ -16,7 +16,7 @@
 #include <thread>
 #include <typeinfo>
 #include <vector>
-#include </data/zhaoyong/Program/Apps/SLAM/GSLAM/GSLAM/core/JSON.h>
+//#include </data/zhaoyong/Program/Apps/SLAM/GSLAM/GSLAM/core/JSON.h>
 #include <GSLAM/core/Glog.h>
 
 namespace Py {
@@ -146,11 +146,41 @@ public:
 };
 
 class SvarFunction: public SvarValue{
-    template <typename Func, typename... Args>
-    SvarFunction(Func&& func,
-                 Args&&... args){
-        _func=std::bind(std::forward<Func>(func),
-                        std::forward<Args>(args)...);
+public:
+    SvarFunction(){}
+//    template <typename Func, typename... Args>
+//    SvarFunction(Func&& func,
+//                 Args&&... args){
+////        _args=Svar(std::vector<Svar>({std::forward<Args>(args)...}));
+//        _func=std::bind(std::forward<Func>(func),
+//                        std::forward<Args>(args)...);
+//    }
+
+    /// Construct a cpp_function from a vanilla function pointer
+    template <typename Return, typename... Args, typename... Extra>
+    SvarFunction(Return (*f)(Args...), const Extra&... extra) {
+        initialize(f, f, extra...);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func, typename... Extra>
+    SvarFunction(Func &&f, const Extra&... extra) {
+        initialize(std::forward<Func>(f),
+                   (detail::function_signature_t<Func> *) nullptr, extra...);
+    }
+
+    /// Construct a cpp_function from a class method (non-const)
+    template <typename Return, typename Class, typename... Arg, typename... Extra>
+    SvarFunction(Return (Class::*f)(Arg...), const Extra&... extra) {
+        initialize([f](Class *c, Arg... args) -> Return { return (c->*f)(args...); },
+                   (Return (*) (Class *, Arg...)) nullptr, extra...);
+    }
+
+    /// Construct a cpp_function from a class method (const)
+    template <typename Return, typename Class, typename... Arg, typename... Extra>
+    cpp_function(Return (Class::*f)(Arg...) const, const Extra&... extra) {
+        initialize([f](const Class *c, Arg... args) -> Return { return (c->*f)(args...); },
+                   (Return (*)(const Class *, Arg ...)) nullptr, extra...);
     }
 
     virtual TypeID          cpptype()const{return &typeid(SvarFunction);}
@@ -159,6 +189,13 @@ class SvarFunction: public SvarValue{
     Svar call(Svar args)const{
 //        assert(args.length()==_args.length());
         return _func(args);
+    }
+private:
+    /// Special internal constructor for functors, lambda functions, etc.
+    template <typename Func, typename Return, typename... Args, typename... Extra>
+    void initialize(Func &&f, Return (*)(Args...), const Extra&... extra)
+    {
+
     }
 
     std::function<Svar(Svar)> _func;

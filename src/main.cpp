@@ -23,6 +23,12 @@ TEST(Svar,SvarCreate)
     Py::Svar obj(std::map<std::string,int>({{"1",1}}));
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
+    using namespace std::placeholders;
+
+    Py::SvarFunction isBool([](Py::Svar config){return config.is<bool>();},_1);
+
+    EXPECT_TRUE(isBool.call(false).as<bool>());
+
 
 }
 
