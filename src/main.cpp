@@ -23,13 +23,27 @@ TEST(Svar,SvarCreate)
     Py::Svar obj(std::map<std::string,int>({{"1",1}}));
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
+}
+
+TEST(Svar,GetSet){
+    Py::Svar var;
+    int& testInt=var.GetInt("child.testInt",20);
+    EXPECT_EQ(testInt,20);
+    testInt=30;
+    EXPECT_EQ(var.GetInt("child.testInt"),30);
+    var.Set("child.testInt",40);
+    EXPECT_EQ(testInt,40);
+}
+
+
+TEST(Svar,SvarFunction)
+{
+
     using namespace std::placeholders;
 
     Py::SvarFunction isBool([](Py::Svar config){return config.is<bool>();},_1);
 
     EXPECT_TRUE(isBool.call(false).as<bool>());
-
-
 }
 
 int main(int argc,char** argv){
