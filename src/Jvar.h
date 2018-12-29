@@ -167,6 +167,13 @@ class SvarFunction: public SvarValue{
 
 class SvarClass: public SvarValue{
 public:
+    std::string  __name__;
+
+    /// buildin functions
+    Svar __init__,__add__,__sub__,__mul__,__div__,__mod__;
+    Svar __xor__,__or__,__and__;
+    Svar __le__,__lt__,__ne__,__eq__,__ge__,__gt__;
+    Svar __len__,__str__,__getitem__,__setitem__,__iter__,__next__;
 };
 
 template <typename T>
