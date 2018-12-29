@@ -385,7 +385,7 @@ public:
 
     template <typename... Args>
     Svar call(Args... args)const{
-        Svar argv = {
+        std::vector<Svar> argv = {
                 (Svar::create(std::move(args)))...
         };
         return _func(argv);
@@ -407,8 +407,8 @@ public:
                 throw SvarExeption("Function "+name+":"
                                    +Svar::typeName(typeid(Return (*)(Args...)).name())
                                    +" expect "+Svar::toString(nargs)
-                                   +" arguments but obtained "+Svar::toString(args.length()));
-//            f();
+                                   +" arguments but obtained "+Svar::toString(args.length())+".");
+            return Svar::create(f(false));
         };
     }
 
