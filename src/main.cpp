@@ -58,6 +58,14 @@ TEST(Svar,Cast){
     EXPECT_TRUE(Svar(1).castAs<double>()==1.);
 }
 
+TEST(Svar,NumOp){
+    EXPECT_EQ(Svar(2.1)+Svar(1),3.1);
+    EXPECT_EQ(Svar(4.1)-Svar(2),4.1-2);
+    EXPECT_EQ(Svar(3)*Svar(3.3),3*3.3);
+    EXPECT_EQ(Svar(5.4)/Svar(2),5.4/2);
+    EXPECT_EQ(Svar(5)%Svar(2),5%2);
+}
+
 int main(int argc,char** argv){
     svar.Arg<int>("argInt",100,"this is a sample int argument");
     svar.Arg<double>("argDouble",100.,"this is a sample double argument");

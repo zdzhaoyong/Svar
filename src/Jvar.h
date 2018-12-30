@@ -288,10 +288,10 @@ public:
 
     std::type_index         cpptype()const;
     const Svar&             classObject()const;
+    SvarClass*              classPtr()const;
     size_t                  length() const;
 
-    const Svar& operator[](size_t i) const;
-    const Svar& operator[](const std::string &key) const;
+    Svar operator[](const Svar& i) const;
 
     Svar& Get(const std::string& name);
 
@@ -316,8 +316,9 @@ public:
     template <typename... Args>
     Svar call(Args... args)const;
 
-    Svar operator +(const Svar& rh)const;//__add__
     Svar operator -()const;              //__neg__
+    Svar operator +(const Svar& rh)const;//__add__
+    Svar operator -(const Svar& rh)const;//__sub__
     Svar operator *(const Svar& rh)const;//__mul__
     Svar operator /(const Svar& rh)const;//__div__
     Svar operator %(const Svar& rh)const;//__mod__
@@ -377,8 +378,8 @@ public:
 
     virtual const char* what() const _GLIBCXX_USE_NOEXCEPT{
         if(_wt.is<std::string>())
-            return _wt.as<std::string>().c_str();
-        else return "";
+            return ("SvarException"+_wt.castAs<std::string>()).c_str();
+        else return "SvarException";
     }
 
     Svar _wt;
@@ -386,15 +387,6 @@ public:
 
 class SvarFunction: public SvarValue{
 public:
-//    SvarFunction(){}
-//    template <typename Func, typename... Args>
-//    SvarFunction(Func&& func,
-//                 Args&&... args){
-////        _args=Svar(std::vector<Svar>({std::forward<Args>(args)...}));
-//        _func=std::bind(std::forward<Func>(func),
-//                        std::forward<Args>(args)...);
-//    }
-
     /// Construct a cpp_function from a vanilla function pointer
     template <typename Return, typename... Args, typename... Extra>
     SvarFunction(Return (*f)(Args...), const Extra&... extra) {
@@ -450,7 +442,7 @@ public:
         signature<<Svar::typeName(typeid(Return).name());
         doc=signature.str();
         nargs=types.size();
-        _func=[this,f](Svar args)->Svar{
+        _func=[this,f](std::vector<Svar>& args)->Svar{
             using indices = detail::make_index_sequence<sizeof...(Args)>;
             return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
         };
@@ -458,14 +450,14 @@ public:
 
     template <typename Func, typename Return, typename... Args,size_t... Is>
     detail::enable_if_t<std::is_void<Return>::value, Svar>
-    call_impl(Func&& f,Return (*)(Args...),Svar args,detail::index_sequence<Is...>){
+    call_impl(Func&& f,Return (*)(Args...),std::vector<Svar>& args,detail::index_sequence<Is...>){
         f(args[Is].castAs<Args>()...);
         return Svar::Null();
     }
 
     template <typename Func, typename Return, typename... Args,size_t... Is>
     detail::enable_if_t<!std::is_void<Return>::value, Svar>
-    call_impl(Func&& f,Return (*)(Args...),Svar args,detail::index_sequence<Is...>){
+    call_impl(Func&& f,Return (*)(Args...),std::vector<Svar>& args,detail::index_sequence<Is...>){
         return Svar::create<Return>(f(args[Is].castAs<Args>()...));
     }
 
@@ -474,7 +466,7 @@ public:
     Svar          stack,next;
     bool          is_method;
 
-    std::function<Svar(Svar)> _func;
+    std::function<Svar(std::vector<Svar>&)> _func;
 };
 
 class SvarClass: public SvarValue{
@@ -600,6 +592,9 @@ class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
         : SvarValue_<std::map<std::string,Svar>>(m){}
+    virtual TypeID          cpptype()const{return typeid(SvarObject);}
+    virtual const void*     ptr() const{return this;}
+    virtual const Svar&     classObject()const{return SvarClass::instance<SvarObject>();}
     virtual size_t          length() const {return _var.size();}
     virtual std::mutex*     accessMutex()const{return &_mutex;}
 
@@ -619,6 +614,9 @@ class SvarArray : public SvarValue_<std::vector<Svar> >{
 public:
     SvarArray(const std::vector<Svar>& v)
         :SvarValue_<std::vector<Svar>>(v){}
+    virtual TypeID          cpptype()const{return typeid(SvarArray);}
+    virtual const void*     ptr() const{return this;}
+    virtual const Svar&     classObject()const{return SvarClass::instance<SvarArray>();}
     virtual size_t          length() const {return _var.size();}
     virtual std::mutex*     accessMutex()const{return &_mutex;}
     virtual Svar& operator[](size_t i) {
@@ -820,16 +818,24 @@ inline const Svar&       Svar::classObject()const{
     return _obj->classObject();
 }
 
+SvarClass*   Svar::classPtr()const
+{
+    auto clsObj=classObject();
+    if(clsObj.isClass()) return &clsObj.as<SvarClass>();
+    return nullptr;
+}
+
 inline size_t            Svar::length() const{
     return _obj->length();
 }
 
-inline const Svar& Svar::operator[](size_t i) const{
-    return (*_obj)[i];
-}
-
-inline const Svar& Svar::operator[](const std::string &key) const{
-    return (*_obj)[key];
+Svar Svar::operator[](const Svar& i) const{
+    if(classObject().is<void>()) return Null();
+    const SvarClass& cl=classObject().as<SvarClass>();
+    if(cl.__getitem__.isFunction()){
+        return cl.__getitem__.call((*this),i);
+    }
+    return Null();
 }
 
 template <typename T>
@@ -889,6 +895,73 @@ Svar Svar::call(Args... args)const
     return as<SvarFunction>().call(args...);
 }
 
+
+Svar Svar::operator -()const
+{
+    return Null();
+}
+
+Svar Svar::operator +(const Svar& rh)const
+{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__add__.isFunction()) return Null();
+    return cls->__add__.call((*this),rh);
+}
+
+Svar Svar::operator -(const Svar& rh)const{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__sub__.isFunction()) return Null();
+    return cls->__sub__.call((*this),rh);
+}
+
+Svar Svar::operator *(const Svar& rh)const
+{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__mul__.isFunction()) return Null();
+    return cls->__mul__.call((*this),rh);
+}
+
+Svar Svar::operator /(const Svar& rh)const
+{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__div__.isFunction()) return Null();
+    return cls->__div__.call((*this),rh);
+}
+
+Svar Svar::operator %(const Svar& rh)const{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__mod__.isFunction()) return Null();
+    return cls->__mod__.call((*this),rh);
+}
+
+Svar Svar::operator ^(const Svar& rh)const{
+
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__xor__.isFunction()) return Null();
+    return cls->__xor__.call((*this),rh);
+}
+
+Svar Svar::operator |(const Svar& rh)const
+{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__or__.isFunction()) return Null();
+    return cls->__or__.call((*this),rh);
+}
+
+Svar Svar::operator &(const Svar& rh)const{
+    auto cls=classPtr();
+    if(!cls) return Null();
+    if(!cls->__and__.isFunction()) return Null();
+    return cls->__and__.call((*this),rh);
+}
+
 bool Svar::operator ==(const Svar& rh)const{
     return _obj->equals(rh);
 }
@@ -924,6 +997,9 @@ inline std::string Svar::typeName(std::string name) {
       {typeid(double).name(), "double"},
       {typeid(std::string).name(), "str"},
       {typeid(bool).name(), "bool"},
+      {typeid(SvarDict).name(), "dict"},
+      {typeid(SvarObject).name(), "object"},
+      {typeid(SvarArray).name(), "array"},
   };
   auto it = decode.find(name);
   if (it != decode.end()) return it->second;
@@ -938,8 +1014,11 @@ inline std::string Svar::typeName(std::string name) {
 inline Svar& SvarValue::operator[](size_t i) {
     if(classObject().is<void>()) return Svar::Null();
     const SvarClass& cl=classObject().as<SvarClass>();
-//    if(cl.__getitem__.isFunction())
-//        return cl.__getitem__.as<SvarFunction>().call(i);
+    Svar func=cl.__getitem__;
+    if(func.isFunction()){
+        Svar idx(int(i));
+//        return func.call(idx);
+    }
     return Svar::Null();
 }
 
@@ -952,7 +1031,38 @@ public:
                 .def("__bool__",[](int i){return (bool)i;})
                 .def("__str__",[](int i){return Svar::toString(i);})
                 .def("__eq__",&SvarBuildin::int_equal)
-                .def("__lt__",&SvarBuildin::int_less);
+                .def("__lt__",&SvarBuildin::int_less)
+                .def("__add__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self+rh.as<int>());
+            if(rh.is<double>()) return Svar(self+rh.as<double>());
+            throw SvarExeption("Failed to __add__(self:int,arg0:"+rh.typeName()+")");
+            return Svar::Null();
+        })
+                .def("__sub__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self-rh.as<int>());
+            if(rh.is<double>()) return Svar(self-rh.as<double>());
+            throw SvarExeption("Failed to __sub__(self:int,arg0:"+rh.typeName()+")");
+            return Svar::Null();
+        })
+                .def("__mul__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self*rh.as<int>());
+            if(rh.is<double>()) return Svar(self*rh.as<double>());
+            throw SvarExeption("Failed to __mul__(self:int,arg0:"+rh.typeName()+")");
+            return Svar::Null();
+        })
+                .def("__div__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self/rh.as<int>());
+            if(rh.is<double>()) return Svar(self/rh.as<double>());
+            throw SvarExeption("Failed to __add__(self:int,arg0:"+rh.typeName()+")");
+            return Svar::Null();
+        })
+                .def("__mod__",[](int self,int rh){
+            return self%rh;
+        })
+                .def("__neg__",[](int self){return -self;})
+                .def("__xor__",[](int self,int rh){return self^rh;})
+                .def("__or__",[](int self,int rh){return self|rh;})
+                .def("__and__",[](int self,int rh){return self&rh;});
 
         SvarClass::Class<bool>()
                 .def("__int__",[](bool b){return (int)b;})
@@ -964,10 +1074,31 @@ public:
                 .def("__bool__",[](double d){return (bool)d;})
                 .def("__str__",[](double d){return Svar::toString(d);})
                 .def("__eq__",[](double self,double rh){return self==rh;})
-                .def("__lt__",[](double self,double rh){return self<rh;});
+                .def("__lt__",[](double self,double rh){return self<rh;})
+                .def("__add__",[](double self,double rh){return self+rh;})
+                .def("__sub__",[](double self,double rh){return self-rh;})
+                .def("__mul__",[](double self,double rh){return self*rh;})
+                .def("__div__",[](double self,double rh){return self/rh;});
 
         SvarClass::Class<std::string>()
                 .def("__len__",[](Svar self){return self.as<std::string>().size();});
+
+        SvarClass::Class<SvarArray>()
+                .def("__getitem__",[](Svar self,int i){
+            SvarArray& array=self.as<SvarArray>();
+            return array[i];
+        });
+
+        SvarClass::Class<SvarDict>()
+                .def("__getitem__",[](Svar self,Svar key){
+            return self.as<SvarDict>()[key];
+        });
+
+
+        SvarClass::Class<SvarObject>()
+                .def("__getitem__",[](Svar self,Svar key){
+            return self.as<SvarObject>()[key.castAs<std::string>()];
+        });
     }
 
     static int int_create(Svar rh){
