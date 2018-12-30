@@ -48,6 +48,20 @@ using function_signature_t = conditional_t<
     >::type
 >;
 
+template <bool B> using bool_constant = std::integral_constant<bool, B>;
+template <typename T> struct negation : bool_constant<!T::value> { };
+template <bool...> struct bools {};
+template <class... Ts> using all_of = std::is_same<
+    bools<Ts::value..., true>,
+    bools<true, Ts::value...>>;
+template <class... Ts> using any_of = negation<all_of<negation<Ts>...>>;
+template <class... Ts> using none_of = negation<any_of<Ts...>>;
+
+template <class T, template<class> class... Predicates> using satisfies_all_of = all_of<Predicates<T>...>;
+template <class T, template<class> class... Predicates> using satisfies_any_of = any_of<Predicates<T>...>;
+template <class T, template<class> class... Predicates> using satisfies_none_of = none_of<Predicates<T>...>;
+template <typename T> using is_lambda = satisfies_none_of<remove_reference_t<T>,
+        std::is_function, std::is_pointer, std::is_member_pointer>;
 
 #  if __cplusplus >= 201402L
 using std::index_sequence;
@@ -181,8 +195,6 @@ class SvarObject;
 class SvarArray;
 class SvarExeption;
 template <typename T>
-class SvarClass_;
-template <typename T>
 class SvarValue_;
 
 class Svar{
@@ -223,6 +235,22 @@ public:
             int>::type = 0>
     Svar(const V & v) : Svar(std::vector<Svar>(v.begin(), v.end())) {}
 
+    /// Construct a cpp_function from a vanilla function pointer
+    template <typename Return, typename... Args, typename... Extra>
+    Svar(Return (*f)(Args...), const Extra&... extra);
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func, typename... Extra>
+    static Svar lambda(Func &&f, const Extra&... extra);
+
+    /// Construct a cpp_function from a class method (non-const)
+    template <typename Return, typename Class, typename... Arg, typename... Extra>
+    Svar(Return (Class::*f)(Arg...), const Extra&... extra);
+
+    /// Construct a cpp_function from a class method (const)
+    template <typename Return, typename Class, typename... Arg, typename... Extra>
+    Svar(Return (Class::*f)(Arg...) const, const Extra&... extra);
+
     /// Create any other c++ type instance
     template <class T>
     static Svar create(const T & t);
@@ -239,6 +267,12 @@ public:
 
     template <typename T>
     T& as();
+
+    template <typename T>
+    Svar cast()const;
+
+    template <typename T>
+    const T& castAs()const;
 
     std::string typeName()const;
 
@@ -279,6 +313,9 @@ public:
                   !std::is_constructible<Svar,T>::value,int>::type = 0>
     void Set(const T& def);
 
+    template <typename... Args>
+    Svar call(Args... args)const;
+
     Svar operator +(const Svar& rh)const;//__add__
     Svar operator -()const;              //__neg__
     Svar operator *(const Svar& rh)const;//__mul__
@@ -299,6 +336,11 @@ public:
     static Svar& False();
     static Svar& Null();
     static std::string typeName(std::string name);
+
+    template <typename T>
+    static std::string type_id(){
+        return typeName(typeid(T).name());
+    }
 
     template <typename T>
     static std::string toString(const T& v);
@@ -344,7 +386,7 @@ public:
 
 class SvarFunction: public SvarValue{
 public:
-    SvarFunction(){}
+//    SvarFunction(){}
 //    template <typename Func, typename... Args>
 //    SvarFunction(Func&& func,
 //                 Args&&... args){
@@ -388,6 +430,12 @@ public:
         std::vector<Svar> argv = {
                 (Svar::create(std::move(args)))...
         };
+
+        //            if(stack.isArray()) stack.append(this);
+        while(argv.size()!=nargs)
+            throw SvarExeption("Function "+name+":"
+                               +signature+" expect "+Svar::toString(nargs)
+                               +" arguments but obtained "+Svar::toString(argv.size())+".");
         return _func(argv);
     }
 
@@ -402,19 +450,29 @@ public:
         signature<<Svar::typeName(typeid(Return).name());
         doc=signature.str();
         nargs=types.size();
-        _func=[&](Svar args)->Svar{
-            if(args.length()!=nargs)
-                throw SvarExeption("Function "+name+":"
-                                   +Svar::typeName(typeid(Return (*)(Args...)).name())
-                                   +" expect "+Svar::toString(nargs)
-                                   +" arguments but obtained "+Svar::toString(args.length())+".");
-            return Svar::create(f(false));
+        _func=[this,f](Svar args)->Svar{
+            using indices = detail::make_index_sequence<sizeof...(Args)>;
+            return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
         };
+    }
+
+    template <typename Func, typename Return, typename... Args,size_t... Is>
+    detail::enable_if_t<std::is_void<Return>::value, Svar>
+    call_impl(Func&& f,Return (*)(Args...),Svar args,detail::index_sequence<Is...>){
+        f(args[Is].castAs<Args>()...);
+        return Svar::Null();
+    }
+
+    template <typename Func, typename Return, typename... Args,size_t... Is>
+    detail::enable_if_t<!std::is_void<Return>::value, Svar>
+    call_impl(Func&& f,Return (*)(Args...),Svar args,detail::index_sequence<Is...>){
+        return Svar::create<Return>(f(args[Is].castAs<Args>()...));
     }
 
     std::string   name,doc,signature;
     std::uint16_t nargs;
-    Svar          scope,next;
+    Svar          stack,next;
+    bool          is_method;
 
     std::function<Svar(Svar)> _func;
 };
@@ -422,21 +480,91 @@ public:
 class SvarClass: public SvarValue{
 public:
     std::string  __name__;
+    std::type_index _cpptype;
+    SvarClass(const std::string& name,std::type_index cpp_type)
+        : __name__(name),_cpptype(cpp_type){}
+
+    virtual TypeID          cpptype()const{return typeid(SvarClass);}
+    virtual const void*     ptr() const{return this;}
+
+    SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
+    {
+        assert(function.isFunction());
+        Svar& dest=_methods.Get(name);
+        while(dest.isFunction()) dest=dest.as<SvarFunction>().next;
+        dest=function;
+        dest.as<SvarFunction>().is_method=isMethod;
+
+        if(__init__.is<void>()&&name=="__init__") __init__=function;
+        if(__int__.is<void>()&&name=="__int__") __int__=function;
+        if(__double__.is<void>()&&name=="__double__") __double__=function;
+        if(__str__.is<void>()&&name=="__str__") __str__=function;
+        if(__add__.is<void>()&&name=="__add__") __add__=function;
+        if(__sub__.is<void>()&&name=="__sub__") __sub__=function;
+        if(__mul__.is<void>()&&name=="__mul__") __mul__=function;
+        if(__div__.is<void>()&&name=="__div__") __div__=function;
+        if(__mod__.is<void>()&&name=="__mod__") __mod__=function;
+        if(__xor__.is<void>()&&name=="__xor__") __xor__=function;
+        if(__or__.is<void>()&&name=="__or__") __or__=function;
+        if(__and__.is<void>()&&name=="__and__") __and__=function;
+        if(__le__.is<void>()&&name=="__le__") __le__=function;
+        if(__lt__.is<void>()&&name=="__lt__") __lt__=function;
+        if(__ne__.is<void>()&&name=="__ne__") __ne__=function;
+        if(__eq__.is<void>()&&name=="__eq__") __eq__=function;
+        if(__ge__.is<void>()&&name=="__ge__") __ge__=function;
+        if(__gt__.is<void>()&&name=="__gt__") __gt__=function;
+        if(__len__.is<void>()&&name=="__len__") __len__=function;
+        if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
+        if(__setitem__.is<void>()&&name=="__setitem__") __setitem__=function;
+        if(__iter__.is<void>()&&name=="__iter__") __iter__=function;
+        if(__next__.is<void>()&&name=="__next__") __next__=function;
+        return *this;
+    }
+
+    SvarClass& def_static(const std::string& name,const Svar& function)
+    {
+        return def(name,function,false);
+    }
+
+    template <typename Func>
+    SvarClass& def(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),true);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func>
+    SvarClass& def_static(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),false);
+    }
+
+
+    template <typename T>
+    static Svar& instance();
+
+    template <typename T>
+    static SvarClass& Class(){
+        Svar& inst=instance<T>();
+        return inst.as<SvarClass>();
+    }
 
     /// buildin functions
-    Svar __int__,__float__,__str__;
+    Svar __int__,__double__,__str__;
     Svar __init__,__add__,__sub__,__mul__,__div__,__mod__;
     Svar __xor__,__or__,__and__;
     Svar __le__,__lt__,__ne__,__eq__,__ge__,__gt__;
     Svar __len__,__getitem__,__setitem__,__iter__,__next__;
+    Svar _methods,_getters,_setters;
 };
 
+
 template <typename T>
-class SvarClass_
+Svar& SvarClass::instance()
 {
-public:
-    static Svar& Class();
-};
+    static Svar cl;
+    if(cl.isClass()) return cl;
+    cl=(SvarValue*)new SvarClass(Svar::type_id<T>(),typeid(T));
+    return cl;
+}
 
 template <typename T>
 class SvarValue_: public SvarValue{
@@ -445,82 +573,27 @@ public:
 
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return &_var;}
-    virtual const Svar&     classObject()const{return Svar::Null();}
+    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
     virtual bool            equals(const Svar& other) const {
-        LOG(WARNING)<<"Compare between "<<Svar::typeName(typeid(int).name())
-                   <<" and "<<other.typeName()<<" should not happen!";
-        return false;
+        const Svar& clsobj=classObject();
+        if(!clsobj.isClass()) return SvarValue::equals(other);
+        Svar eq_func=clsobj.as<SvarClass>().__eq__;
+        if(!eq_func.isFunction()) return SvarValue::equals(other);
+        Svar ret=eq_func.call(_var,other);
+        assert(ret.is<bool>());
+        return ret.as<bool>();
     }
     virtual bool            less(const Svar& other) const {
-        LOG(WARNING)<<"Compare between "<<Svar::typeName(typeid(int).name())
-                   <<" and "<<other.typeName()<<" should not happen!";
-        return false;
+        const Svar& clsobj=classObject();
+        if(!clsobj.isClass()) return SvarValue::less(other);
+        Svar lt_func=clsobj.as<SvarClass>().__lt__;
+        if(!lt_func.isFunction()) return SvarValue::less(other);
+        Svar ret=lt_func.call(_var,other);
+        assert(ret.is<bool>());
+        return ret.as<bool>();
     }
 
     T _var;
-};
-
-template <>
-class SvarValue_<int>: public SvarValue{
-public:
-    SvarValue_<int>(const int& v):_var(v){}
-
-    virtual TypeID          cpptype()const{return typeid(int);}
-    virtual const void*     ptr() const{return &_var;}
-    virtual const Svar&     classObject()const{return Svar::Null();}
-    virtual bool            equals(const Svar& other) const {
-        if(other.is<int>()) return other.as<int>()==_var;
-        if(other.is<double>()) return other.as<double>()==_var;
-        return SvarValue::equals(other);
-    }
-    virtual bool            less(const Svar& other) const {
-        if(other.is<int>()) return other.as<int>()<_var;
-        if(other.is<double>()) return other.as<double>()<_var;
-        return SvarValue::less(other);
-    }
-
-    int _var;
-};
-
-template <>
-class SvarValue_<double>: public SvarValue{
-public:
-    SvarValue_<double>(const double& v):_var(v){}
-
-    virtual TypeID          cpptype()const{return typeid(double);}
-    virtual const void*     ptr() const{return &_var;}
-    virtual const Svar&     classObject()const{return Svar::Null();}
-    virtual bool            equals(const Svar& other) const {
-        if(other.is<int>()) return other.as<int>()==_var;
-        if(other.is<double>()) return other.as<double>()==_var;
-        return SvarValue::equals(other);
-    }
-    virtual bool            less(const Svar& other) const {
-        if(other.is<int>()) return other.as<int>()<_var;
-        if(other.is<double>()) return other.as<double>()<_var;
-        return SvarValue::less(other);
-    }
-    double _var;
-};
-
-template <>
-class SvarValue_<std::string>: public SvarValue{
-public:
-    SvarValue_<std::string>(const std::string& v):_var(v){}
-
-    virtual TypeID          cpptype()const{return typeid(std::string);}
-    virtual const void*     ptr() const{return &_var;}
-    virtual const Svar&     classObject()const{return Svar::Null();}
-    virtual bool            equals(const Svar& other) const {
-        if(other.is<std::string>()) return other.as<std::string>()==_var;
-        return SvarValue::equals(other);
-    }
-    virtual bool            less(const Svar& other) const {
-        if(other.is<std::string>()) return other.as<std::string>()<_var;
-        return SvarValue::less(other);
-    }
-
-    std::string _var;
 };
 
 class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
@@ -550,6 +623,7 @@ public:
     virtual std::mutex*     accessMutex()const{return &_mutex;}
     virtual Svar& operator[](size_t i) {
         std::unique_lock<std::mutex> lock(_mutex);
+        if(i<_var.size()) return _var[i];
         return Svar::Null();
     }
     mutable std::mutex _mutex;
@@ -620,10 +694,37 @@ inline bool Svar::fromString<bool>(const std::string& str) {
   return true;
 }
 
+template <typename Return, typename... Args, typename... Extra>
+Svar::Svar(Return (*f)(Args...), const Extra&... extra)
+    :_obj(std::make_shared<SvarFunction>(f,extra...)){}
+
+/// Construct a cpp_function from a lambda function (possibly with internal state)
+template <typename Func, typename... Extra>
+Svar Svar::lambda(Func &&f, const Extra&... extra)
+{
+    return Svar(((SvarValue*)new SvarFunction(f,extra...)));
+}
+
+/// Construct a cpp_function from a class method (non-const)
+template <typename Return, typename Class, typename... Arg, typename... Extra>
+Svar::Svar(Return (Class::*f)(Arg...), const Extra&... extra)
+    :_obj(std::make_shared<SvarFunction>(f,extra...)){}
+
+/// Construct a cpp_function from a class method (const)
+template <typename Return, typename Class, typename... Arg, typename... Extra>
+Svar::Svar(Return (Class::*f)(Arg...) const, const Extra&... extra)
+    :_obj(std::make_shared<SvarFunction>(f,extra...)){}
+
 template <class T>
 inline Svar Svar::create(const T & t)
 {
     return (SvarValue*)new SvarValue_<T>(t);
+}
+
+template <>
+inline Svar Svar::create(const Svar & t)
+{
+    return t;
 }
 
 inline Svar::Svar(const std::string& m)
@@ -659,10 +760,52 @@ inline const T& Svar::as()const{
     return *(T*)_obj->ptr();
 }
 
+template <>
+inline const Svar& Svar::as<Svar>()const{
+    return *this;
+}
+
 template <typename T>
 T& Svar::as(){
     assert(is<T>());
     return *(T*)_obj->ptr();
+}
+
+template <typename T>
+Svar Svar::cast()const{
+    if(is<T>()) return (*this);
+
+    Svar cl=_obj->classObject();
+    if(cl.isClass()){
+        SvarClass& srcClass=cl.as<SvarClass>();
+        Svar cvt=srcClass._methods["__"+type_id<T>()+"__"];
+        if(cvt.isFunction()){
+            Svar ret=cvt.call(*this);
+            if(ret.is<T>()) return ret;
+        }
+    }
+
+    SvarClass& destClass=SvarClass::instance<T>().as<SvarClass>();
+    if(destClass.__init__.isFunction()){
+        Svar ret=destClass.__init__.call(*this);
+        if(ret.is<T>()) return ret;
+    }
+
+    return Null();
+}
+
+template <typename T>
+const T& Svar::castAs()const
+{
+    auto ret=cast<T>();
+    if(!ret.is<T>())
+        throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
+    return ret.as<T>();// let compiler happy
+}
+
+template <>
+const Svar& Svar::castAs<Svar>()const{
+    return *this;
 }
 
 inline std::string Svar::typeName()const{
@@ -739,6 +882,13 @@ void Svar::Set(const T& def){
     else (*this)=Svar::create(def);
 }
 
+
+template <typename... Args>
+Svar Svar::call(Args... args)const
+{
+    return as<SvarFunction>().call(args...);
+}
+
 bool Svar::operator ==(const Svar& rh)const{
     return _obj->equals(rh);
 }
@@ -766,13 +916,13 @@ inline std::string Svar::typeName(std::string name) {
   static std::map<std::string, std::string> decode = {
       {typeid(int32_t).name(), "int32_t"},
       {typeid(int64_t).name(), "int64_t"},
-      {typeid(uint32_t).name(), "uint32_t"},
+      {typeid(uint32_t).name(), "int"},
       {typeid(uint64_t).name(), "uint64_t"},
       {typeid(u_char).name(), "u_char"},
       {typeid(char).name(), "char"},
       {typeid(float).name(), "float"},
       {typeid(double).name(), "double"},
-      {typeid(std::string).name(), "string"},
+      {typeid(std::string).name(), "str"},
       {typeid(bool).name(), "bool"},
   };
   auto it = decode.find(name);
@@ -792,6 +942,48 @@ inline Svar& SvarValue::operator[](size_t i) {
 //        return cl.__getitem__.as<SvarFunction>().call(i);
     return Svar::Null();
 }
+
+class SvarBuildin{
+public:
+    SvarBuildin(){
+        SvarClass::Class<int>()
+                .def("__init__",&SvarBuildin::int_create)
+                .def("__double__",&SvarBuildin::int_to_double)
+                .def("__bool__",[](int i){return (bool)i;})
+                .def("__str__",[](int i){return Svar::toString(i);})
+                .def("__eq__",&SvarBuildin::int_equal)
+                .def("__lt__",&SvarBuildin::int_less);
+
+        SvarClass::Class<bool>()
+                .def("__int__",[](bool b){return (int)b;})
+                .def("__double__",[](bool b){return (double)b;})
+                .def("__str__",[](bool b){return Svar::toString(b);});
+
+        SvarClass::Class<double>()
+                .def("__int__",[](double d){return (int)d;})
+                .def("__bool__",[](double d){return (bool)d;})
+                .def("__str__",[](double d){return Svar::toString(d);})
+                .def("__eq__",[](double self,double rh){return self==rh;})
+                .def("__lt__",[](double self,double rh){return self<rh;});
+
+        SvarClass::Class<std::string>()
+                .def("__len__",[](Svar self){return self.as<std::string>().size();});
+    }
+
+    static int int_create(Svar rh){
+        if(rh.is<int>()) return rh.as<int>();
+        if(rh.is<std::string>()) return Svar::fromString<int>(rh.as<std::string>());
+        if(rh.is<double>()) return (int)rh.as<double>();
+        if(rh.is<bool>()) return (int)rh.as<bool>();
+
+        throw SvarExeption("Can't construct int from "+rh.typeName()+".");
+        return rh.as<int>();
+    }
+
+    static double int_to_double(int i){return (double)i;}
+    static bool int_equal(int i,Svar v){return v.castAs<int>()==i;}
+    static bool int_less(int i,Svar v){return i<v.castAs<int>();}
+}SvarBuildinInitializerinstance;
 
 
 }
