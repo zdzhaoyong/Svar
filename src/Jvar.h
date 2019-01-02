@@ -386,8 +386,8 @@ public:
     virtual size_t          length() const {return 0;}
     virtual std::mutex*     accessMutex()const{return nullptr;}
 
-    virtual Svar& operator[](size_t i) {return Svar::Undefined();}
-    virtual Svar& operator[](const std::string &key) {return Svar::Undefined();}
+    virtual Svar& operator[](size_t ) {return Svar::Undefined();}
+    virtual Svar& operator[](const std::string &) {return Svar::Undefined();}
 };
 
 class SvarExeption: public std::exception{
@@ -442,7 +442,7 @@ public:
     }
 
     virtual TypeID          cpptype()const{return typeid(SvarFunction);}
-    virtual const void*     ptr() const{return this;}    
+    virtual const void*     ptr() const{return this;}
     virtual const Svar&     classObject()const;
 
     template <typename... Args>
@@ -493,7 +493,7 @@ public:
     {
         std::vector<std::type_index> types={typeid(Args)...};
         std::stringstream signature;signature<<"(";
-        for(int i=0;i<types.size();i++)
+        for(size_t i=0;i<types.size();i++)
             signature<<Svar::typeName(types[i].name())<<(i+1==types.size()?")->":",");
         signature<<Svar::typeName(typeid(Return).name());
         this->signature=signature.str();
@@ -717,11 +717,29 @@ public:
     friend std::ostream& operator<<(std::ostream& ost,const SvarArray& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
         ost<<"[";
-        for(int i=0;i<rh._var.size();++i)
+        for(size_t i=0;i<rh._var.size();++i)
             ost<<rh._var[i]<<(i+1==rh._var.size()?"":",");
         ost<<"]";
         return ost;
     }
+
+    Svar operator+(Svar other){
+        std::unique_lock<std::mutex> lock(_mutex);
+        std::vector<Svar> ret=_var;
+        if(other.isArray()){
+            SvarArray& rh=other.as<SvarArray>();
+            std::unique_lock<std::mutex> lock(rh._mutex);
+            ret.insert(ret.end(),rh._var.begin(),rh._var.end());
+        }
+        else ret.push_back(other);
+        return Svar::Array(ret);
+    }
+
+    void append(Svar other){
+        std::unique_lock<std::mutex> lock(_mutex);
+        _var.push_back(other);
+    }
+
     mutable std::mutex _mutex;
 };
 
@@ -988,7 +1006,6 @@ T& Svar::Get(const std::string& name,T def){
         return var.Get(typeName(typeid(T).name()),def);
     }
 
-    if(var.is<std::string>());
     var=Svar::create(def);
     return var.as<T>();
 }
@@ -1292,7 +1309,7 @@ public:
                     Svar arrObj=iter.Get("array");
                     SvarArray& array=arrObj.as<SvarArray>();
                     int& index=iter.Get<int>("index",0);
-                    if(index<array.length()){
+                    if(index<(int)array.length()){
                         return array[index++];
                     }
                     throw SvarIterEnd();
@@ -1305,7 +1322,11 @@ public:
             std::cerr<<"iter:"<<iter;
             iter.as<SvarObject>()._class=arrayinteratorClass;
             return iter;
-        });
+        })
+        .def("__add__",[](Svar self,Svar other){
+            return self.as<SvarArray>()+other;
+        })
+        .def("append",&SvarArray::append);
 
         SvarClass::Class<SvarDict>()
                 .def("__getitem__",[](Svar self,Svar key){
