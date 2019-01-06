@@ -703,6 +703,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
+        if(rh._var.empty()) {
+            ost<<"{}";return ost;
+        }
         ost<<"\n{\n";
         std::stringstream context;
         for(auto it=rh._var.begin();it!=rh._var.end();it++)
@@ -735,6 +738,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarArray& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
+        if(rh._var.empty()) {
+            ost<<"[]";return ost;
+        }
         ost<<"[\n";
         std::stringstream context;
         for(size_t i=0;i<rh._var.size();++i)

@@ -1,7 +1,6 @@
 //#include "Svar.h"
 #include "Jvar.h"
 #include "gtest.h"
-#include <GSLAM/core/VecParament.h>
 #include <GSLAM/core/Timer.h>
 
 using namespace GSLAM;
@@ -158,7 +157,7 @@ int main(int argc,char** argv){
     testInt=30;
     EXPECT_EQ(var.GetInt("child.testInt"),30);
 
-    GSLAM::VecParament<std::string> unParsed=svar.ParseMain(argc,argv);
+    Svar unParsed=svar.ParseMain(argc,argv);
     svar.arg<int>("argInt",100,"this is a sample int argument");
     svar.arg<double>("argDouble",100.,"this is a sample double argument");
     svar.arg<std::string>("argString","hello","Sample string argument");
