@@ -31,8 +31,9 @@ TEST(Svar,GetSet){
     EXPECT_EQ(testInt,20);
     testInt=30;
     EXPECT_EQ(var.GetInt("child.testInt"),30);
-    var.Set("child.testInt",40);
+    var.set("child.testInt",40);
     EXPECT_EQ(testInt,40);
+    EXPECT_EQ(var["child"]["testInt"],40);
 }
 
 std::string add(std::string left,const std::string& r){
@@ -129,18 +130,15 @@ TEST(Svar,Iterator){
 
 TEST(Svar,Thread){
     auto readThread=[](){
-        while(!svar.Get<bool>("shouldstop",false)){
-            double& d=svar.Get<double>("thread.Double",100);
+        while(!svar.get<bool>("shouldstop",false)){
+            double& d=svar.get<double>("thread.Double",100);
             usleep(1);
         }
     };
     auto writeThread=[](){
-        svar.Set<double>("thread.Double",svar.GetDouble("thread.Double")++);
-        while(!svar.Get<bool>("shouldstop",false)){
-            double& d=svar.Get<double>("thread.Double",100);
-            svar.Set<double>("thread.Double",svar.GetDouble("thread.Double")++);
-            d=0;
-            double* ptr=&svar.Get<double>("thread.Double",100);
+        svar.set<double>("thread.Double",svar.GetDouble("thread.Double")++);
+        while(!svar.get<bool>("shouldstop",false)){
+            svar.set<int>("thread.Double",10);// use int instead of double to violately testing robustness
             usleep(1);
         }
     };
@@ -148,7 +146,7 @@ TEST(Svar,Thread){
     for(int i=0;i<svar.GetInt("readThreads",4);i++) threads.push_back(std::thread(readThread));
     for(int i=0;i<svar.GetInt("writeThreads",4);i++) threads.push_back(std::thread(writeThread));
     sleep(1);
-    svar.Set("shouldstop",true);
+    svar.set("shouldstop",true);
     for(auto& it:threads) it.join();
 }
 
@@ -161,12 +159,12 @@ int main(int argc,char** argv){
     EXPECT_EQ(var.GetInt("child.testInt"),30);
 
     GSLAM::VecParament<std::string> unParsed=svar.ParseMain(argc,argv);
-    svar.Arg<int>("argInt",100,"this is a sample int argument");
-    svar.Arg<double>("argDouble",100.,"this is a sample double argument");
-    svar.Arg<std::string>("argString","hello","Sample string argument");
-    svar.Arg<bool>("argBool",false,"Sample bool argument");
-    svar.Arg<bool>("child.bool",true,"Child bool");
-    if(svar.Get<bool>("help",false)){
+    svar.arg<int>("argInt",100,"this is a sample int argument");
+    svar.arg<double>("argDouble",100.,"this is a sample double argument");
+    svar.arg<std::string>("argString","hello","Sample string argument");
+    svar.arg<bool>("argBool",false,"Sample bool argument");
+    svar.arg<bool>("child.bool",true,"Child bool");
+    if(svar.get<bool>("help",false)){
         svar.help();
         return 0;
     }

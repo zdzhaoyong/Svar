@@ -77,82 +77,6 @@ template<size_t ...S> struct make_index_sequence_impl <0, S...> { typedef index_
 template<size_t N> using make_index_sequence = typename make_index_sequence_impl<N>::type;
 #endif
 
-/* Concatenate type signatures at compile time */
-template <size_t N, typename... Ts>
-struct descr {
-    char text[N + 1];
-
-    constexpr descr() : text{'\0'} { }
-    constexpr descr(char const (&s)[N+1]) : descr(s, make_index_sequence<N>()) { }
-
-    template <size_t... Is>
-    constexpr descr(char const (&s)[N+1], index_sequence<Is...>) : text{s[Is]..., '\0'} { }
-
-    template <typename... Chars>
-    constexpr descr(char c, Chars... cs) : text{c, static_cast<char>(cs)..., '\0'} { }
-
-    static constexpr std::array<const std::type_info *, sizeof...(Ts) + 1> types() {
-        return {{&typeid(Ts)..., nullptr}};
-    }
-};
-
-template <size_t N1, size_t N2, typename... Ts1, typename... Ts2, size_t... Is1, size_t... Is2>
-constexpr descr<N1 + N2, Ts1..., Ts2...> plus_impl(const descr<N1, Ts1...> &a, const descr<N2, Ts2...> &b,
-                                                   index_sequence<Is1...>, index_sequence<Is2...>) {
-    return {a.text[Is1]..., b.text[Is2]...};
-}
-
-template <size_t N1, size_t N2, typename... Ts1, typename... Ts2>
-constexpr descr<N1 + N2, Ts1..., Ts2...> operator+(const descr<N1, Ts1...> &a, const descr<N2, Ts2...> &b) {
-    return plus_impl(a, b, make_index_sequence<N1>(), make_index_sequence<N2>());
-}
-
-template <size_t N>
-constexpr descr<N - 1> _(char const(&text)[N]) { return descr<N - 1>(text); }
-constexpr descr<0> _(char const(&)[1]) { return {}; }
-
-template <size_t Rem, size_t... Digits> struct int_to_str : int_to_str<Rem/10, Rem%10, Digits...> { };
-template <size_t...Digits> struct int_to_str<0, Digits...> {
-    static constexpr auto digits = descr<sizeof...(Digits)>(('0' + Digits)...);
-};
-
-// Ternary description (like std::conditional)
-template <bool B, size_t N1, size_t N2>
-constexpr enable_if_t<B, descr<N1 - 1>> _(char const(&text1)[N1], char const(&)[N2]) {
-    return _(text1);
-}
-template <bool B, size_t N1, size_t N2>
-constexpr enable_if_t<!B, descr<N2 - 1>> _(char const(&)[N1], char const(&text2)[N2]) {
-    return _(text2);
-}
-
-template <bool B, typename T1, typename T2>
-constexpr enable_if_t<B, T1> _(const T1 &d, const T2 &) { return d; }
-template <bool B, typename T1, typename T2>
-constexpr enable_if_t<!B, T2> _(const T1 &, const T2 &d) { return d; }
-
-template <size_t Size> auto constexpr _() -> decltype(int_to_str<Size / 10, Size % 10>::digits) {
-    return int_to_str<Size / 10, Size % 10>::digits;
-}
-
-template <typename Type> constexpr descr<1, Type> _() { return {'%'}; }
-
-constexpr descr<0> concat() { return {}; }
-
-template <size_t N, typename... Ts>
-constexpr descr<N, Ts...> concat(const descr<N, Ts...> &descr) { return descr; }
-
-template <size_t N, typename... Ts, typename... Args>
-constexpr auto concat(const descr<N, Ts...> &d, const Args &...args)
-    -> decltype(std::declval<descr<N + 2, Ts...>>() + concat(args...)) {
-    return d + _(", ") + concat(args...);
-}
-
-template <size_t N, typename... Ts>
-constexpr descr<N + 2, Ts...> type_descr(const descr<N, Ts...> &descr) {
-    return _("{") + descr + _("}");
-}
-
 typedef char yes;
 typedef char (&no)[2];
 
@@ -267,12 +191,12 @@ public:
     static Svar lambda(Func &&f, const Extra&... extra);
 
     /// Construct a cpp_function from a class method (non-const)
-    template <typename Return, typename Class, typename... Arg, typename... Extra>
-    Svar(Return (Class::*f)(Arg...), const Extra&... extra);
+    template <typename Return, typename Class, typename... arg, typename... Extra>
+    Svar(Return (Class::*f)(arg...), const Extra&... extra);
 
     /// Construct a cpp_function from a class method (const)
-    template <typename Return, typename Class, typename... Arg, typename... Extra>
-    Svar(Return (Class::*f)(Arg...) const, const Extra&... extra);
+    template <typename Return, typename Class, typename... arg, typename... Extra>
+    Svar(Return (Class::*f)(arg...) const, const Extra&... extra);
 
     /// Create any other c++ type instance, T need to be a copyable type
     template <class T>
@@ -295,7 +219,8 @@ public:
     template <typename T>
     const T&   as()const;
 
-    /// Return the value as type T, TAKE CARE when using this
+    /// Return the value as type T, TAKE CARE when using this.
+    /// The Svar should be hold during operations of the value.
     template <typename T>
     T& as();
 
@@ -344,30 +269,30 @@ public:
     size_t                  length() const;
 
     /// When this is an object, return the element named "name", return Undefined when failed
-    Svar Get(const std::string& name)const;
+    Svar get(const std::string& name)const;
 
     /// Force to return the children as type T, cast is performed,
     /// otherwise the old value will be droped and set to the value "def"
     template <typename T>
-    T& Get(const std::string& name,T def);
-    int& GetInt(const std::string& name,int def=0){return Get<int>(name,def);}
-    double& GetDouble(const std::string& name,double def=0){return Get<double>(name,def);}
-    std::string& GetString(const std::string& name,std::string def=""){return Get<std::string>(name,def);}
-    void*& GetPointer(const std::string& name,void* def=nullptr){return Get<void*>(name,def);}
+    T& get(const std::string& name,T def);
+    int& GetInt(const std::string& name,int def=0){return get<int>(name,def);}
+    double& GetDouble(const std::string& name,double def=0){return get<double>(name,def);}
+    std::string& GetString(const std::string& name,std::string def=""){return get<std::string>(name,def);}
+    void*& GetPointer(const std::string& name,void* def=nullptr){return get<void*>(name,def);}
 
     /// Set the child "name" to "create<T>(def)"
     template <typename T>
-    void Set(const std::string& name,const T& def);
+    void set(const std::string& name,const T& def);
 
     /// Set to "Svar(def)" when T is constructible
     template <typename T, typename std::enable_if<
                   std::is_constructible<Svar,T>::value,int>::type = 0>
-    void Set(const T& def);
+    void set(const T& def);
 
     /// Set to "create<T>(def)" when T is not constructible
     template <typename T, typename std::enable_if<
                   !std::is_constructible<Svar,T>::value,int>::type = 0>
-    void Set(const T& def);
+    void set(const T& def);
 
     /// Append item when this is an array
     void push_back(const Svar& rh);
@@ -394,7 +319,7 @@ public:
 
     /// Register default required arguments
     template <typename T>
-    T& Arg(const std::string& name, T def, const std::string& help);
+    T& arg(const std::string& name, T def, const std::string& help);
 
     /// Format print version, usages and arguments as string
     std::string helpInfo();
@@ -452,7 +377,8 @@ public:
     /// Return the raw holder
     const std::shared_ptr<SvarValue>& value()const{return _obj;}
 
-    Svar& GetOrCreate(const std::string& name);// FIXME: Not thread safe
+    /// This is dangerous since the returned Svar may be free by other threads, TAKE CARE!
+    Svar& getOrCreate(const std::string& name);// FIXME: Not thread safe
 
     std::shared_ptr<SvarValue> _obj;
 };
@@ -636,7 +562,7 @@ public:
     SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
         assert(function.isFunction());
-        Svar& dest=_methods.GetOrCreate(name);
+        Svar& dest=_methods.getOrCreate(name);
         while(dest.isFunction()) dest=dest.as<SvarFunction>().next;
         dest=function;
         dest.as<SvarFunction>().is_method=isMethod;
@@ -777,11 +703,14 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
-        ost<<"{";
+        ost<<"\n{\n";
+        std::stringstream context;
         for(auto it=rh._var.begin();it!=rh._var.end();it++)
         {
-            ost<<(it==rh._var.begin()?"":",\n")<<Svar(it->first)<<" : "<<it->second;
+            context<<(it==rh._var.begin()?"":",\n")<<Svar(it->first)<<" : "<<it->second;
         }
+        std::string line;
+        while(std::getline(context,line)) ost<<"  "<<line<<std::endl;
         ost<<"}";
         return ost;
     }
@@ -806,9 +735,12 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarArray& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
-        ost<<"[";
+        ost<<"[\n";
+        std::stringstream context;
         for(size_t i=0;i<rh._var.size();++i)
-            ost<<rh._var[i]<<(i+1==rh._var.size()?"":",");
+            context<<rh._var[i]<<(i+1==rh._var.size()?"\n":",\n");
+        std::string line;
+        while(std::getline(context,line)) ost<<"  "<<line<<std::endl;
         ost<<"]";
         return ost;
     }
@@ -1083,42 +1015,42 @@ Svar Svar::operator[](const Svar& i) const{
 }
 
 template <typename T>
-T& Svar::Get(const std::string& name,T def){
+T& Svar::get(const std::string& name,T def){
     auto idx = name.find(".");
     if (idx != std::string::npos) {
-      return GetOrCreate(name.substr(0, idx)).Get(name.substr(idx + 1), def);
+      return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def);
     }
     Svar var;
 
     if(isUndefined())
-        Set(object());
-    else var=Get(name);
+        set(object());
+    else var=get(name);
 
     if(var.is<T>()) return var.as<T>();
 
     if(!var.isUndefined()){
         Svar casted=var.cast<T>();
         if(casted.is<T>()){
-            var.Set(casted);
+            var.set(casted);
         }
     }
     else
         var=Svar::create(def);
-    Set(name,var);// value type changed
+    set(name,var);// value type changed
 
     return var.as<T>();
 }
 
-Svar Svar::Get(const std::string& name) const {
+Svar Svar::get(const std::string& name) const {
     if(!isObject())
         throw SvarExeption("Svar::Get can only be called with an object, got "+ typeName());
     return as<SvarObject>()[name];
 }
 
-Svar& Svar::GetOrCreate(const std::string& name)
+Svar& Svar::getOrCreate(const std::string& name)
 {
     if(isUndefined()) {
-        Set(object());
+        set(object());
     }
     if(!isObject())
         throw SvarExeption("Svar::Get can only be called with an object, got "+ typeName());
@@ -1136,23 +1068,23 @@ Svar& Svar::GetOrCreate(const std::string& name)
 }
 
 template <typename T>
-inline void Svar::Set(const std::string& name,const T& def){
+inline void Svar::set(const std::string& name,const T& def){
     auto idx = name.find(".");
     if (idx != std::string::npos) {
-      return GetOrCreate(name.substr(0, idx)).Set(name.substr(idx + 1), def);
+      return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
     }
     if(isUndefined()){
-        Set(object({{name,Svar::create(def)}}));
+        set(object({{name,Svar::create(def)}}));
         return;
     }
-    Svar var=Get(name);
+    Svar var=get(name);
     if(var.is<T>()) {var.as<T>()=def;return;}
     as<SvarObject>().set(name,Svar::create(def));
 }
 
 template <typename T, typename std::enable_if<
               std::is_constructible<Svar,T>::value,int>::type>
-void Svar::Set(const T& def)
+void Svar::set(const T& def)
 {
     if(is<T>()) as<T>()=def;
     else (*this)=Svar(def);
@@ -1160,7 +1092,7 @@ void Svar::Set(const T& def)
 
 template <typename T, typename std::enable_if<
               !std::is_constructible<Svar,T>::value,int>::type>
-void Svar::Set(const T& def){
+void Svar::set(const T& def){
     if(is<T>()) as<T>()=def;
     else (*this)=Svar::create(def);
 }
@@ -1175,7 +1107,7 @@ void Svar::push_back(const Svar& rh)
 template <typename... Args>
 Svar Svar::call(const std::string function, Args... args)const
 {
-    return Get(function)(args...);
+    return get(function)(args...);
 }
 
 template <typename... Args>
@@ -1198,14 +1130,14 @@ Svar& Svar::def(const std::string& name,Svar funcOrClass)
         funcOrClass.as<SvarFunction>().initName(name);
         Svar old=(*this)[name];
         if(!old.isFunction()){
-            Set(name,funcOrClass);
+            set(name,funcOrClass);
         }else{
             SvarFunction& oldF=old.as<SvarFunction>();
             oldF.next=funcOrClass;
         }
     }
     else if(funcOrClass.isClass()){
-        Set(name,funcOrClass);
+        set(name,funcOrClass);
     }
     else throw SvarExeption("Svar::def can only define a function or class.");
     return *this;
@@ -1251,7 +1183,7 @@ inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
           } else
             val = "";
 
-          Set(var, val);
+          set(var, val);
           return true;
         }
       }
@@ -1278,17 +1210,17 @@ inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
     }
 
     if (i + 1 >= argc) {
-      Set(str, true);
+      set(str, true);
       continue;
     }
     string str2 = argv[i + 1];
     if (str2.front() == '-') {
-      Set(str, true);
+      set(str, true);
       continue;
     }
 
     i++;
-    Set<std::string>(str, argv[i]);
+    set<std::string>(str, argv[i]);
     continue;
   }
 
@@ -1307,12 +1239,12 @@ inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
 }
 
 template <typename T>
-T& Svar::Arg(const std::string& name, T def, const std::string& help) {
+T& Svar::arg(const std::string& name, T def, const std::string& help) {
     Svar argInfo=array({name,Svar::create(def),help});
-    Svar& args=(*this).operator[]("__builtin__").GetOrCreate("args");
-    if(!args.isArray()) args.Set(array());
+    Svar& args=(*this).operator[]("__builtin__").getOrCreate("args");
+    if(!args.isArray()) args.set(array());
     args.push_back(argInfo);
-    return Get(name,def);
+    return get(name,def);
 }
 
 std::string Svar::helpInfo()
@@ -1338,10 +1270,10 @@ std::string Svar::helpInfo()
         "several argument introductions.\n";
     sst << printTable({{width, desc}});
 
-    Arg<std::string>("conf", "Default.cfg",
+    arg<std::string>("conf", "Default.cfg",
                      "The default configure file going to parse.");
-    Arg<bool>("help", false, "Show the help information.");
-    Svar& args=(*this).operator[]("__builtin__").GetOrCreate("args");
+    arg<bool>("help", false, "Show the help information.");
+    Svar& args=(*this).operator[]("__builtin__").getOrCreate("args");
     if(!args.isArray()) return "";
 
     sst << printTable({{namePartWidth, "Argument"},
@@ -1354,7 +1286,7 @@ std::string Svar::helpInfo()
       Svar info=args[i];
       std::stringstream defset;
       Svar def    = info[1];
-      Svar setted = Get(info[0].castAs<std::string>());
+      Svar setted = get(info[0].castAs<std::string>());
       if(setted.isUndefined()||def==setted) defset<<def;
       else defset<<def<<"->"<<setted;
       std::string name = "-" + info[0].castAs<std::string>();
@@ -1459,7 +1391,7 @@ std::ostream& operator <<(std::ostream& ost,const Svar& self)
         ost<<cls->__str__(self).as<std::string>();
         return ost;
     }
-    ost<<"["<<self.typeName()<<": at "<<self.value()->ptr()<<"]";
+    ost<<"<"<<self.typeName()<<" at "<<self.value()->ptr()<<">";
     return ost;
 }
 
@@ -1632,9 +1564,9 @@ public:
                 SvarClass* cls=new SvarClass("arrayiterator",typeid(SvarObject));
                 arrayinteratorClass=(SvarValue*)cls;
                 cls->def("next",[](Svar iter){
-                    Svar arrObj=iter.Get("array");
+                    Svar arrObj=iter.get("array");
                     SvarArray& array=arrObj.as<SvarArray>();
-                    int& index=iter.Get<int>("index",0);
+                    int& index=iter.get<int>("index",0);
                     if(index<(int)array.length()){
                         return array[index++];
                     }
@@ -1670,13 +1602,13 @@ public:
         SvarClass::Class<SvarClass>()
                 .def("__str__",[](Svar self){return Svar::toString(self.as<SvarClass>());});
 
-        Svar::instance().Set("__builtin__.int",SvarClass::instance<int>());
-        Svar::instance().Set("__builtin__.double",SvarClass::instance<double>());
-        Svar::instance().Set("__builtin__.int",SvarClass::instance<bool>());
-        Svar::instance().Set("__builtin__.str",SvarClass::instance<std::string>());
-        Svar::instance().Set("__builtin__.dict",SvarClass::instance<SvarDict>());
-        Svar::instance().Set("__builtin__.object",SvarClass::instance<SvarObject>());
-        Svar::instance().Set("__builtin__.array",SvarClass::instance<SvarArray>());
+        Svar::instance().set("__builtin__.int",SvarClass::instance<int>());
+        Svar::instance().set("__builtin__.double",SvarClass::instance<double>());
+        Svar::instance().set("__builtin__.int",SvarClass::instance<bool>());
+        Svar::instance().set("__builtin__.str",SvarClass::instance<std::string>());
+        Svar::instance().set("__builtin__.dict",SvarClass::instance<SvarDict>());
+        Svar::instance().set("__builtin__.object",SvarClass::instance<SvarObject>());
+        Svar::instance().set("__builtin__.array",SvarClass::instance<SvarArray>());
     }
 
     static Svar int_create(Svar rh){
@@ -1726,6 +1658,415 @@ public:
     }
 
 }SvarBuildinInitializerinstance;
+
+/* JsonParser
+ *
+ * Object that tracks all state of an in-progress parse.
+ */
+struct JsonParser final {
+    typedef Svar Json;
+    enum JsonParse {
+        STANDARD, COMMENTS
+    };
+    /* State
+     */
+    const std::string &str;
+    size_t i;
+    std::string &err;
+    bool failed;
+    const JsonParse strategy;
+    const int max_depth = 200;
+
+    /* fail(msg, err_ret = Json())
+     *
+     * Mark this parse as failed.
+     */
+    Json fail(std::string &&msg) {
+        return fail(move(msg), Json());
+    }
+
+    template <typename T>
+    T fail(std::string &&msg, const T err_ret) {
+        if (!failed)
+            err = std::move(msg);
+        failed = true;
+        return err_ret;
+    }
+
+    /* consume_whitespace()
+     *
+     * Advance until the current character is non-whitespace.
+     */
+    void consume_whitespace() {
+        while (str[i] == ' ' || str[i] == '\r' || str[i] == '\n' || str[i] == '\t')
+            i++;
+    }
+
+    /* consume_comment()
+     *
+     * Advance comments (c-style inline and multiline).
+     */
+    bool consume_comment() {
+      bool comment_found = false;
+      if (str[i] == '/') {
+        i++;
+        if (i == str.size())
+          return fail("unexpected end of input after start of comment", false);
+        if (str[i] == '/') { // inline comment
+          i++;
+          // advance until next line, or end of input
+          while (i < str.size() && str[i] != '\n') {
+            i++;
+          }
+          comment_found = true;
+        }
+        else if (str[i] == '*') { // multiline comment
+          i++;
+          if (i > str.size()-2)
+            return fail("unexpected end of input inside multi-line comment", false);
+          // advance until closing tokens
+          while (!(str[i] == '*' && str[i+1] == '/')) {
+            i++;
+            if (i > str.size()-2)
+              return fail(
+                "unexpected end of input inside multi-line comment", false);
+          }
+          i += 2;
+          comment_found = true;
+        }
+        else
+          return fail("malformed comment", false);
+      }
+      return comment_found;
+    }
+
+    /* consume_garbage()
+     *
+     * Advance until the current character is non-whitespace and non-comment.
+     */
+    void consume_garbage() {
+      consume_whitespace();
+      if(strategy == JsonParse::COMMENTS) {
+        bool comment_found = false;
+        do {
+          comment_found = consume_comment();
+          if (failed) return;
+          consume_whitespace();
+        }
+        while(comment_found);
+      }
+    }
+
+    /* get_next_token()
+     *
+     * Return the next non-whitespace character. If the end of the input is reached,
+     * flag an error and return 0.
+     */
+    char get_next_token() {
+        consume_garbage();
+        if (failed) return (char)0;
+        if (i == str.size())
+            return fail("unexpected end of input", (char)0);
+
+        return str[i++];
+    }
+
+    /* encode_utf8(pt, out)
+     *
+     * Encode pt as UTF-8 and add it to out.
+     */
+    void encode_utf8(long pt, std::string & out) {
+        if (pt < 0)
+            return;
+
+        if (pt < 0x80) {
+            out += static_cast<char>(pt);
+        } else if (pt < 0x800) {
+            out += static_cast<char>((pt >> 6) | 0xC0);
+            out += static_cast<char>((pt & 0x3F) | 0x80);
+        } else if (pt < 0x10000) {
+            out += static_cast<char>((pt >> 12) | 0xE0);
+            out += static_cast<char>(((pt >> 6) & 0x3F) | 0x80);
+            out += static_cast<char>((pt & 0x3F) | 0x80);
+        } else {
+            out += static_cast<char>((pt >> 18) | 0xF0);
+            out += static_cast<char>(((pt >> 12) & 0x3F) | 0x80);
+            out += static_cast<char>(((pt >> 6) & 0x3F) | 0x80);
+            out += static_cast<char>((pt & 0x3F) | 0x80);
+        }
+    }
+    /* esc(c)
+     *
+     * Format char c suitable for printing in an error message.
+     */
+    static inline std::string esc(char c) {
+        char buf[12];
+        if (static_cast<uint8_t>(c) >= 0x20 && static_cast<uint8_t>(c) <= 0x7f) {
+            snprintf(buf, sizeof buf, "'%c' (%d)", c, c);
+        } else {
+            snprintf(buf, sizeof buf, "(%d)", c);
+        }
+        return std::string(buf);
+    }
+
+    static inline bool in_range(long x, long lower, long upper) {
+        return (x >= lower && x <= upper);
+    }
+
+    /* parse_string()
+     *
+     * Parse a string, starting at the current position.
+     */
+    std::string parse_string() {
+        std::string out;
+        long last_escaped_codepoint = -1;
+        while (true) {
+            if (i == str.size())
+                return fail("unexpected end of input in string", "");
+
+            char ch = str[i++];
+
+            if (ch == '"') {
+                encode_utf8(last_escaped_codepoint, out);
+                return out;
+            }
+
+            if (in_range(ch, 0, 0x1f))
+                return fail("unescaped " + esc(ch) + " in string", "");
+
+            // The usual case: non-escaped characters
+            if (ch != '\\') {
+                encode_utf8(last_escaped_codepoint, out);
+                last_escaped_codepoint = -1;
+                out += ch;
+                continue;
+            }
+
+            // Handle escapes
+            if (i == str.size())
+                return fail("unexpected end of input in string", "");
+
+            ch = str[i++];
+
+            if (ch == 'u') {
+                // Extract 4-byte escape sequence
+                std::string esc = str.substr(i, 4);
+                // Explicitly check length of the substring. The following loop
+                // relies on std::string returning the terminating NUL when
+                // accessing str[length]. Checking here reduces brittleness.
+                if (esc.length() < 4) {
+                    return fail("bad \\u escape: " + esc, "");
+                }
+                for (size_t j = 0; j < 4; j++) {
+                    if (!in_range(esc[j], 'a', 'f') && !in_range(esc[j], 'A', 'F')
+                            && !in_range(esc[j], '0', '9'))
+                        return fail("bad \\u escape: " + esc, "");
+                }
+
+                long codepoint = strtol(esc.data(), nullptr, 16);
+
+                // JSON specifies that characters outside the BMP shall be encoded as a pair
+                // of 4-hex-digit \u escapes encoding their surrogate pair components. Check
+                // whether we're in the middle of such a beast: the previous codepoint was an
+                // escaped lead (high) surrogate, and this is a trail (low) surrogate.
+                if (in_range(last_escaped_codepoint, 0xD800, 0xDBFF)
+                        && in_range(codepoint, 0xDC00, 0xDFFF)) {
+                    // Reassemble the two surrogate pairs into one astral-plane character, per
+                    // the UTF-16 algorithm.
+                    encode_utf8((((last_escaped_codepoint - 0xD800) << 10)
+                                 | (codepoint - 0xDC00)) + 0x10000, out);
+                    last_escaped_codepoint = -1;
+                } else {
+                    encode_utf8(last_escaped_codepoint, out);
+                    last_escaped_codepoint = codepoint;
+                }
+
+                i += 4;
+                continue;
+            }
+
+            encode_utf8(last_escaped_codepoint, out);
+            last_escaped_codepoint = -1;
+
+            if (ch == 'b') {
+                out += '\b';
+            } else if (ch == 'f') {
+                out += '\f';
+            } else if (ch == 'n') {
+                out += '\n';
+            } else if (ch == 'r') {
+                out += '\r';
+            } else if (ch == 't') {
+                out += '\t';
+            } else if (ch == '"' || ch == '\\' || ch == '/') {
+                out += ch;
+            } else {
+                return fail("invalid escape character " + esc(ch), "");
+            }
+        }
+    }
+
+    /* parse_number()
+     *
+     * Parse a double.
+     */
+    Json parse_number() {
+        size_t start_pos = i;
+
+        if (str[i] == '-')
+            i++;
+
+        // Integer part
+        if (str[i] == '0') {
+            i++;
+            if (in_range(str[i], '0', '9'))
+                return fail("leading 0s not permitted in numbers");
+        } else if (in_range(str[i], '1', '9')) {
+            i++;
+            while (in_range(str[i], '0', '9'))
+                i++;
+        } else {
+            return fail("invalid " + esc(str[i]) + " in number");
+        }
+
+        if (str[i] != '.' && str[i] != 'e' && str[i] != 'E'
+                && (i - start_pos) <= static_cast<size_t>(std::numeric_limits<int>::digits10)) {
+            return std::atoi(str.c_str() + start_pos);
+        }
+
+        // Decimal part
+        if (str[i] == '.') {
+            i++;
+            if (!in_range(str[i], '0', '9'))
+                return fail("at least one digit required in fractional part");
+
+            while (in_range(str[i], '0', '9'))
+                i++;
+        }
+
+        // Exponent part
+        if (str[i] == 'e' || str[i] == 'E') {
+            i++;
+
+            if (str[i] == '+' || str[i] == '-')
+                i++;
+
+            if (!in_range(str[i], '0', '9'))
+                return fail("at least one digit required in exponent");
+
+            while (in_range(str[i], '0', '9'))
+                i++;
+        }
+
+        return std::strtod(str.c_str() + start_pos, nullptr);
+    }
+
+    /* expect(str, res)
+     *
+     * Expect that 'str' starts at the character that was just read. If it does, advance
+     * the input and return res. If not, flag an error.
+     */
+    Json expect(const std::string &expected, Json res) {
+        assert(i != 0);
+        i--;
+        if (str.compare(i, expected.length(), expected) == 0) {
+            i += expected.length();
+            return res;
+        } else {
+            return fail("parse error: expected " + expected + ", got " + str.substr(i, expected.length()));
+        }
+    }
+
+    /* parse_json()
+     *
+     * Parse a JSON object.
+     */
+    Json parse_json(int depth) {
+        if (depth > max_depth) {
+            return fail("exceeded maximum nesting depth");
+        }
+
+        char ch = get_next_token();
+        if (failed)
+            return Json();
+
+        if (ch == '-' || (ch >= '0' && ch <= '9')) {
+            i--;
+            return parse_number();
+        }
+
+        if (ch == 't')
+            return expect("true", true);
+
+        if (ch == 'f')
+            return expect("false", false);
+
+        if (ch == 'n')
+            return expect("null", Json());
+
+        if (ch == '"')
+            return parse_string();
+
+        if (ch == '{') {
+            std::map<std::string, Json> data;
+            ch = get_next_token();
+            if (ch == '}')
+                return data;
+
+            while (1) {
+                if (ch != '"')
+                    return fail("expected '\"' in object, got " + esc(ch));
+
+                std::string key = parse_string();
+                if (failed)
+                    return Json();
+
+                ch = get_next_token();
+                if (ch != ':')
+                    return fail("expected ':' in object, got " + esc(ch));
+
+                data[std::move(key)] = parse_json(depth + 1);
+                if (failed)
+                    return Json();
+
+                ch = get_next_token();
+                if (ch == '}')
+                    break;
+                if (ch != ',')
+                    return fail("expected ',' in object, got " + esc(ch));
+
+                ch = get_next_token();
+            }
+            return data;
+        }
+
+        if (ch == '[') {
+            std::vector<Json> data;
+            ch = get_next_token();
+            if (ch == ']')
+                return data;
+
+            while (1) {
+                i--;
+                data.push_back(parse_json(depth + 1));
+                if (failed)
+                    return Json();
+
+                ch = get_next_token();
+                if (ch == ']')
+                    break;
+                if (ch != ',')
+                    return fail("expected ',' in list, got " + esc(ch));
+
+                ch = get_next_token();
+                (void)ch;
+            }
+            return data;
+        }
+
+        return fail("expected value, got " + esc(ch));
+    }
+};
 
 class SvarLanguage{
     typedef std::pair<std::string,std::string> stringpair;
@@ -1816,5 +2157,4 @@ class SvarLanguage{
 };
 
 }
-
 #endif
