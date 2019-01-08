@@ -1665,30 +1665,43 @@ public:
 
 }SvarBuildinInitializerinstance;
 
-/* JsonParser
- *
- * Object that tracks all state of an in-progress parse.
- */
-struct JsonParser final {
-    typedef Svar Json;
+/// Json save and load class
+class Json final {
+public:
     enum JsonParse {
         STANDARD, COMMENTS
     };
-    /* State
-     */
-    const std::string &str;
+
+    static Svar load(const std::string& in, JsonParse strategy=COMMENTS){
+        Json parser(in,strategy);
+        Svar result = parser.parse_json(0);
+        // Check for any trailing garbage
+        parser.consume_garbage();
+        if (parser.failed)
+            return Svar();
+        if (parser.i != in.size())
+            return parser.fail("unexpected trailing " + esc(in[parser.i]));
+
+        return result;
+    }
+
+    static std::ostringstream dump(Svar var){
+    }
+
+private:
+    Json(const std::string& str_input, JsonParse parse_strategy=STANDARD)
+        :str(str_input),i(0),failed(false),strategy(parse_strategy){}
+
+    std::string str;
     size_t i;
-    std::string &err;
+    std::string err;
     bool failed;
     const JsonParse strategy;
     const int max_depth = 200;
 
-    /* fail(msg, err_ret = Json())
-     *
-     * Mark this parse as failed.
-     */
-    Json fail(std::string &&msg) {
-        return fail(move(msg), Json());
+    /// fail(msg, err_ret = Json())
+    Svar fail(std::string &&msg) {
+        return fail(move(msg), Svar());
     }
 
     template <typename T>
@@ -1699,19 +1712,13 @@ struct JsonParser final {
         return err_ret;
     }
 
-    /* consume_whitespace()
-     *
-     * Advance until the current character is non-whitespace.
-     */
+    /// Advance until the current character is non-whitespace.
     void consume_whitespace() {
         while (str[i] == ' ' || str[i] == '\r' || str[i] == '\n' || str[i] == '\t')
             i++;
     }
 
-    /* consume_comment()
-     *
-     * Advance comments (c-style inline and multiline).
-     */
+    /// Advance comments (c-style inline and multiline).
     bool consume_comment() {
       bool comment_found = false;
       if (str[i] == '/') {
@@ -1746,10 +1753,7 @@ struct JsonParser final {
       return comment_found;
     }
 
-    /* consume_garbage()
-     *
-     * Advance until the current character is non-whitespace and non-comment.
-     */
+    /// Advance until the current character is non-whitespace and non-comment.
     void consume_garbage() {
       consume_whitespace();
       if(strategy == JsonParse::COMMENTS) {
@@ -1763,11 +1767,8 @@ struct JsonParser final {
       }
     }
 
-    /* get_next_token()
-     *
-     * Return the next non-whitespace character. If the end of the input is reached,
-     * flag an error and return 0.
-     */
+    /// Return the next non-whitespace character. If the end of the input is reached,
+    /// flag an error and return 0.
     char get_next_token() {
         consume_garbage();
         if (failed) return (char)0;
@@ -1777,10 +1778,7 @@ struct JsonParser final {
         return str[i++];
     }
 
-    /* encode_utf8(pt, out)
-     *
-     * Encode pt as UTF-8 and add it to out.
-     */
+    /// Encode pt as UTF-8 and add it to out.
     void encode_utf8(long pt, std::string & out) {
         if (pt < 0)
             return;
@@ -1801,10 +1799,8 @@ struct JsonParser final {
             out += static_cast<char>((pt & 0x3F) | 0x80);
         }
     }
-    /* esc(c)
-     *
-     * Format char c suitable for printing in an error message.
-     */
+
+    /// Format char c suitable for printing in an error message.
     static inline std::string esc(char c) {
         char buf[12];
         if (static_cast<uint8_t>(c) >= 0x20 && static_cast<uint8_t>(c) <= 0x7f) {
@@ -1819,10 +1815,7 @@ struct JsonParser final {
         return (x >= lower && x <= upper);
     }
 
-    /* parse_string()
-     *
-     * Parse a string, starting at the current position.
-     */
+    /// Parse a string, starting at the current position.
     std::string parse_string() {
         std::string out;
         long last_escaped_codepoint = -1;
@@ -1912,11 +1905,8 @@ struct JsonParser final {
         }
     }
 
-    /* parse_number()
-     *
-     * Parse a double.
-     */
-    Json parse_number() {
+    /// Parse a double.
+    Svar parse_number() {
         size_t start_pos = i;
 
         if (str[i] == '-')
@@ -1967,12 +1957,9 @@ struct JsonParser final {
         return std::strtod(str.c_str() + start_pos, nullptr);
     }
 
-    /* expect(str, res)
-     *
-     * Expect that 'str' starts at the character that was just read. If it does, advance
-     * the input and return res. If not, flag an error.
-     */
-    Json expect(const std::string &expected, Json res) {
+    /// Expect that 'str' starts at the character that was just read. If it does, advance
+    /// the input and return res. If not, flag an error.
+    Svar expect(const std::string &expected, Svar res) {
         assert(i != 0);
         i--;
         if (str.compare(i, expected.length(), expected) == 0) {
@@ -1983,18 +1970,15 @@ struct JsonParser final {
         }
     }
 
-    /* parse_json()
-     *
-     * Parse a JSON object.
-     */
-    Json parse_json(int depth) {
+    /// Parse a JSON object.
+    Svar parse_json(int depth) {
         if (depth > max_depth) {
             return fail("exceeded maximum nesting depth");
         }
 
         char ch = get_next_token();
         if (failed)
-            return Json();
+            return Svar();
 
         if (ch == '-' || (ch >= '0' && ch <= '9')) {
             i--;
@@ -2008,13 +1992,13 @@ struct JsonParser final {
             return expect("false", false);
 
         if (ch == 'n')
-            return expect("null", Json());
+            return expect("null", Svar());
 
         if (ch == '"')
             return parse_string();
 
         if (ch == '{') {
-            std::map<std::string, Json> data;
+            std::map<std::string, Svar> data;
             ch = get_next_token();
             if (ch == '}')
                 return data;
@@ -2025,7 +2009,7 @@ struct JsonParser final {
 
                 std::string key = parse_string();
                 if (failed)
-                    return Json();
+                    return Svar();
 
                 ch = get_next_token();
                 if (ch != ':')
@@ -2033,7 +2017,7 @@ struct JsonParser final {
 
                 data[std::move(key)] = parse_json(depth + 1);
                 if (failed)
-                    return Json();
+                    return Svar();
 
                 ch = get_next_token();
                 if (ch == '}')
@@ -2047,7 +2031,7 @@ struct JsonParser final {
         }
 
         if (ch == '[') {
-            std::vector<Json> data;
+            std::vector<Svar> data;
             ch = get_next_token();
             if (ch == ']')
                 return data;
@@ -2056,7 +2040,7 @@ struct JsonParser final {
                 i--;
                 data.push_back(parse_json(depth + 1));
                 if (failed)
-                    return Json();
+                    return Svar();
 
                 ch = get_next_token();
                 if (ch == ']')

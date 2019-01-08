@@ -118,13 +118,13 @@ TEST(Svar,Dump){
 }
 
 TEST(Svar,Iterator){
-//    auto vec=Svar::array({1,2,3});
-//    Svar arrayiter=vec.classPtr()->__iter__(vec);
-//    try{
-//    while(true){
-//        std::cout<<arrayiter.classPtr()->_methods["next"](arrayiter);;
-//    }}
-//    catch (SvarIterEnd){}
+    auto vec=Svar::array({1,2,3});
+    Svar arrayiter=vec.classPtr()->__iter__(vec);
+    try{
+    while(true){
+        std::cout<<arrayiter.classPtr()->_methods["next"](arrayiter);;
+    }}
+    catch (SvarIterEnd){}
 }
 
 TEST(Svar,Thread){
@@ -150,12 +150,12 @@ TEST(Svar,Thread){
 }
 
 int main(int argc,char** argv){
-
-    Svar var;
-    int& testInt=var.GetInt("child.testInt",20);
-    EXPECT_EQ(testInt,20);
-    testInt=30;
-    EXPECT_EQ(var.GetInt("child.testInt"),30);
+    std::ifstream ifs("/usr/share/npm/node_modules/unpipe/package.json");
+    std::stringstream sst;
+    std::string line;
+    while(std::getline(ifs,line)) sst<<line<<std::endl;
+    Svar var=Json::load(sst.str());
+    std::cout<<var;
 
     Svar unParsed=svar.ParseMain(argc,argv);
     svar.arg<int>("argInt",100,"this is a sample int argument");
