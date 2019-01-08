@@ -17,8 +17,11 @@
 #include <vector>
 #include <regex>
 #include <iterator>
+#include <cctype>
 #ifdef __GNUC__
 #include <cxxabi.h>
+#else
+#define _GLIBCXX_USE_NOEXCEPT
 #endif
 
 #define svar GSLAM::Svar::instance()
@@ -52,20 +55,20 @@ using function_signature_t = conditional_t<
     >::type
 >;
 
-template <bool B> using bool_constant = std::integral_constant<bool, B>;
-template <typename T> struct negation : bool_constant<!T::value> { };
-template <bool...> struct bools {};
-template <class... Ts> using all_of = std::is_same<
-    bools<Ts::value..., true>,
-    bools<true, Ts::value...>>;
-template <class... Ts> using any_of = negation<all_of<negation<Ts>...>>;
-template <class... Ts> using none_of = negation<any_of<Ts...>>;
+//template <bool B> using bool_constant = std::integral_constant<bool, B>;
+//template <typename T> struct negation : bool_constant<!T::value> { };
+//template <bool...> struct bools {};
+//template <class... Ts> using all_of = std::is_same<
+//    bools<Ts::value..., true>,
+//    bools<true, Ts::value...>>;
+//template <class... Ts> using any_of = negation<all_of<negation<Ts>...>>;
+//template <class... Ts> using none_of = negation<any_of<Ts...>>;
 
-template <class T, template<class> class... Predicates> using satisfies_all_of = all_of<Predicates<T>...>;
-template <class T, template<class> class... Predicates> using satisfies_any_of = any_of<Predicates<T>...>;
-template <class T, template<class> class... Predicates> using satisfies_none_of = none_of<Predicates<T>...>;
-template <typename T> using is_lambda = satisfies_none_of<remove_reference_t<T>,
-        std::is_function, std::is_pointer, std::is_member_pointer>;
+//template <class T, template<class> class... Predicates> using satisfies_all_of = all_of<Predicates<T>...>;
+//template <class T, template<class> class... Predicates> using satisfies_any_of = any_of<Predicates<T>...>;
+//template <class T, template<class> class... Predicates> using satisfies_none_of = none_of<Predicates<T>...>;
+//template <typename T> using is_lambda = satisfies_none_of<remove_reference_t<T>,
+//        std::is_function, std::is_pointer, std::is_member_pointer>;
 
 #  if __cplusplus >= 201402L
 using std::index_sequence;
@@ -325,7 +328,7 @@ public:
     std::string helpInfo();
 
     /// Format print version, usages and arguments
-    void help(){std::cout<<helpInfo();}
+    int help(){std::cout<<helpInfo();return 0;}
 
     /// Format print strings as table
     static std::string printTable(
@@ -539,10 +542,10 @@ public:
     }
 
     std::string getName()const{return name.empty()?"function":name;}
-    std::string initName(const std::string& nm){if(name.empty()) name=nm;}
+    void        initName(const std::string& nm){if(name.empty()) name=nm;}
 
     std::string   name,signature;
-    std::uint16_t nargs;
+    std::size_t   nargs;
     Svar          stack,next;
     bool          is_method;
 
@@ -1193,6 +1196,7 @@ inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
           return true;
         }
       }
+      return false;
   };
 
   // parse main cmd
@@ -1434,7 +1438,7 @@ inline std::string Svar::typeName(std::string name) {
       {typeid(int64_t).name(), "int64_t"},
       {typeid(uint32_t).name(), "uint32_t"},
       {typeid(uint64_t).name(), "uint64_t"},
-      {typeid(u_char).name(), "u_char"},
+      {typeid(unsigned char).name(), "u_char"},
       {typeid(char).name(), "char"},
       {typeid(float).name(), "float"},
       {typeid(double).name(), "double"},
@@ -2103,7 +2107,7 @@ class SvarLanguage{
         stringpair  token;
         std::list<stringpair> stack;
         while (str.length()) {
-            for (int i = 0, len = tokens.size(); i < len; ++i)
+            for (size_t i = 0, len = tokens.size(); i < len; ++i)
                 if(std::regex_search(str,captures,std::regex(tokens[i].second)))
                 {
                     auto type=tokens[i].first;
