@@ -88,6 +88,11 @@ TEST(Svar,SvarFunction)
 
 }
 
+TEST(Svar,Call){
+    EXPECT_EQ(Svar(1).call("__str__"),"1");// Call as member methods
+    EXPECT_EQ(SvarClass::instance<int>().call("__str__",1),"1");// Call as static function
+}
+
 TEST(Svar,Cast){
     EXPECT_EQ(Svar(2.).castAs<int>(),2);
     EXPECT_TRUE(Svar(1).castAs<double>()==1.);
@@ -119,12 +124,30 @@ TEST(Svar,Dump){
 
 TEST(Svar,Iterator){
     auto vec=Svar::array({1,2,3});
-    Svar arrayiter=vec.classPtr()->__iter__(vec);
-    try{
-    while(true){
-        std::cout<<arrayiter.classPtr()->_methods["next"](arrayiter);;
-    }}
-    catch (SvarIterEnd){}
+    Svar arrayiter=vec.call("__iter__");
+    Svar next=arrayiter.classObject()["next"];
+    int i=0;
+    for(Svar it=next(arrayiter);!it.isUndefined();it=next(arrayiter)){
+        EXPECT_EQ(vec[i++],it);
+    }
+    i=0;
+    for(Svar it=arrayiter.call("next");!it.isUndefined();it=arrayiter.call("next"))
+    {
+        EXPECT_EQ(vec[i++],it);
+    }
+}
+
+TEST(Svar,Json){
+    Svar var;
+    var.set("i",1);
+    var.set("d",2.);
+    var.set("s",Svar("str"));
+    var.set("b",false);
+    var.set("l",Svar::array({1,2,3}));
+    var.set("m",Svar::object({{"a",1},{"b",false}}));
+    std::string str=Json::dump(var);
+    Svar varCopy=Json::load(str);
+    EXPECT_EQ(str,Json::dump(varCopy));
 }
 
 TEST(Svar,Thread){
@@ -149,15 +172,27 @@ TEST(Svar,Thread){
     for(auto& it:threads) it.join();
 }
 
-int main(int argc,char** argv){
-    std::ifstream ifs("/usr/share/npm/node_modules/unpipe/package.json");
-    std::stringstream sst;
-    std::string line;
-    while(std::getline(ifs,line)) sst<<line<<std::endl;
-    Svar var=Json::load(sst.str());
-    std::cout<<var;
+TEST(Svar,Inherit){
+    SvarClass* parent=new SvarClass("parent",typeid(SvarObject));
+    parent->def("__init__",[](Svar self){
+        self.set("name","father");
+    })
+    .def("__str__",[](Svar self){
+        return Svar("I am the parent");
+    });
+    Svar p((SvarValue*)parent);
+    SvarClass* child=new SvarClass("child",typeid(SvarObject),{p});
+    child->def("__init__",[](Svar self){
+        self.set("age",10);
+    })
+    .def("__str__",[](Svar self){
+        return Svar("I am the child");
+    });
+    arrayinteratorClass=(SvarValue*)cls;
+}
 
-    Svar unParsed=svar.ParseMain(argc,argv);
+int main(int argc,char** argv){
+    Svar unParsed=svar.parseMain(argc,argv);
     svar.arg<int>("argInt",100,"this is a sample int argument");
     svar.arg<double>("argDouble",100.,"this is a sample double argument");
     svar.arg<std::string>("argString","hello","Sample string argument");
@@ -168,7 +203,6 @@ int main(int argc,char** argv){
         return 0;
     }
     std::cerr<<"Unparsed arguments:"<<unParsed;
-
 
     testing::InitGoogleTest(&argc,argv);
     auto ret= RUN_ALL_TESTS();

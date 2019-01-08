@@ -2,7 +2,6 @@
 #define GSLAM_JVAR_H
 
 #include <assert.h>
-#include <deque>
 #include <fstream>
 #include <functional>
 #include <iomanip>
@@ -23,8 +22,16 @@
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
+#define GSLAM_SVAR_HAS_XML
+#ifdef GSLAM_SVAR_HAS_XML
+#include <GSLAM/core/XML.h>
+#endif
+#ifdef GSLAM_SVAR_HAS_YAML
+#include <yaml-cpp/yaml.h>
+#endif
 
 #define svar GSLAM::Svar::instance()
+
 
 namespace GSLAM {
 
@@ -54,21 +61,6 @@ using function_signature_t = conditional_t<
         strip_function_object<F>
     >::type
 >;
-
-//template <bool B> using bool_constant = std::integral_constant<bool, B>;
-//template <typename T> struct negation : bool_constant<!T::value> { };
-//template <bool...> struct bools {};
-//template <class... Ts> using all_of = std::is_same<
-//    bools<Ts::value..., true>,
-//    bools<true, Ts::value...>>;
-//template <class... Ts> using any_of = negation<all_of<negation<Ts>...>>;
-//template <class... Ts> using none_of = negation<any_of<Ts...>>;
-
-//template <class T, template<class> class... Predicates> using satisfies_all_of = all_of<Predicates<T>...>;
-//template <class T, template<class> class... Predicates> using satisfies_any_of = any_of<Predicates<T>...>;
-//template <class T, template<class> class... Predicates> using satisfies_none_of = none_of<Predicates<T>...>;
-//template <typename T> using is_lambda = satisfies_none_of<remove_reference_t<T>,
-//        std::is_function, std::is_pointer, std::is_member_pointer>;
 
 #  if __cplusplus >= 201402L
 using std::index_sequence;
@@ -318,7 +310,9 @@ public:
     }
 
     /// Parse the "main(int argc,char** argv)" arguments
-    std::vector<std::string> ParseMain(int argc, char** argv);
+    std::vector<std::string> parseMain(int argc, char** argv);
+
+    bool parseFile(const std::string& file_path);
 
     /// Register default required arguments
     template <typename T>
@@ -363,7 +357,8 @@ public:
     static const Svar& Null();
     static const Svar& True();
     static const Svar& False();
-    static Svar& instance();
+    static Svar&       instance();
+    static Svar        loadFile(const std::string& file_path);
     static std::string typeName(std::string name);
 
     template <typename T>
@@ -556,11 +551,14 @@ class SvarClass: public SvarValue{
 public:
     std::string  __name__;
     std::type_index _cpptype;
-    SvarClass(const std::string& name,std::type_index cpp_type)
-        : __name__(name),_cpptype(cpp_type),_methods(Svar::object()){}
+    SvarClass(const std::string& name,std::type_index cpp_type,
+              std::vector<Svar> parents={})
+        : __name__(name),_cpptype(cpp_type),
+          _methods(Svar::object()),_parents(parents){}
 
     virtual TypeID          cpptype()const{return typeid(SvarClass);}
     virtual const void*     ptr() const{return this;}
+    virtual const Svar&     classObject()const{return instance<SvarClass>();}
 
     SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
@@ -614,6 +612,18 @@ public:
         return def(name,Svar::lambda(f),false);
     }
 
+//    SvarClass& def_property(const std::string& name,);
+
+    Svar operator [](const std::string& name){
+        Svar c=_methods[name];
+        if(!c.isUndefined())  return c;
+        for(Svar& p:_parents)
+        {
+            c=p.as<SvarClass>()._methods[name];
+            if(!c.isUndefined()) return c;
+        }
+        return Svar::Undefined();
+    }
 
     template <typename T>
     static Svar& instance();
@@ -632,7 +642,7 @@ public:
     Svar __xor__,__or__,__and__;
     Svar __le__,__lt__,__ne__,__eq__,__ge__,__gt__;
     Svar __len__,__getitem__,__setitem__,__iter__,__next__;
-    Svar _methods,_getters,_setters,_doc;
+    Svar _methods,_doc;
     std::vector<Svar> _parents;
 };
 
@@ -702,6 +712,14 @@ public:
     void set(const std::string &key,const Svar& value){
         std::unique_lock<std::mutex> lock(_mutex);
         _var[key]=value;
+    }
+
+    void update(Svar rh){
+        if(!rh.isObject()) return;
+        std::unique_lock<std::mutex> lock(_mutex);
+        auto cp=rh.as<SvarObject>().getCopy();
+        for(auto it:cp)
+            _var[it.first]=it.second;// overwrite
     }
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
@@ -890,19 +908,19 @@ template <typename T>
 inline bool Svar::is()const{return _obj->cpptype()==typeid(T);}
 
 
-bool Svar::isNull()const{
+inline bool Svar::isNull()const{
     return Null()==(*this);
 }
 
-bool Svar::isObject() const{
+inline bool Svar::isObject() const{
     return std::dynamic_pointer_cast<SvarObject>(_obj)!=nullptr;
 }
 
-bool Svar::isArray()const{
+inline bool Svar::isArray()const{
     return std::dynamic_pointer_cast<SvarArray>(_obj)!=nullptr;
 }
 
-bool Svar::isDict()const{
+inline bool Svar::isDict()const{
     return std::dynamic_pointer_cast<SvarDict>(_obj)!=nullptr;
 }
 
@@ -986,7 +1004,7 @@ Svar::castAs(){
 }
 
 template <>
-const Svar& Svar::castAs<Svar>()const{
+inline const Svar& Svar::castAs<Svar>()const{
     return *this;
 }
 
@@ -1002,7 +1020,7 @@ inline const Svar&       Svar::classObject()const{
     return _obj->classObject();
 }
 
-SvarClass*   Svar::classPtr()const
+inline SvarClass*   Svar::classPtr()const
 {
     auto clsObj=classObject();
     if(clsObj.isClass()) return &clsObj.as<SvarClass>();
@@ -1013,7 +1031,7 @@ inline size_t            Svar::length() const{
     return _obj->length();
 }
 
-Svar Svar::operator[](const Svar& i) const{
+inline Svar Svar::operator[](const Svar& i) const{
     if(isObject()) return (*std::dynamic_pointer_cast<SvarObject>(_obj))[i.castAs<std::string>()];
     if(classObject().is<void>()) return Undefined();
     const SvarClass& cl=classObject().as<SvarClass>();
@@ -1050,13 +1068,13 @@ T& Svar::get(const std::string& name,T def){
     return var.as<T>();
 }
 
-Svar Svar::get(const std::string& name) const {
+inline Svar Svar::get(const std::string& name) const {
     if(!isObject())
         throw SvarExeption("Svar::Get can only be called with an object, got "+ typeName());
     return as<SvarObject>()[name];
 }
 
-Svar& Svar::getOrCreate(const std::string& name)
+inline Svar& Svar::getOrCreate(const std::string& name)
 {
     if(isUndefined()) {
         set(object());
@@ -1107,7 +1125,7 @@ void Svar::set(const T& def){
 }
 
 
-void Svar::push_back(const Svar& rh)
+inline void Svar::push_back(const Svar& rh)
 {
     assert(isArray());
     as<SvarArray>().append(rh);
@@ -1116,7 +1134,19 @@ void Svar::push_back(const Svar& rh)
 template <typename... Args>
 Svar Svar::call(const std::string function, Args... args)const
 {
-    return get(function)(args...);
+    // call as static methods without check
+    if(isClass()) return as<SvarClass>()._methods[function](args...);
+    // call when func member available
+    Svar func=(*this)[function];
+    if(func.isFunction()) return func(args...);
+    // call as member methods with check
+    auto clsPtr=classPtr();
+    if(!clsPtr) throw SvarExeption("Unable to call "+typeName()+"."+function);
+    func=clsPtr->_methods[function];
+    if(!func.isFunction()) throw SvarExeption("Unable to call "+clsPtr->__name__+"."+function);
+    if(func.as<SvarFunction>().is_method) return func(*this,args...);
+
+    return func(args...);
 }
 
 template <typename... Args>
@@ -1133,7 +1163,7 @@ Svar Svar::operator()(Args... args)const{
     return Undefined();
 }
 
-Svar& Svar::def(const std::string& name,Svar funcOrClass)
+inline Svar& Svar::def(const std::string& name,Svar funcOrClass)
 {
     if(funcOrClass.isFunction()){
         funcOrClass.as<SvarFunction>().initName(name);
@@ -1152,7 +1182,7 @@ Svar& Svar::def(const std::string& name,Svar funcOrClass)
     return *this;
 }
 
-inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
+inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   using namespace std;
   // save main cmd things
   GetInt("argc") = argc;
@@ -1234,18 +1264,38 @@ inline std::vector<std::string> Svar::ParseMain(int argc, char** argv) {
     continue;
   }
 
-//  // parse default config file
-//  string argv0 = argv[0];
-//  Set("argv0", argv0);
-//  Set("ProgramPath", getFolderPath(argv0));
-//  Set("ProgramName", getFileName(argv0));
-
-//  if (fileExists(argv0 + ".cfg")) ParseFile(argv0 + ".cfg");
-
-//  argv0 = GetString("conf", "./Default.cfg");
-//  if (fileExists(argv0)) ParseFile(argv0);
-
+  // parse default config file
+  string argv0 = argv[0];
+  std::vector<std::string> tries={argv0+".json",
+                                  argv0+".yaml",
+                                  argv0+".xml",
+                                 "Default.json",
+                                 "Default.yaml",
+                                 "Default.xml"};
+  auto fileExists=[](const std::string& filename)
+  {
+      std::ifstream f(filename.c_str());
+      return f.good();
+  };
+  if(Svar::get("conf").is<std::string>()){
+      parseFile(get("conf").as<std::string>());
+  }
+  else
+  for(auto& it:tries)
+      if(fileExists(it)){
+          parseFile(it);
+          break;
+      }
   return unParsed;
+}
+
+
+inline bool Svar::parseFile(const std::string& file_path)
+{
+    Svar var=loadFile(file_path);
+    if(var.isUndefined()) return false;
+    call("update",var);
+    return true;
 }
 
 template <typename T>
@@ -1257,7 +1307,7 @@ T& Svar::arg(const std::string& name, T def, const std::string& help) {
     return get(name,def);
 }
 
-std::string Svar::helpInfo()
+inline std::string Svar::helpInfo()
 {
     std::stringstream sst;
     int width = GetInt("COLUMNS", 80);
@@ -1333,7 +1383,7 @@ inline std::string Svar::printTable(
   return sst.str();
 }
 
-Svar Svar::operator -()const
+inline Svar Svar::operator -()const
 {
     auto cls=classPtr();
     if(!cls) throw SvarExeption(typeName()+" has not class to operator __neg__.");
@@ -1353,40 +1403,40 @@ Svar Svar::operator -()const
     return ret;\
 }
 
-Svar Svar::operator +(const Svar& rh)const
+inline Svar Svar::operator +(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__add__)
 
-Svar Svar::operator -(const Svar& rh)const
+inline Svar Svar::operator -(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__sub__)
 
-Svar Svar::operator *(const Svar& rh)const
+inline Svar Svar::operator *(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__mul__)
 
-Svar Svar::operator /(const Svar& rh)const
+inline Svar Svar::operator /(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__div__)
 
-Svar Svar::operator %(const Svar& rh)const
+inline Svar Svar::operator %(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__mod__)
 
-Svar Svar::operator ^(const Svar& rh)const
+inline Svar Svar::operator ^(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__xor__)
 
-Svar Svar::operator |(const Svar& rh)const
+inline Svar Svar::operator |(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__or__)
 
-Svar Svar::operator &(const Svar& rh)const
+inline Svar Svar::operator &(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__and__)
 
-bool Svar::operator ==(const Svar& rh)const{
+inline bool Svar::operator ==(const Svar& rh)const{
     return _obj->equals(rh);
 }
 
-bool Svar::operator <(const Svar& rh)const{
+inline bool Svar::operator <(const Svar& rh)const{
     return _obj->less(rh);
 }
 
 
-std::ostream& operator <<(std::ostream& ost,const Svar& self)
+inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
 {
     if(self.isUndefined()) {
         ost<<"Undefined";
@@ -1432,6 +1482,35 @@ inline Svar& Svar::instance(){
     return v;
 }
 
+inline Svar  Svar::loadFile(const std::string& file_path)
+{
+    std::ifstream ifs(file_path);
+    if(!ifs.is_open()) return Svar();
+
+    auto getExtension=[](const std::string& filename)->std::string{
+        auto idx = filename.find_last_of('.');
+        if (idx == std::string::npos)
+          return "";
+        else
+          return filename.substr(idx+1);
+    };
+    std::string ext=getExtension(file_path);
+    Svar ext2cls=Svar::object({{"json","Json"},
+                               {"xml","Xml"},
+                               {"yaml","Yaml"},
+                               {"yml","Yaml"}});
+    Svar cls=Svar::instance()["__builtin__"][ext2cls[ext]];
+    if(!cls.isClass()){
+        std::cerr<<"Svar::loadFile don't support format "<<ext<<".\n";
+        return Svar();
+    }
+    std::stringstream sst;
+    std::string line;
+    while(std::getline(ifs,line)) sst<<line<<std::endl;
+    Svar ret=cls.call("load",sst.str());
+    return ret;
+}
+
 inline std::string Svar::typeName(std::string name) {
   static std::map<std::string, std::string> decode = {
       {typeid(int32_t).name(), "int"},
@@ -1445,7 +1524,7 @@ inline std::string Svar::typeName(std::string name) {
       {typeid(std::string).name(), "str"},
       {typeid(bool).name(), "bool"},
       {typeid(SvarDict).name(), "dict"},
-//      {typeid(SvarObject).name(), "object"},
+      {typeid(SvarObject).name(), "object"},
       {typeid(SvarArray).name(), "array"},
       {typeid(SvarClass).name(), "class"},
       {typeid(Svar).name(), "object"},
@@ -1466,7 +1545,7 @@ inline std::string Svar::typeName(std::string name) {
 
 inline const Svar&  SvarFunction::classObject()const{return SvarClass::instance<SvarFunction>();}
 
-std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
+inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     ost<<"class "<<rh.__name__<<"():\n";
     std::stringstream  content;
     if(rh.__init__.isFunction()) content<<rh.__init__<<std::endl<<std::endl;
@@ -1484,191 +1563,6 @@ std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     return ost;
 }
 
-class SvarBuildin{
-public:
-    SvarBuildin(){
-        SvarClass::Class<void>()
-                .def("__str__",[](Svar){return "Null";});
-        SvarClass::Class<int>()
-                .def("__init__",&SvarBuildin::int_create)
-                .def("__double__",[](int i){return (double)i;})
-                .def("__bool__",[](int i){return (bool)i;})
-                .def("__str__",[](int i){return Svar::toString(i);})
-                .def("__eq__",[](int self,int rh){return self==rh;})
-                .def("__lt__",[](int self,int rh){return self<rh;})
-                .def("__add__",[](int self,Svar rh){
-            if(rh.is<int>()) return Svar(self+rh.as<int>());
-            if(rh.is<double>()) return Svar(self+rh.as<double>());
-            return Svar::Undefined();
-        })
-                .def("__sub__",[](int self,Svar rh){
-            if(rh.is<int>()) return Svar(self-rh.as<int>());
-            if(rh.is<double>()) return Svar(self-rh.as<double>());
-            return Svar::Undefined();
-        })
-                .def("__mul__",[](int self,Svar rh){
-            if(rh.is<int>()) return Svar(self*rh.as<int>());
-            if(rh.is<double>()) return Svar(self*rh.as<double>());
-            return Svar::Undefined();
-        })
-                .def("__div__",[](int self,Svar rh){
-            if(rh.is<int>()) return Svar(self/rh.as<int>());
-            if(rh.is<double>()) return Svar(self/rh.as<double>());
-            return Svar::Undefined();
-        })
-                .def("__mod__",[](int self,int rh){
-            return self%rh;
-        })
-                .def("__neg__",[](int self){return -self;})
-                .def("__xor__",[](int self,int rh){return self^rh;})
-                .def("__or__",[](int self,int rh){return self|rh;})
-                .def("__and__",[](int self,int rh){return self&rh;});
-
-        SvarClass::Class<bool>()
-                .def("__int__",[](bool b){return (int)b;})
-                .def("__double__",[](bool b){return (double)b;})
-                .def("__str__",[](bool b){return Svar::toString(b);})
-                .def("__eq__",[](bool self,bool rh){return self==rh;});
-
-        SvarClass::Class<double>()
-                .def("__int__",[](double d){return (int)d;})
-                .def("__bool__",[](double d){return (bool)d;})
-                .def("__str__",[](double d){return Svar::toString(d);})
-                .def("__eq__",[](double self,double rh){return self==rh;})
-                .def("__lt__",[](double self,double rh){return self<rh;})
-                .def("__neg__",[](double self){return -self;})
-                .def("__add__",[](double self,double rh){return self+rh;})
-                .def("__sub__",[](double self,double rh){return self-rh;})
-                .def("__mul__",[](double self,double rh){return self*rh;})
-                .def("__div__",[](double self,double rh){return self/rh;})
-                .def("__invert__",[](double self){return 1./self;});
-
-        SvarClass::Class<std::string>()
-                .def("__len__",[](const Svar& self){return self.as<std::string>().size();})
-                .def("__str__",[](Svar self){
-            std::string out;
-            dump(self.as<std::string>(),out);
-            return out;
-        })
-                .def("__add__",[](const std::string& self,std::string rh){
-            std::cerr<<"added "<<self<<rh;
-            return self+rh;
-        })
-                .def("__eq__",[](const std::string& self,std::string rh){return self==rh;})
-                .def("__lt__",[](const std::string& self,std::string rh){return self<rh;});
-
-        SvarClass::Class<char const*>()
-                .def("__str__",[](char const* str){
-            return std::string(str);
-        });
-
-        SvarClass::Class<SvarArray>()
-                .def("__getitem__",[](Svar self,int i){
-            SvarArray& array=self.as<SvarArray>();
-            return array[i];
-        })
-        .def("__str__",[](Svar self){return Svar::toString(self.as<SvarArray>());})
-        .def("__iter__",[](Svar self){
-            static Svar arrayinteratorClass;
-            if(!arrayinteratorClass.isClass()){
-                SvarClass* cls=new SvarClass("arrayiterator",typeid(SvarObject));
-                arrayinteratorClass=(SvarValue*)cls;
-                cls->def("next",[](Svar iter){
-                    Svar arrObj=iter.get("array");
-                    SvarArray& array=arrObj.as<SvarArray>();
-                    int& index=iter.get<int>("index",0);
-                    if(index<(int)array.length()){
-                        return array[index++];
-                    }
-                    throw SvarIterEnd();
-                    return Svar();
-                });
-            }
-            Svar iter=Svar::object({{"array",self},
-                                   {"index",0}});
-            iter.as<SvarObject>()._class=arrayinteratorClass;
-            return iter;
-        })
-        .def("__add__",[](Svar self,Svar other){
-            return self.as<SvarArray>()+other;
-        })
-        .def("append",&SvarArray::append);
-
-        SvarClass::Class<SvarDict>()
-                .def("__getitem__",[](Svar self,Svar key){
-            return self.as<SvarDict>()[key];
-        });
-
-
-        SvarClass::Class<SvarObject>()
-                .def("__getitem__",[](Svar self,Svar key){
-            return self.as<SvarObject>()[key.castAs<std::string>()];
-        })
-        .def("__str__",[](Svar self){return Svar::toString(self.as<SvarObject>());});
-
-        SvarClass::Class<SvarFunction>()
-                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
-
-        SvarClass::Class<SvarClass>()
-                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarClass>());});
-
-        Svar::instance().set("__builtin__.int",SvarClass::instance<int>());
-        Svar::instance().set("__builtin__.double",SvarClass::instance<double>());
-        Svar::instance().set("__builtin__.int",SvarClass::instance<bool>());
-        Svar::instance().set("__builtin__.str",SvarClass::instance<std::string>());
-        Svar::instance().set("__builtin__.dict",SvarClass::instance<SvarDict>());
-        Svar::instance().set("__builtin__.object",SvarClass::instance<SvarObject>());
-        Svar::instance().set("__builtin__.array",SvarClass::instance<SvarArray>());
-    }
-
-    static Svar int_create(Svar rh){
-        if(rh.is<int>()) return rh;
-        if(rh.is<std::string>()) return (Svar)Svar::fromString<int>(rh.as<std::string>());
-        if(rh.is<double>()) return (Svar)(int)rh.as<double>();
-        if(rh.is<bool>()) return (Svar)(int)rh.as<bool>();
-
-        throw SvarExeption("Can't construct int from "+rh.typeName()+".");
-        return Svar::Undefined();
-    }
-    static void dump(const std::string &value, std::string &out) {
-        out += '"';
-        for (size_t i = 0; i < value.length(); i++) {
-            const char ch = value[i];
-            if (ch == '\\') {
-                out += "\\\\";
-            } else if (ch == '"') {
-                out += "\\\"";
-            } else if (ch == '\b') {
-                out += "\\b";
-            } else if (ch == '\f') {
-                out += "\\f";
-            } else if (ch == '\n') {
-                out += "\\n";
-            } else if (ch == '\r') {
-                out += "\\r";
-            } else if (ch == '\t') {
-                out += "\\t";
-            } else if (static_cast<uint8_t>(ch) <= 0x1f) {
-                char buf[8];
-                snprintf(buf, sizeof buf, "\\u%04x", ch);
-                out += buf;
-            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
-                       && static_cast<uint8_t>(value[i+2]) == 0xa8) {
-                out += "\\u2028";
-                i += 2;
-            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
-                       && static_cast<uint8_t>(value[i+2]) == 0xa9) {
-                out += "\\u2029";
-                i += 2;
-            } else {
-                out += ch;
-            }
-        }
-        out += '"';
-    }
-
-}SvarBuildinInitializerinstance;
-
 /// Json save and load class
 class Json final {
 public:
@@ -1676,20 +1570,24 @@ public:
         STANDARD, COMMENTS
     };
 
-    static Svar load(const std::string& in, JsonParse strategy=COMMENTS){
-        Json parser(in,strategy);
+    static Svar load(const std::string& in){
+        Json parser(in,COMMENTS);
         Svar result = parser.parse_json(0);
         // Check for any trailing garbage
         parser.consume_garbage();
-        if (parser.failed)
+        if (parser.failed){
             return Svar();
+        }
         if (parser.i != in.size())
             return parser.fail("unexpected trailing " + esc(in[parser.i]));
 
         return result;
     }
 
-    static std::ostringstream dump(Svar var){
+    static std::string dump(Svar var){
+        std::stringstream sst;
+        sst<<var;
+        return sst.str();
     }
 
 private:
@@ -1705,7 +1603,11 @@ private:
 
     /// fail(msg, err_ret = Json())
     Svar fail(std::string &&msg) {
-        return fail(move(msg), Svar());
+        if (!failed)
+            err = std::move(msg);
+        failed = true;
+        throw SvarExeption(msg);
+        return Svar();
     }
 
     template <typename T>
@@ -1713,6 +1615,7 @@ private:
         if (!failed)
             err = std::move(msg);
         failed = true;
+
         return err_ret;
     }
 
@@ -2062,6 +1965,172 @@ private:
     }
 };
 
+/// Xml save and load class
+class Xml final{
+public:
+    static Svar load(const std::string& in){
+#ifdef GSLAM_SVAR_HAS_XML
+        XMLDocument doc;
+        if(XML_SUCCESS!=doc.Parse(in.c_str(),in.size())) return Svar();
+        Svar var;
+        loadXML(var,&doc);
+        return var;
+#endif
+        return Svar();
+    }
+
+    static std::string dump(Svar var){
+#ifdef GSLAM_SVAR_HAS_XML
+        tinyxml2::XMLDocument doc;
+        doc.InsertEndChild(doc.NewDeclaration());
+        exportXML(var,&doc);
+        XMLPrinter printer;
+        doc.Print( &printer );
+        return printer.CStr();
+#endif
+
+        return "";
+    }
+
+#ifdef GSLAM_SVAR_HAS_XML
+    static void loadXML(Svar& var,XMLNode* node){
+        if(auto text=node->ToText()){
+            if(var.isUndefined())
+                var.set(std::string(text->Value()));
+            else
+                var.set("#text",std::string(text->Value()));
+            return;
+        }
+        if(auto comment=node->ToComment()){
+            return;
+        }
+        if(auto doc=node->ToDocument()){
+            for(auto it=doc->FirstChild();it;it=it->NextSibling())
+            {
+                loadXML(var,it);
+            }
+            return;
+        }
+        if(node->ToDeclaration()){
+            return;
+        }
+
+        XMLElement* ele=node->ToElement();
+        if(!ele) {
+            std::cerr<<"Unkown XMLElement type.";
+            return;
+        }
+
+        GSLAM::Svar child;
+        for(auto it=ele->FirstAttribute();it!=nullptr;it=it->Next())
+        {
+            child.set(std::string("@")+it->Name(),std::string(it->Value()));
+        }
+        for(auto it=ele->FirstChild();it;it=it->NextSibling())
+        {
+            loadXML(child,it);
+        }
+        auto old=var[std::string(ele->Name())];
+        if(old.isUndefined())
+            var.set(ele->Name(),child);
+        else if(old.isArray())
+            old.push_back(child);
+        else
+            var.set(ele->Name(),Svar::array({old,child}));
+    }
+
+    static void exportXML(const Svar& var,XMLNode* node){
+        if(auto doc=node->ToDocument()){
+            if(!var.isObject()) return;
+            for(std::pair<std::string,Svar> child:var.as<SvarObject>().getCopy())
+            {
+                XMLElement* ele = doc->NewElement(child.first.c_str());
+                doc->InsertEndChild(ele);
+                exportXML(child.second,ele);
+            }
+            return;
+        }
+
+        auto ele=node->ToElement();
+        if(!var.isObject()) {
+            ele->SetText(toString(var).c_str());
+            return;
+        }
+        for(std::pair<std::string,Svar> child:var.as<SvarObject>().getCopy())
+        {
+            if(child.first[0]=='@')
+                ele->SetAttribute(child.first.substr(1).c_str(),toString(child.second).c_str());
+            else if(child.first[0]=='#')
+                ele->SetText(toString(child.second).c_str());
+            else if(child.second.isArray()){
+                for(size_t i=0;i<child.second.length();i++){
+                    XMLElement* newEle = ele->GetDocument()->NewElement(child.first.c_str());
+                    exportXML(child.second[(int)i],newEle);
+                    ele->InsertEndChild(newEle);
+                }
+            }
+            else if(child.second.isObject()){
+                XMLElement* newEle = ele->GetDocument()->NewElement(child.first.c_str());
+                exportXML(child.second,newEle);
+                ele->InsertEndChild(newEle);
+            }
+            else {
+                XMLElement* newEle = ele->GetDocument()->NewElement(child.first.c_str());
+                newEle->SetText(toString(child.second).c_str());
+                ele->InsertEndChild(newEle);
+            }
+        }
+
+    }
+
+    static std::string toString(Svar var){
+        if(var.is<std::string>()) return var.as<std::string>();
+        else return Svar::toString(var).c_str();
+    }
+#endif
+};
+
+/// Yaml save and load class
+class Yaml final{
+public:
+    static Svar load(const std::string& input){
+#ifdef GSLAM_SVAR_HAS_YAML
+        YAML::Node node=YAML::Load(input);
+        std::cout<<node;
+        return toSvar(node);
+#endif
+        return Svar();
+    }
+    static std::string dump(Svar var){return "";}
+
+#ifdef GSLAM_SVAR_HAS_YAML
+    static Svar toSvar(const YAML::Node& node){
+        if(!node.IsDefined()) return Svar::Undefined();
+        if(node.IsScalar()) return Svar(node.Scalar());
+        if(node.IsSequence()){
+            std::vector<Svar> vars;
+            vars.reserve(node.size());
+            for(auto it:node)
+                vars.push_back(toSvar(it));
+            return vars;
+        }
+        else {
+            std::map<std::string,Svar> vars;
+            for(YAML::const_iterator it=node.begin();it!=node.end();++it)
+            {
+//                std::cout<<it->first<<it->second;
+            }
+            return vars;
+        }
+        return Svar::Undefined();
+    }
+
+    static YAML::Node toNode(Svar var){
+        return YAML::Node();
+    }
+#endif
+};
+
 class SvarLanguage{
     typedef std::pair<std::string,std::string> stringpair;
     std::vector<stringpair> _token_regex={
@@ -2150,5 +2219,213 @@ class SvarLanguage{
     }
 };
 
+class SvarBuiltin{
+public:
+    SvarBuiltin(){
+        SvarClass::Class<void>()
+                .def("__str__",[](Svar){return "Null";});
+        SvarClass::Class<int>()
+                .def("__init__",&SvarBuiltin::int_create)
+                .def("__double__",[](int i){return (double)i;})
+                .def("__bool__",[](int i){return (bool)i;})
+                .def("__str__",[](int i){return Svar::toString(i);})
+                .def("__eq__",[](int self,int rh){return self==rh;})
+                .def("__lt__",[](int self,int rh){return self<rh;})
+                .def("__add__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self+rh.as<int>());
+            if(rh.is<double>()) return Svar(self+rh.as<double>());
+            return Svar::Undefined();
+        })
+                .def("__sub__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self-rh.as<int>());
+            if(rh.is<double>()) return Svar(self-rh.as<double>());
+            return Svar::Undefined();
+        })
+                .def("__mul__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self*rh.as<int>());
+            if(rh.is<double>()) return Svar(self*rh.as<double>());
+            return Svar::Undefined();
+        })
+                .def("__div__",[](int self,Svar rh){
+            if(rh.is<int>()) return Svar(self/rh.as<int>());
+            if(rh.is<double>()) return Svar(self/rh.as<double>());
+            return Svar::Undefined();
+        })
+                .def("__mod__",[](int self,int rh){
+            return self%rh;
+        })
+                .def("__neg__",[](int self){return -self;})
+                .def("__xor__",[](int self,int rh){return self^rh;})
+                .def("__or__",[](int self,int rh){return self|rh;})
+                .def("__and__",[](int self,int rh){return self&rh;});
+
+        SvarClass::Class<bool>()
+                .def("__int__",[](bool b){return (int)b;})
+                .def("__double__",[](bool b){return (double)b;})
+                .def("__str__",[](bool b){return Svar::toString(b);})
+                .def("__eq__",[](bool self,bool rh){return self==rh;});
+
+        SvarClass::Class<double>()
+                .def("__int__",[](double d){return (int)d;})
+                .def("__bool__",[](double d){return (bool)d;})
+                .def("__str__",[](double d){return Svar::toString(d);})
+                .def("__eq__",[](double self,double rh){return self==rh;})
+                .def("__lt__",[](double self,double rh){return self<rh;})
+                .def("__neg__",[](double self){return -self;})
+                .def("__add__",[](double self,double rh){return self+rh;})
+                .def("__sub__",[](double self,double rh){return self-rh;})
+                .def("__mul__",[](double self,double rh){return self*rh;})
+                .def("__div__",[](double self,double rh){return self/rh;})
+                .def("__invert__",[](double self){return 1./self;});
+
+        SvarClass::Class<std::string>()
+                .def("__len__",[](const Svar& self){return self.as<std::string>().size();})
+                .def("__str__",[](Svar self){
+            std::string out;
+            dump(self.as<std::string>(),out);
+            return out;
+        })
+                .def("__add__",[](const std::string& self,std::string rh){
+            std::cerr<<"added "<<self<<rh;
+            return self+rh;
+        })
+                .def("__eq__",[](const std::string& self,std::string rh){return self==rh;})
+                .def("__lt__",[](const std::string& self,std::string rh){return self<rh;});
+
+        SvarClass::Class<char const*>()
+                .def("__str__",[](char const* str){
+            return std::string(str);
+        });
+
+        SvarClass::Class<SvarArray>()
+                .def("__getitem__",[](Svar self,int i){
+            SvarArray& array=self.as<SvarArray>();
+            return array[i];
+        })
+        .def("__str__",[](Svar self){return Svar::toString(self.as<SvarArray>());})
+        .def("__iter__",[](Svar self){
+            static Svar arrayinteratorClass;
+            if(!arrayinteratorClass.isClass()){
+                SvarClass* cls=new SvarClass("arrayiterator",typeid(SvarObject));
+                arrayinteratorClass=(SvarValue*)cls;
+                cls->def("next",[](Svar iter){
+                    Svar arrObj=iter.get("array");
+                    SvarArray& array=arrObj.as<SvarArray>();
+                    int& index=iter.get<int>("index",0);
+                    if(index<(int)array.length()){
+                        return array[index++];
+                    }
+                    return Svar();
+                });
+            }
+            Svar iter=Svar::object({{"array",self},
+                                   {"index",0}});
+            iter.as<SvarObject>()._class=arrayinteratorClass;
+            return iter;
+        })
+        .def("__add__",[](Svar self,Svar other){
+            return self.as<SvarArray>()+other;
+        })
+        .def("append",&SvarArray::append);
+
+        SvarClass::Class<SvarDict>()
+                .def("__getitem__",[](Svar self,Svar key){
+            return self.as<SvarDict>()[key];
+        });
+
+
+        SvarClass::Class<SvarObject>()
+                .def("__getitem__",[](Svar self,Svar key){
+            return self.as<SvarObject>()[key.castAs<std::string>()];
+        })
+        .def("__str__",[](Svar self){return Svar::toString(self.as<SvarObject>());})
+        .def("update",&SvarObject::update);
+
+        SvarClass::Class<SvarFunction>()
+                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
+
+        SvarClass::Class<SvarClass>()
+                .def("doc",[](Svar self){return Svar::toString(self.as<SvarClass>());})
+        .def("__getitem__",[](Svar self,std::string key){
+            return self.as<SvarClass>()[key];
+        });
+
+        SvarClass::Class<Json>()
+                .def("load",&Json::load)
+                .def("dump",&Json::dump);
+
+        SvarClass::Class<Xml>()
+                .def("load",&Xml::load)
+                .def("dump",&Xml::dump);
+
+        SvarClass::Class<Yaml>()
+                .def("load",&Yaml::load)
+                .def("dump",&Yaml::dump);
+
+        Svar::instance().set("__builtin__.int",SvarClass::instance<int>());
+        Svar::instance().set("__builtin__.double",SvarClass::instance<double>());
+        Svar::instance().set("__builtin__.int",SvarClass::instance<bool>());
+        Svar::instance().set("__builtin__.str",SvarClass::instance<std::string>());
+        Svar::instance().set("__builtin__.dict",SvarClass::instance<SvarDict>());
+        Svar::instance().set("__builtin__.object",SvarClass::instance<SvarObject>());
+        Svar::instance().set("__builtin__.array",SvarClass::instance<SvarArray>());
+        Svar::instance().set("__builtin__.Json",SvarClass::instance<Json>());
+#ifdef GSLAM_SVAR_HAS_XML
+        Svar::instance().set("__builtin__.Xml",SvarClass::instance<Xml>());
+#endif
+#ifdef GSLAM_SVAR_HAS_YAML
+        Svar::instance().set("__builtin__.Yaml",SvarClass::instance<Yaml>());
+#endif
+    }
+
+    static Svar int_create(Svar rh){
+        if(rh.is<int>()) return rh;
+        if(rh.is<std::string>()) return (Svar)Svar::fromString<int>(rh.as<std::string>());
+        if(rh.is<double>()) return (Svar)(int)rh.as<double>();
+        if(rh.is<bool>()) return (Svar)(int)rh.as<bool>();
+
+        throw SvarExeption("Can't construct int from "+rh.typeName()+".");
+        return Svar::Undefined();
+    }
+    static void dump(const std::string &value, std::string &out) {
+        out += '"';
+        for (size_t i = 0; i < value.length(); i++) {
+            const char ch = value[i];
+            if (ch == '\\') {
+                out += "\\\\";
+            } else if (ch == '"') {
+                out += "\\\"";
+            } else if (ch == '\b') {
+                out += "\\b";
+            } else if (ch == '\f') {
+                out += "\\f";
+            } else if (ch == '\n') {
+                out += "\\n";
+            } else if (ch == '\r') {
+                out += "\\r";
+            } else if (ch == '\t') {
+                out += "\\t";
+            } else if (static_cast<uint8_t>(ch) <= 0x1f) {
+                char buf[8];
+                snprintf(buf, sizeof buf, "\\u%04x", ch);
+                out += buf;
+            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
+                       && static_cast<uint8_t>(value[i+2]) == 0xa8) {
+                out += "\\u2028";
+                i += 2;
+            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
+                       && static_cast<uint8_t>(value[i+2]) == 0xa9) {
+                out += "\\u2029";
+                i += 2;
+            } else {
+                out += ch;
+            }
+        }
+        out += '"';
+    }
+
+}SvarBuiltinInitializerinstance;
+
+extern "C" GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 }
 #endif
