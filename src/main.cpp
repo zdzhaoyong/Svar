@@ -173,33 +173,34 @@ TEST(Svar,Thread){
 }
 
 TEST(Svar,Inherit){
-    SvarClass* parent=new SvarClass("parent",typeid(SvarObject));
-    parent->def("__init__",[](Svar self){
-        self.set("name","father");
-    })
-    .def("__str__",[](Svar self){
-        return Svar("I am the parent");
-    });
-    Svar p((SvarValue*)parent);
-    SvarClass* child=new SvarClass("child",typeid(SvarObject),{p});
-    child->def("__init__",[](Svar self){
-        self.set("age",10);
-    })
-    .def("__str__",[](Svar self){
-        return Svar("I am the child");
-    });
-    arrayinteratorClass=(SvarValue*)cls;
+//    SvarClass* parent=new SvarClass("parent",typeid(SvarObject));
+//    parent->def("__init__",[](Svar self){
+//        self.set("name","father");
+//    })
+//    .def("__str__",[](Svar self){
+//        return Svar("I am the parent");
+//    });
+//    Svar p((SvarValue*)parent);
+//    SvarClass* child=new SvarClass("child",typeid(SvarObject),{p});
+//    child->def("__init__",[](Svar self){
+//        self.set("age",10);
+//    })
+//    .def("__str__",[](Svar self){
+//        return Svar("I am the child");
+//    });
+//    arrayinteratorClass=(SvarValue*)cls;
 }
 
 int main(int argc,char** argv){
-    Svar unParsed=svar.parseMain(argc,argv);
-    svar.arg<int>("argInt",100,"this is a sample int argument");
-    svar.arg<double>("argDouble",100.,"this is a sample double argument");
-    svar.arg<std::string>("argString","hello","Sample string argument");
-    svar.arg<bool>("argBool",false,"Sample bool argument");
-    svar.arg<bool>("child.bool",true,"Child bool");
-    if(svar.get<bool>("help",false)){
-        svar.help();
+    Svar var;
+    Svar unParsed=var.parseMain(argc,argv);
+    var.arg<int>("argInt",100,"this is a sample int argument");
+    var.arg<double>("argDouble",100.,"this is a sample double argument");
+    var.arg<std::string>("argString","hello","Sample string argument");
+    var.arg<bool>("argBool",false,"Sample bool argument");
+    var.arg<bool>("child.bool",true,"Child bool");
+    if(var.get<bool>("help",false)){
+        var.help();
         return 0;
     }
     std::cerr<<"Unparsed arguments:"<<unParsed;
@@ -207,6 +208,6 @@ int main(int argc,char** argv){
     testing::InitGoogleTest(&argc,argv);
     auto ret= RUN_ALL_TESTS();
 
-    std::cout<<svar;
+    std::cout<<var;
     return 0;
 }
