@@ -41,27 +41,25 @@
 #define GSLAM_JVAR_H
 
 #include <assert.h>
-#include <fstream>
-#include <functional>
-#include <iomanip>
+#include <cctype>
 #include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <vector>
 #include <list>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <thread>
 #include <typeindex>
-#include <vector>
-#include <regex>
-#include <iterator>
-#include <cctype>
+#include <functional>
 #ifdef __GNUC__
 #include <cxxabi.h>
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
-#define GSLAM_SVAR_HAS_XML
+//#define GSLAM_SVAR_HAS_XML
 #ifdef GSLAM_SVAR_HAS_XML
 #include <GSLAM/core/XML.h>
 #endif
@@ -248,6 +246,8 @@ public:
     /// Is holding a type T value?
     template <typename T>
     bool is()const;
+    bool is(const std::type_index& typeId)const;
+    bool is(const std::string& typeStr)const;
 
     /// Should always check type with "is<T>()" first
     template <typename T>
@@ -261,6 +261,8 @@ public:
     /// Success: return a Svar holding T instance, Failed: return Undefined
     template <typename T>
     Svar cast()const;
+
+    Svar cast(const std::string& typeStr)const;
 
     /// No cast is performed, directly return the c++ pointer, throw SvarException when failed
     template <typename T>
@@ -1044,6 +1046,8 @@ inline Svar::Svar(const std::map<Svar,Svar>& m)
 
 template <typename T>
 inline bool Svar::is()const{return _obj->cpptype()==typeid(T);}
+inline bool Svar::is(const std::type_index& typeId)const{return _obj->cpptype()==typeId;}
+inline bool Svar::is(const std::string& typeStr)const{return typeName(_obj->cpptype().name())==typeStr;}
 
 template <>
 inline bool Svar::is<Svar>()const{return !isUndefined();}
@@ -1083,6 +1087,22 @@ T& Svar::as(){
 template <>
 inline Svar& Svar::as<Svar>(){
     return *this;
+}
+
+Svar Svar::cast(const std::string& typeStr)const
+{
+    if(is(typeStr)) return (*this);
+
+    Svar cl=_obj->classObject();
+    if(cl.isClass()){
+        SvarClass& srcClass=cl.as<SvarClass>();
+        Svar cvt=srcClass._methods["__"+typeStr+"__"];
+        if(cvt.isFunction()){
+            Svar ret=cvt(*this);
+            if(ret.is(typeStr)) return ret;
+        }
+    }
+    return Undefined();
 }
 
 template <typename T>
@@ -3055,97 +3075,10 @@ private:
  SvarMapHolder<std::vector<std::string> > functions;
 
  std::string parsingFile;
- std::deque<std::string> fileQueue;
+ std::vector<std::string> fileQueue;
  int         collectFlag=0;
 };
 
-class SvarLanguage{
-    typedef std::pair<std::string,std::string> stringpair;
-    std::vector<stringpair> _token_regex={
-        {"comment", "^#[^\\n]*"},
-        {"indent", "^\\n( *)"},
-        {"space", "^ +"},
-        {"import","^from +([\\w][\\w -]*) +import +([\\w][\\w -,]*)\\n"},
-        {"import","^import +([\\w][\\w -,]*) +(as +[\\w][\\w -]*)\\n"},
-        {"class", "^class +([\\w]+)\\(?([\\w][\\w -,]*)\\)?: *\\n"},
-        {"def", "^def +([\\w]+)\\(?([\\w][\\w -,]*)\\)?: *\\n"},
-        {"if","^if +(.+): *\\n"},
-        {"@","^@(.+)\\n"},
-        {"set","^([\\w][\\w.]*) *= *"},
-        {"call","^([\\w][\\w.]*)"},
-        {"true", "^\\b(enabled|true|yes|on)\\b"},
-        {"false", "^\\b(disabled|false|no|off)\\b"},
-        {"null", "^\\b(null|Null|NULL|~)\\b"},
-        {"string", "^\"(.*?)\""},
-        {"string", "^'(.*?)'"},
-        {"timestamp", "^((\\d{4})-(\\d\\d?)-(\\d\\d?)(?:(?:[ \\t]+)(\\d\\d?):(\\d\\d)(?::(\\d\\d))?)?)"},
-        {"float", "^(\\d+\\.\\d+)"},
-        {"int", "^(\\d+)"},
-        {"doc", "^---"},
-        {",", "^,"},
-        {"{", "^\\{(?![^\\n\\}]*\\}[^\\n]*[^\\s\\n\\}])"},
-        {"}", "^\\}"},
-        {"[", "^\\[(?![^\\n\\]]*\\][^\\n]*[^\\s\\n\\]])"},
-        {"]", "^\\]"},
-        {"(", "^\\((?![^\\n\\]]*\\][^\\n]*[^\\s\\n\\]])"},
-        {")", "^\\)"},
-        {"-", "^\\-"},
-        {":", "^[:]"},
-        {"string", "^(?![^:\\n\\s]*:[^\\/]{2})(([^:,\\]\\}\\n\\s]|(?!\\n)\\s(?!\\s*?\\n)|:\\/\\/|,(?=[^\\n]*\\s*[^\\]\\}\\s\\n]\\s*\\n)|[\\]\\}](?=[^\\n]*\\s*[^\\]\\}\\s\\n]\\s*\\n))*)(?=[,:\\]\\}\\s\\n]|$)"},
-        {"id", "^([\\w][\\w -]*)"}
-    };
-
-    static std::list<stringpair> tokenize(std::string str,std::vector<stringpair> tokens){
-        str=std::regex_replace(str,std::regex("\\r\\n"),"\\n");
-        std::smatch captures;
-        bool ignore=false;
-        int indents = 0, lastIndents = 0,indentAmount = -1;
-        std::list<std::string> indents_stack;
-        stringpair  token;
-        std::list<stringpair> stack;
-        while (str.length()) {
-            for (size_t i = 0, len = tokens.size(); i < len; ++i)
-                if(std::regex_search(str,captures,std::regex(tokens[i].second)))
-                {
-                    auto type=tokens[i].first;
-                    token=std::make_pair(type,captures.str());
-                    str = std::regex_replace(str,std::regex(tokens[i].second),"");
-                    if(type=="comment")
-                    {
-                        ignore = true;
-                    }
-                    else if(type=="indent")
-                    {
-                        if(indents_stack.empty()){
-                            indents_stack.push_back(token.second);
-                            stack.push_back(token);
-                        }
-                        if(token.second==indents_stack.back())
-                            token.first = "";
-                        else if(token.second.length()>indents_stack.back().length())
-                            indents_stack.push_back(token.second);
-                        else{
-                            token.first = "dedent";
-                            while(token.second.length()<indents_stack.back().length()
-                                  &&!indents_stack.empty()){
-                                indents_stack.pop_back();
-                                stack.push_back(token);
-                            }
-                            token.first.clear();
-                        }
-                    }
-                    break;
-                }
-            if (token.first.size()){
-                stack.push_back(token);
-                std::cout<<"push_back:"<<token.first<<","
-                        <<token.second<<std::endl;
-                token.first="";
-            }
-        }
-        return stack;
-    }
-};
 
 class SvarBuiltin{
 public:
