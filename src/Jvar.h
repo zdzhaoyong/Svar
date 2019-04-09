@@ -233,7 +233,10 @@ public:
     /// Create any other c++ type instance, T need to be a copyable type
     template <class T>
     static Svar create(const T & t);
-
+    template <class T>
+    static Svar create(T && t);
+//    static Svar create(Svar && t);
+//    static Svar create(int && t);
     /// Create an Object instance
     static Svar object(const std::map<std::string,Svar>& m={}){return Svar(m);}
 
@@ -592,7 +595,8 @@ public:
         std::vector<std::type_index> types={typeid(Args)...};
         std::stringstream signature;signature<<"(";
         for(size_t i=0;i<types.size();i++)
-            signature<<Svar::typeName(types[i].name())<<(i+1==types.size()?")->":",");
+            signature<<Svar::typeName(types[i].name())<<(i+1==types.size()?"":",");
+        signature<<")->";
         signature<<Svar::typeName(typeid(Return).name());
         this->signature=signature.str();
         nargs=types.size();
@@ -622,7 +626,7 @@ public:
         while(overload){
             sst<<"    "<<overload->getName()<<overload->signature<<std::endl;
             if(!overload->next.isFunction()) {
-                overload=nullptr;break;
+                return sst;
             }
             overload=&overload->next.as<SvarFunction>();
         }
@@ -656,11 +660,11 @@ public:
     SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
         assert(function.isFunction());
-        Svar& dest=_methods.getOrCreate(name);
-        while(dest.isFunction()) dest=dest.as<SvarFunction>().next;
-        dest=function;
-        dest.as<SvarFunction>().is_method=isMethod;
-        dest.as<SvarFunction>().name=__name__+"."+name;
+        Svar* dest=&_methods.getOrCreate(name);
+        while(dest->isFunction()) dest=&dest->as<SvarFunction>().next;
+        *dest=function;
+        dest->as<SvarFunction>().is_method=isMethod;
+        dest->as<SvarFunction>().name=__name__+"."+name;
 
         if(__init__.is<void>()&&name=="__init__") __init__=function;
         if(__int__.is<void>()&&name=="__int__") __int__=function;
@@ -705,6 +709,17 @@ public:
         return def(name,Svar::lambda(f),false);
     }
 
+    template <typename... Types>
+    SvarClass& inherit(Types... types){
+        _parents={SvarClass::instance<Types>()...};
+        return *this;
+    }
+
+    SvarClass& inherit(std::vector<Svar> parents={}){
+        _parents=parents;
+        return *this;
+    }
+
 //    SvarClass& def_property(const std::string& name,);
 
     Svar operator [](const std::string& name){
@@ -712,7 +727,7 @@ public:
         if(!c.isUndefined())  return c;
         for(Svar& p:_parents)
         {
-            c=p.as<SvarClass>()._methods[name];
+            c=p.as<SvarClass>()[name];
             if(!c.isUndefined()) return c;
         }
         return Svar::Undefined();
@@ -752,7 +767,9 @@ Svar& SvarClass::instance()
 template <typename T>
 class SvarValue_: public SvarValue{
 public:
-    SvarValue_(const T& v):_var(v){}
+    explicit SvarValue_(const T& v):_var(v){}
+    explicit SvarValue_(T&& v):_var(std::move(v)){
+    }
 
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return &_var;}
@@ -778,6 +795,12 @@ public:
     T getCopy()const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     T _var;
+};
+
+template <>
+class SvarValue_<Svar>: public SvarValue{
+private:
+    SvarValue_(const Svar& v){}
 };
 
 class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
@@ -1026,11 +1049,28 @@ inline Svar Svar::create(const T & t)
     return (SvarValue*)new SvarValue_<T>(t);
 }
 
+template <class T>
+inline Svar Svar::create(T && t)
+{
+    return (SvarValue*)new SvarValue_<typename std::remove_reference<T>::type>(t);
+}
+
 template <>
 inline Svar Svar::create(const Svar & t)
 {
     return t;
 }
+
+template <>
+inline Svar Svar::create( Svar && t)
+{
+    return std::move(t);
+}
+
+//inline Svar Svar::create(int && t)
+//{
+//    return (SvarValue*)new SvarValue_<int>(t);
+//}
 
 inline Svar::Svar(const std::string& m)
     :_obj(std::make_shared<SvarValue_<std::string>>(m)){}
@@ -1365,7 +1405,7 @@ Svar Svar::call(const std::string function, Args... args)const
     // call as member methods with check
     auto clsPtr=classPtr();
     if(!clsPtr) throw SvarExeption("Unable to call "+typeName()+"."+function);
-    func=clsPtr->_methods[function];
+    func=(*clsPtr)[function];
     if(!func.isFunction()) throw SvarExeption("Unable to call "+clsPtr->__name__+"."+function);
     if(func.as<SvarFunction>().is_method) return func(*this,args...);
 
@@ -1674,7 +1714,8 @@ inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
     }
     auto cls=self.classPtr();
     if(cls&&cls->__str__.isFunction()){
-        ost<<cls->__str__(self).as<std::string>();
+        Svar a = cls->__str__(self);
+        ost<<a.as<std::string>();
         return ost;
     }
     ost<<"<"<<self.typeName()<<" at "<<self.value()->ptr()<<">";

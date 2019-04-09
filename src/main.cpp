@@ -5,7 +5,17 @@
 
 using namespace GSLAM;
 
-TEST(Svar,SvarCreate)
+class NoCopyV{
+public:
+    NoCopyV(int v):value(v){}
+
+//    NoCopyV(const NoCopyV& v):value(v.value){}
+    int value;
+    NoCopyV & operator =(const NoCopyV &v) = delete;
+    NoCopyV(const NoCopyV &) = delete;
+};
+
+TEST(Svar,Variable)
 {
     Svar var(false);
     EXPECT_EQ(var.typeName(),"bool");
@@ -22,24 +32,16 @@ TEST(Svar,SvarCreate)
     Svar obj(std::map<std::string,int>({{"1",1}}));
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
-}
+//    NoCopyV v(3);
+//    Svar NoCopyVar=Svar::create(3);
 
-TEST(Svar,GetSet){
-    Svar var;
-    int& testInt=var.GetInt("child.testInt",20);
-    EXPECT_EQ(testInt,20);
-    testInt=30;
-    EXPECT_EQ(var.GetInt("child.testInt"),30);
-    var.set("child.testInt",40);
-    EXPECT_EQ(testInt,40);
-    EXPECT_EQ(var["child"]["testInt"],40);
 }
 
 std::string add(std::string left,const std::string& r){
     return left+r;
 }
 
-TEST(Svar,SvarFunction)
+TEST(Svar,Function)
 {
     int intV=0,srcV=0;
     Svar intSvar(0);
@@ -86,6 +88,75 @@ TEST(Svar,SvarFunction)
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
 
+}
+
+class BaseClass{
+public:
+    BaseClass():age_(0){}
+    BaseClass(int age):age_(age){}
+
+    int getAge()const{return age_;}
+    void setAge(int a){age_=a;}
+
+    static BaseClass create(int a){return BaseClass(a);}
+    static BaseClass create1(){return BaseClass();}
+
+    virtual std::string intro()const{return "age:"+std::to_string(age_);}
+
+    int age_;
+};
+
+class InheritClass: public BaseClass
+{
+public:
+    InheritClass(int age,std::string name):BaseClass(age),name_(name){}
+
+    std::string name()const{return name_;}
+
+    virtual std::string intro() const{return BaseClass::intro()+", name:"+name_;}
+    std::string name_;
+};
+
+
+TEST(Svar,Class){
+    SvarClass::Class<BaseClass>()
+            .def_static("__init__",[](){return BaseClass();})
+            .def_static("__init__",[](int age){return BaseClass(age);})
+            .def("getAge",&BaseClass::getAge)
+            .def("setAge",&BaseClass::setAge)
+            .def_static("create",&BaseClass::create)
+            .def_static("create1",&BaseClass::create1)
+            .def("intro",&BaseClass::intro);
+    Svar a=Svar::create(BaseClass(10));
+    Svar baseClass=a.classObject();
+    a=baseClass["__init__"](10);
+    a=baseClass();//
+    a=baseClass(10);//
+    EXPECT_EQ(a.call("getAge").as<int>(),10);
+    EXPECT_EQ(a.call("intro").as<std::string>(),BaseClass(10).intro());
+
+
+    SvarClass::Class<InheritClass>()
+            .inherit({SvarClass::instance<BaseClass>()})
+            .def("__init__",[](int age,std::string name){return InheritClass(age,name);})
+            .def("name",&InheritClass::name)
+            .def("intro",&InheritClass::intro);
+    Svar b=Svar::create(InheritClass(10,"xm"));
+    std::cout<<SvarClass::Class<InheritClass>();
+    EXPECT_EQ(b.call("getAge").as<int>(),10);
+    EXPECT_EQ(b.call("name").as<std::string>(),"xm");
+    EXPECT_EQ(b.call("intro").as<std::string>(),InheritClass(10,"xm").intro());
+}
+
+TEST(Svar,GetSet){
+    Svar var;
+    int& testInt=var.GetInt("child.testInt",20);
+    EXPECT_EQ(testInt,20);
+    testInt=30;
+    EXPECT_EQ(var.GetInt("child.testInt"),30);
+    var.set("child.testInt",40);
+    EXPECT_EQ(testInt,40);
+    EXPECT_EQ(var["child"]["testInt"],40);
 }
 
 TEST(Svar,Call){
@@ -172,7 +243,28 @@ TEST(Svar,Thread){
     for(auto& it:threads) it.join();
 }
 
+class SayHello{
+public:
+    SayHello(std::string nm):name(nm){}
+    void sayHello(){}
+    std::string name;// warp a member value
+};
+
 TEST(Svar,Inherit){
+    svar.set("classSayHello",SayHello("xiaoming"));
+    EXPECT_TRUE(svar["classSayHello"].is<SayHello>());
+//    auto say_hello=new SvarClass("SayHello",typeid(SayHello));
+//    say_hello->def("__init__",&SayHello::SayHello)
+//            .def("sayHello",&SayHello::sayHello)
+//            .def("name",&SayHello::name)
+//            ;
+
+//    Svar zy=Svar(say_hello)("zhaoyong");
+//    zy["sayHello"]();
+//    zy.call("sayHello");
+//    std::string name=zy["name"].as<std::string>();
+
+
 //    SvarClass* parent=new SvarClass("parent",typeid(SvarObject));
 //    parent->def("__init__",[](Svar self){
 //        self.set("name","father");
@@ -190,7 +282,6 @@ TEST(Svar,Inherit){
 //    });
 //    arrayinteratorClass=(SvarValue*)cls;
 }
-
 int main(int argc,char** argv){
     Svar var;
     Svar unParsed=var.parseMain(argc,argv);
