@@ -1,29 +1,23 @@
 //#include "Svar.h"
-#include "Jvar.h"
+#include "Svar.h"
 #include "gtest.h"
 #include <GSLAM/core/Timer.h>
 
 using namespace GSLAM;
 
-class NoCopyV{
-public:
-    NoCopyV(int v):value(v){}
-
-//    NoCopyV(const NoCopyV& v):value(v.value){}
-    int value;
-    NoCopyV & operator =(const NoCopyV &v) = delete;
-    NoCopyV(const NoCopyV &) = delete;
-};
-
 TEST(Svar,Variable)
 {
+    EXPECT_TRUE(Svar()==Svar::Undefined());
+    EXPECT_TRUE(Svar(nullptr)==Svar::Null());
+
     Svar var(false);
     EXPECT_EQ(var.typeName(),"bool");
-    EXPECT_TRUE(Svar()==Svar::Undefined());
     EXPECT_TRUE(var.is<bool>());
     EXPECT_FALSE(var.as<bool>());
+
     EXPECT_TRUE(Svar(1).is<int>());
     EXPECT_TRUE(Svar(1).as<int>()==1);
+
     EXPECT_TRUE(Svar("").as<std::string>().empty());
     EXPECT_TRUE(Svar(1.).as<double>()==1.);
     EXPECT_TRUE(Svar(std::vector<int>({1,2})).isArray());
@@ -32,9 +26,6 @@ TEST(Svar,Variable)
     Svar obj(std::map<std::string,int>({{"1",1}}));
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
-//    NoCopyV v(3);
-//    Svar NoCopyVar=Svar::create(3);
-
 }
 
 std::string add(std::string left,const std::string& r){
@@ -112,6 +103,7 @@ public:
     InheritClass(int age,std::string name):BaseClass(age),name_(name){}
 
     std::string name()const{return name_;}
+    std::string setName(std::string name){name_=name;}
 
     virtual std::string intro() const{return BaseClass::intro()+", name:"+name_;}
     std::string name_;
@@ -135,9 +127,8 @@ TEST(Svar,Class){
     EXPECT_EQ(a.call("getAge").as<int>(),10);
     EXPECT_EQ(a.call("intro").as<std::string>(),BaseClass(10).intro());
 
-
     SvarClass::Class<InheritClass>()
-            .inherit({SvarClass::instance<BaseClass>()})
+            .inherit<BaseClass>()
             .def("__init__",[](int age,std::string name){return InheritClass(age,name);})
             .def("name",&InheritClass::name)
             .def("intro",&InheritClass::intro);
@@ -146,6 +137,8 @@ TEST(Svar,Class){
     EXPECT_EQ(b.call("getAge").as<int>(),10);
     EXPECT_EQ(b.call("name").as<std::string>(),"xm");
     EXPECT_EQ(b.call("intro").as<std::string>(),InheritClass(10,"xm").intro());
+    b.call("setAge",20);
+    EXPECT_EQ(b.call("getAge").as<int>(),20);
 }
 
 TEST(Svar,GetSet){
@@ -157,6 +150,14 @@ TEST(Svar,GetSet){
     var.set("child.testInt",40);
     EXPECT_EQ(testInt,40);
     EXPECT_EQ(var["child"]["testInt"],40);
+    var.set("int",100);
+    var.set("double",100);
+    var.set<std::string>("string","100");
+    var.set("bool",true);
+    EXPECT_EQ(var["int"],100);
+    EXPECT_EQ(var["double"],100);
+    EXPECT_EQ(var["string"],100);
+    EXPECT_EQ(var["bool"],true);
 }
 
 TEST(Svar,Call){
@@ -282,6 +283,59 @@ TEST(Svar,Inherit){
 //    });
 //    arrayinteratorClass=(SvarValue*)cls;
 }
+
+class InterfaceDemo{
+public:
+    InterfaceDemo(){}
+    virtual std::string type()const{return "DIYSLAM";}
+    virtual bool valid()const{return true;}
+
+    virtual bool track(Svar& frame);
+
+    virtual void call(const std::string& command,void* arg=NULL);
+
+    virtual void draw();
+
+    virtual bool isDrawable()const{return false;}
+
+    virtual bool setCallback(Svar *cbk);
+
+    void trackingThread();
+
+    void init();
+    void release();
+    void tryFitGPS();
+};
+
+class ApplicationDemo{
+public:
+    ApplicationDemo(std::string name){
+        std::cout<<"Application Created.";
+    }
+    std::string name()const{return "ApplicationDemo";}
+
+    std::string gslam_version()const{return "3.2";}
+
+    std::string introduction()const{
+
+    }
+};
+
+REGISTER_SVAR_MODULE(ApplicationDemo){
+    SvarClass::Class<ApplicationDemo>()
+            .def("__init__",[](std::string name){return ApplicationDemo(name);})
+    .def("name",&ApplicationDemo::name);
+    svar.set("ApplicationDemo",SvarClass::instance<ApplicationDemo>());
+}
+
+void interfaceDemo()
+{
+    Svar ApplicationDemo=svar["ApplicationDemo"];
+    EXPECT_TRUE(ApplicationDemo.isClass());
+    std::cout<<ApplicationDemo.as<SvarClass>();
+    Svar inst=ApplicationDemo("name");
+}
+
 int main(int argc,char** argv){
     Svar var;
     Svar unParsed=var.parseMain(argc,argv);
@@ -290,15 +344,27 @@ int main(int argc,char** argv){
     var.arg<std::string>("argString","hello","Sample string argument");
     var.arg<bool>("argBool",false,"Sample bool argument");
     var.arg<bool>("child.bool",true,"Child bool");
+    bool interface=var.arg<bool>("interfaceDemo",false,"Show the interface demo.");
+    bool tests=var.arg<bool>("test",false,"Perform google tests.");
+    var.arg<bool>("dumpVar",false,"DumpVar");
     if(var.get<bool>("help",false)){
         var.help();
         return 0;
     }
-    std::cerr<<"Unparsed arguments:"<<unParsed;
 
-    testing::InitGoogleTest(&argc,argv);
-    auto ret= RUN_ALL_TESTS();
+    std::cerr<<"Unparsed arguments:"<<unParsed<<std::endl;
 
-    std::cout<<var;
+    if(interface){
+        interfaceDemo();
+    }
+
+    if(tests){
+        testing::InitGoogleTest(&argc,argv);
+        auto ret= RUN_ALL_TESTS();
+    }
+
+    if(var.Get<bool>("dumpVar")){
+        std::cout<<var;
+    }
     return 0;
 }

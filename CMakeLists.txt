@@ -2,5 +2,5 @@ cmake_minimum_required(VERSION 2.8)
 include(PICMake)
 
 set(CMAKE_CXX_FLAGS -std=c++11)
-pi_add_target(svar BIN src REQUIRED System DEPENDENCY yaml-cpp)
+pi_add_target(svar BIN src REQUIRED System GSLAM DEPENDENCY yaml-cpp)
 pi_report_targets()
