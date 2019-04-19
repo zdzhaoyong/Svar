@@ -1,7 +1,6 @@
-//#include "Svar.h"
+#define __SVAR_BUILDIN__
 #include "Svar.h"
 #include "gtest.h"
-#include <GSLAM/core/Timer.h>
 
 using namespace GSLAM;
 
@@ -26,6 +25,7 @@ TEST(Svar,Variable)
     Svar obj(std::map<std::string,int>({{"1",1}}));
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
+
 }
 
 std::string add(std::string left,const std::string& r){
@@ -133,7 +133,6 @@ TEST(Svar,Class){
             .def("name",&InheritClass::name)
             .def("intro",&InheritClass::intro);
     Svar b=Svar::create(InheritClass(10,"xm"));
-    std::cout<<SvarClass::Class<InheritClass>();
     EXPECT_EQ(b.call("getAge").as<int>(),10);
     EXPECT_EQ(b.call("name").as<std::string>(),"xm");
     EXPECT_EQ(b.call("intro").as<std::string>(),InheritClass(10,"xm").intro());
@@ -244,46 +243,6 @@ TEST(Svar,Thread){
     for(auto& it:threads) it.join();
 }
 
-class SayHello{
-public:
-    SayHello(std::string nm):name(nm){}
-    void sayHello(){}
-    std::string name;// warp a member value
-};
-
-TEST(Svar,Inherit){
-    svar.set("classSayHello",SayHello("xiaoming"));
-    EXPECT_TRUE(svar["classSayHello"].is<SayHello>());
-//    auto say_hello=new SvarClass("SayHello",typeid(SayHello));
-//    say_hello->def("__init__",&SayHello::SayHello)
-//            .def("sayHello",&SayHello::sayHello)
-//            .def("name",&SayHello::name)
-//            ;
-
-//    Svar zy=Svar(say_hello)("zhaoyong");
-//    zy["sayHello"]();
-//    zy.call("sayHello");
-//    std::string name=zy["name"].as<std::string>();
-
-
-//    SvarClass* parent=new SvarClass("parent",typeid(SvarObject));
-//    parent->def("__init__",[](Svar self){
-//        self.set("name","father");
-//    })
-//    .def("__str__",[](Svar self){
-//        return Svar("I am the parent");
-//    });
-//    Svar p((SvarValue*)parent);
-//    SvarClass* child=new SvarClass("child",typeid(SvarObject),{p});
-//    child->def("__init__",[](Svar self){
-//        self.set("age",10);
-//    })
-//    .def("__str__",[](Svar self){
-//        return Svar("I am the child");
-//    });
-//    arrayinteratorClass=(SvarValue*)cls;
-}
-
 class InterfaceDemo{
 public:
     InterfaceDemo(){}
@@ -309,16 +268,17 @@ public:
 
 class ApplicationDemo{
 public:
-    ApplicationDemo(std::string name){
+    ApplicationDemo(std::string name):_name(name){
         std::cout<<"Application Created.";
     }
-    std::string name()const{return "ApplicationDemo";}
+    std::string name()const{return _name;}
 
     std::string gslam_version()const{return "3.2";}
 
     std::string introduction()const{
 
     }
+    std::string _name;
 };
 
 REGISTER_SVAR_MODULE(ApplicationDemo){
@@ -334,6 +294,7 @@ void interfaceDemo()
     EXPECT_TRUE(ApplicationDemo.isClass());
     std::cout<<ApplicationDemo.as<SvarClass>();
     Svar inst=ApplicationDemo("name");
+    EXPECT_EQ(inst.call("name"),"name");
 }
 
 int main(int argc,char** argv){

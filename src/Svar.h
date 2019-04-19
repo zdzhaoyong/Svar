@@ -416,9 +416,6 @@ public:
     template <typename T>
     static std::string toString(const T& v);
 
-    template <typename T>
-    static T fromString(const std::string& str);
-
     /// Return the raw holder
     const std::shared_ptr<SvarValue>& value()const{return _obj;}
 
@@ -446,25 +443,6 @@ public:
         return set<T>(name,def);
     }
 
-    static std::string getFolderPath(const std::string& path) {
-      auto idx = std::string::npos;
-      if ((idx = path.find_last_of('/')) == std::string::npos)
-        idx = path.find_last_of('\\');
-      if (idx != std::string::npos)
-        return path.substr(0, idx);
-      else
-        return "";
-    }
-
-    static std::string getBaseName(const std::string& path) {
-      std::string filename = getFileName(path);
-      auto idx = filename.find_last_of('.');
-      if (idx == std::string::npos)
-        return filename;
-      else
-        return filename.substr(0, idx);
-    }
-
     static std::string getFileName(const std::string& path) {
       auto idx = std::string::npos;
       if ((idx = path.find_last_of('/')) == std::string::npos)
@@ -485,8 +463,6 @@ public:
     virtual TypeID          cpptype()const{return typeid(void);}
     virtual const void*     ptr() const{return nullptr;}
     virtual const Svar&     classObject()const{return Svar::Undefined();}
-    virtual bool            equals(const Svar& other) const {return other.value()->ptr()==ptr();}
-    virtual bool            less(const Svar& other) const {return other.value()->ptr()<ptr();}
     virtual size_t          length() const {return 0;}
     virtual std::mutex*     accessMutex()const{return nullptr;}
 };
@@ -512,7 +488,6 @@ public:
         return "SvarIterEnd";
     }
 };
-
 
 class SvarFunction: public SvarValue{
 public:
@@ -776,7 +751,6 @@ public:
     std::vector<Svar> _parents;
 };
 
-
 template <typename T>
 Svar& SvarClass::instance()
 {
@@ -790,30 +764,12 @@ template <typename T>
 class SvarValue_: public SvarValue{
 public:
     explicit SvarValue_(const T& v):_var(v){}
-    explicit SvarValue_(T&& v):_var(std::move(v)){
-    }
+    explicit SvarValue_(T&& v):_var(std::move(v)){}
 
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return &_var;}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
-    virtual bool            equals(const Svar& other) const {
-        const Svar& clsobj=classObject();
-        if(!clsobj.isClass()) return SvarValue::equals(other);
-        Svar eq_func=clsobj.as<SvarClass>().__eq__;
-        if(!eq_func.isFunction()) return SvarValue::equals(other);
-        Svar ret=eq_func(_var,other);
-        assert(ret.is<bool>());
-        return ret.as<bool>();
-    }
-    virtual bool            less(const Svar& other) const {
-        const Svar& clsobj=classObject();
-        if(!clsobj.isClass()) return SvarValue::less(other);
-        Svar lt_func=clsobj.as<SvarClass>().__lt__;
-        if(!lt_func.isFunction()) return SvarValue::less(other);
-        Svar ret=lt_func(_var,other);
-        assert(ret.is<bool>());
-        return ret.as<bool>();
-    }
+
     T getCopy()const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     T _var;
@@ -1019,31 +975,6 @@ inline std::string Svar::toString(const bool& def) {
   return def ? "true" : "false";
 }
 
-template <typename T>
-inline T Svar::fromString(const std::string& str) {
-  std::istringstream sst(str);
-  T def;
-  try {
-    sst >> def;
-  } catch (std::exception e) {
-    std::cerr << "Failed to read value from " << str << std::endl;
-  }
-  return def;
-}
-
-template <>
-inline std::string Svar::fromString(const std::string& str) {
-  return str;
-}
-
-template <>
-inline bool Svar::fromString<bool>(const std::string& str) {
-  if (str.empty()) return false;
-  if (str == "0") return false;
-  if (str == "false") return false;
-  return true;
-}
-
 template <typename Return, typename... Args, typename... Extra>
 Svar::Svar(Return (*f)(Args...), const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
@@ -1074,7 +1005,7 @@ inline Svar Svar::create(const T & t)
 template <class T>
 inline Svar Svar::create(T && t)
 {
-    return (SvarValue*)new SvarValue_<typename std::remove_reference<T>::type>(t);
+    return (SvarValue*)new SvarValue_<typename std::remove_reference<T>::type>(std::move(t));
 }
 
 template <>
@@ -1418,12 +1349,12 @@ Svar Svar::call(const std::string function, Args... args)const
     // call as static methods without check
     if(isClass()) return as<SvarClass>()._methods[function](args...);
     // call when func member available
-    Svar func=(*this)[function];
-    if(func.isFunction()) return func(args...);
+//    Svar func=(*this)[function];
+//    if(func.isFunction()) return func(args...);
     // call as member methods with check
     auto clsPtr=classPtr();
     if(!clsPtr) throw SvarExeption("Unable to call "+typeName()+"."+function);
-    func=(*clsPtr)[function];
+    Svar func=(*clsPtr)[function];
     if(!func.isFunction()) throw SvarExeption("Unable to call "+clsPtr->__name__+"."+function);
     if(func.as<SvarFunction>().is_method) return func(*this,args...);
 
@@ -1712,13 +1643,24 @@ inline Svar Svar::operator &(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__and__)
 
 inline bool Svar::operator ==(const Svar& rh)const{
-    return _obj->equals(rh);
+    const Svar& clsobj=classObject();
+    if(!clsobj.isClass()) return _obj->ptr()==rh.value()->ptr();
+    Svar eq_func=clsobj.as<SvarClass>().__eq__;
+    if(!eq_func.isFunction()) return _obj->ptr()==rh.value()->ptr();
+    Svar ret=eq_func(*this,rh);
+    assert(ret.is<bool>());
+    return ret.as<bool>();
 }
 
 inline bool Svar::operator <(const Svar& rh)const{
-    return _obj->less(rh);
+    const Svar& clsobj=classObject();
+    if(!clsobj.isClass()) return _obj->ptr()<rh.value()->ptr();
+    Svar lt_func=clsobj.as<SvarClass>().__lt__;
+    if(!lt_func.isFunction()) return _obj->ptr()<rh.value()->ptr();
+    Svar ret=lt_func(*this,rh);
+    assert(ret.is<bool>());
+    return ret.as<bool>();
 }
-
 
 inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
 {
@@ -1856,6 +1798,8 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     while(std::getline(content,line)){ost<<"|  "<<line<<std::endl;}
     return ost;
 }
+
+#ifdef __SVAR_BUILDIN__
 
 /// Json save and load class
 class Json final {
@@ -2260,9 +2204,6 @@ private:
 };
 
 
-
-
-
 class SvarBuiltin{
 public:
     SvarBuiltin(){
@@ -2409,7 +2350,7 @@ public:
 
     static Svar int_create(Svar rh){
         if(rh.is<int>()) return rh;
-        if(rh.is<std::string>()) return (Svar)Svar::fromString<int>(rh.as<std::string>());
+        if(rh.is<std::string>()) return (Svar)std::stoi(rh.as<std::string>());
         if(rh.is<double>()) return (Svar)(int)rh.as<double>();
         if(rh.is<bool>()) return (Svar)(int)rh.as<bool>();
 
@@ -2456,6 +2397,8 @@ public:
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;
+#endif
+
 extern "C" inline GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 }
 #endif

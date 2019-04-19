@@ -287,8 +287,8 @@ class SvarConfigLanguage {
 
   inline bool ParseStream(std::istream& is) {
     using namespace std;
-    svar_.Set("Svar.ParsingPath", Svar::getFolderPath(parsingFile));
-    svar_.Set("Svar.ParsingName", Svar::getBaseName(parsingFile));
+    svar_.Set("Svar.ParsingPath", getFolderPath(parsingFile));
+    svar_.Set("Svar.ParsingName", getBaseName(parsingFile));
     svar_.Set("Svar.ParsingFile", parsingFile);
     string buffer;
     int& shouldParse = svar_.GetInt("Svar.NoReturn", 1);
@@ -303,6 +303,26 @@ class SvarConfigLanguage {
     }
     shouldParse = 1;
     return true;
+  }
+
+
+  static std::string getFolderPath(const std::string& path) {
+    auto idx = std::string::npos;
+    if ((idx = path.find_last_of('/')) == std::string::npos)
+      idx = path.find_last_of('\\');
+    if (idx != std::string::npos)
+      return path.substr(0, idx);
+    else
+      return "";
+  }
+
+  static std::string getBaseName(const std::string& path) {
+    std::string filename = Svar::getFileName(path);
+    auto idx = filename.find_last_of('.');
+    if (idx == std::string::npos)
+      return filename;
+    else
+      return filename.substr(0, idx);
   }
 
   inline bool ParseFile(std::string sFileName) {
@@ -327,7 +347,7 @@ class SvarConfigLanguage {
     fileQueue.pop_back();
     if (fileQueue.size()) {
       parsingFile = fileQueue.back();
-      svar_.Set("Svar.ParsingPath", Svar::getFolderPath(parsingFile));
+      svar_.Set("Svar.ParsingPath", getFolderPath(parsingFile));
       svar_.Set("Svar.ParsingName", Svar::getFileName(parsingFile));
       svar_.Set("Svar.ParsingFile", parsingFile);
     } else {
