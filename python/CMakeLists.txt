@@ -11,5 +11,7 @@ pybind11_add_module(svar src/Svar.cpp src/backward.cpp)
 include(PICMake)
 
 set(CMAKE_CXX_FLAGS -std=c++11)
-pi_add_target(basic SHARED src/basic.cpp REQUIRED System)
+pi_add_target(basic SHARED src/basic.cpp)
+
+set_target_properties(basic PROPERTIES CXX_VISIBILITY_PRESET "hidden")
 pi_report_targets()

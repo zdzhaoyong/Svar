@@ -294,8 +294,7 @@ py::handle getPy(Svar src){
         convert=[](Svar src){return PyFloat_FromDouble(src.as<double>());};
     else if(src.is<std::string>())
         convert=[](Svar src){
-        std::string str=src.as<std::string>();
-        return py::str(str);
+        return py::str(src.as<std::string>()).release();
     };
     else if(src.isArray())
         convert=[](Svar src){
@@ -373,7 +372,7 @@ py::object loadSvarPlugin(std::string pluginPath){
 PYBIND11_MODULE(svar,m)
 {
     PyEval_InitThreads();
-    m.def("loadSvarPlugin",loadSvarPlugin);
+    m.def("load",loadSvarPlugin);
 
     py::class_<Svar>(m,"Svar")
             .def(py::init<>())

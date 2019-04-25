@@ -66,7 +66,11 @@
     public: SVAR_MODULE_##MODULE_NAME();\
     }SVAR_MODULE_##MODULE_NAME##instance;\
     SVAR_MODULE_##MODULE_NAME::SVAR_MODULE_##MODULE_NAME()
-
+#  if defined(WIN32) || defined(_WIN32)
+#    define SVAR_EXPORT __declspec(dllexport)
+#  else
+#    define SVAR_EXPORT __attribute__ ((visibility("default")))
+#  endif
 
 namespace GSLAM {
 
@@ -2401,7 +2405,7 @@ public:
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;
-extern "C" GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
+extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #endif
 
 }
