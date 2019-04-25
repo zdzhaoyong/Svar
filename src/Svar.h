@@ -532,13 +532,9 @@ public:
         std::list<const SvarFunction*>& _stack;
     };
 
-    template <typename... Args>
-    Svar call(Args... args)const{
+    Svar Call(std::vector<Svar> argv)const{
         thread_local static std::list<const SvarFunction*> stack;
         ScopedStack scoped_stack(stack,this);
-        std::vector<Svar> argv = {
-                (Svar::create(std::move(args)))...
-        };
 
         const SvarFunction* overload=this;
         std::vector<SvarExeption> catches;
@@ -576,6 +572,14 @@ public:
         }
 
         return Svar::Undefined();
+    }
+
+    template <typename... Args>
+    Svar call(Args... args)const{
+        std::vector<Svar> argv = {
+                (Svar::create(std::move(args)))...
+        };
+        return Call(argv);
     }
 
     /// Special internal constructor for functors, lambda functions, methods etc.
@@ -2397,8 +2401,8 @@ public:
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;
+extern "C" GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #endif
 
-extern "C" inline GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 }
 #endif
