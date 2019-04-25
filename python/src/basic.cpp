@@ -21,4 +21,5 @@ REGISTER_SVAR_MODULE(basic)
     svar.def("obtainInfo",obtainInfo);
     svar.def("dtos",dtos);
     svar.def("add",add);
+    svar.Set<std::string>("__doc__","This is a demo to show how to export a module using svar.");
 }

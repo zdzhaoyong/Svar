@@ -87,9 +87,9 @@ public:
 
         /* Dispatch code which converts function arguments and performs the actual function call */
         rec->impl = [](function_call &call) -> handle {
-            LOG(INFO)<<call.args.size();
+//            LOG(INFO)<<call.args.size();
             for(auto arg:call.args){
-                LOG(INFO)<<arg.cast<Svar>();
+//                LOG(INFO)<<arg.cast<Svar>();
             }
             std::vector<Svar> args;
             if(call.args.size()==1)
@@ -332,50 +332,13 @@ py::handle getPy(Svar src){
 }
 
 py::handle getModule(GSLAM::Svar src){
-    SvarClass* cls=src.classPtr();
-    Svar func=(*cls)["getPy"];
-    if(func.isFunction())
-        return func(src).as<py::handle>();
-
-    std::function<py::handle(Svar)> convert;
-    if(src.isNull())
-        convert=[](Svar src){return pybind11::cast(nullptr);};
-    else if(src.is<int>())
-        convert=[](Svar src){return PyLong_FromLong(src.as<int>());};
-    else if(src.is<double>())
-        convert=[](Svar src){return PyFloat_FromDouble(src.as<double>());};
-    else if(src.is<std::string>())
-        convert=[](Svar src){
-        std::string str=src.as<std::string>();
-        return py::str(str);
-    };
-    else if(src.isArray())
-        convert=[](Svar src){
-        py::list l(src.length());
-        size_t index = 0;
-        for (Svar& value : src.as<SvarArray>()._var) {
-            auto value_ = py::reinterpret_steal<py::object>(getPy(value));
-            if (!value_)
-                return py::handle();
-            PyList_SET_ITEM(l.ptr(), (ssize_t) index++, value_.release().ptr()); // steals a reference
+    if(src.isObject()){
+        py::module module("svar");
+        for (auto kv : src.as<SvarObject>()._var) {
+            module.attr(kv.first.c_str())=py::reinterpret_steal<py::object>(getModule(kv.second));
         }
-        return l.release();
+        return module.release();
     };
-    else if(src.isObject())
-        convert=[](Svar src){
-            py::module module("svar");
-            for (auto kv : src.as<SvarObject>()._var) {
-                module.attr(kv.first.c_str())=py::reinterpret_steal<py::object>(getPy(kv.second));
-            }
-            return module.release();
-        };
-    else if(src.isFunction())
-        convert=[](Svar src){
-        return svar_function(src).release();
-    };
-    else convert=[](Svar src){return py::detail::type_caster_base<Svar>::cast(src,py::return_value_policy::automatic,py::handle());};
-
-    cls->def("getPy",convert);
     return getPy(src);
 }
 
@@ -398,7 +361,7 @@ py::object loadSvarPlugin(std::string pluginPath){
     }
 
     if(var->isObject()){
-        py::reinterpret_steal<py::object>(getModule(*var));
+        return py::reinterpret_steal<py::object>(getModule(*var));
     }
 
     return py::reinterpret_steal<py::object>(getPy(*var));
