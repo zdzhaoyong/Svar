@@ -1,6 +1,12 @@
 # Svar, A Tiny Header Brings Dynamic C++ Interface
 
 ---
+
+[![Build Status](https://travis-ci.org/zdzhaoyong/Svar.svg?branch=master)](https://travis-ci.org/zdzhaoyong/Svar)
+[![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](./LICENSE)
+[![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
+
+---
 [English](./README_en.md)
 
 # 1. Why Svar? 把C++变成动态语言的高性能中介！
