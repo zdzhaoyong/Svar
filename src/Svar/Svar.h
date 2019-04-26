@@ -61,6 +61,7 @@
 #endif
 
 #define svar GSLAM::Svar::instance()
+#define GSLAM_VERSION 0x000100 // 0.1.0
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
     public: SVAR_MODULE_##MODULE_NAME();\
@@ -2361,6 +2362,7 @@ public:
         Svar::instance().set("__builtin__.object",SvarClass::instance<SvarObject>());
         Svar::instance().set("__builtin__.array",SvarClass::instance<SvarArray>());
         Svar::instance().set("__builtin__.Json",SvarClass::instance<Json>());
+        Svar::instance().set("__builtin__.version",GSLAM_VERSION);
 
     }
 
