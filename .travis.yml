@@ -58,7 +58,7 @@ script:
   - pwd
   - cmake .. -DCMAKE_BUILD_TYPE=Release -DTESTS_ENABLED=ON ${CMAKE_OPTIONS}
   - make -j2
-  - ./svar -tests
+  - ../bin/svar -tests
   
 # Generate and deploy documentation
 after_success:
