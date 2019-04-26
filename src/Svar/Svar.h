@@ -659,10 +659,16 @@ public:
     {
         assert(function.isFunction());
         Svar* dest=&_methods.getOrCreate(name);
-        while(dest->isFunction()) dest=&dest->as<SvarFunction>().next;
+        while(dest->isFunction())
+        {
+            if(dest->as<SvarFunction>().signature==function.as<SvarFunction>().signature)
+                return *this;
+            dest=&dest->as<SvarFunction>().next;
+        }
         *dest=function;
         dest->as<SvarFunction>().is_method=isMethod;
         dest->as<SvarFunction>().name=__name__+"."+name;
+
 
         if(__init__.is<void>()&&name=="__init__") __init__=function;
         if(__int__.is<void>()&&name=="__int__") __int__=function;
@@ -1392,7 +1398,8 @@ inline Svar& Svar::def(const std::string& name,Svar funcOrClass)
             set(name,funcOrClass);
         }else{
             SvarFunction& oldF=old.as<SvarFunction>();
-            oldF.next=funcOrClass;
+            if(oldF.signature!=funcOrClass.as<SvarFunction>().signature)
+                oldF.next=funcOrClass;
         }
     }
     else if(funcOrClass.isClass()){
@@ -1770,8 +1777,9 @@ inline std::string Svar::typeName(std::string name) {
       {typeid(SvarDict).name(), "dict"},
       {typeid(SvarObject).name(), "object"},
       {typeid(SvarArray).name(), "array"},
+      {typeid(SvarFunction).name(), "function"},
       {typeid(SvarClass).name(), "class"},
-      {typeid(Svar).name(), "object"},
+      {typeid(Svar).name(), "svar"},
   };
   auto it = decode.find(name);
   if (it != decode.end()) return it->second;
@@ -1792,14 +1800,14 @@ inline const Svar&  SvarFunction::classObject()const{return SvarClass::instance<
 inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     ost<<"class "<<rh.__name__<<"():\n";
     std::stringstream  content;
-    if(rh.__init__.isFunction()) content<<rh.__init__<<std::endl<<std::endl;
+    if(rh.__init__.isFunction()) content<<rh.__init__.as<SvarFunction>()<<std::endl<<std::endl;
     if(rh._doc.is<std::string>()) content<<rh._doc.as<std::string>()<<std::endl;
     if(rh._methods.isObject()&&rh._methods.length()){
         content<<"Methods defined here:\n";
         const SvarObject& methods=rh._methods.as<SvarObject>();
         auto varCopy=methods.getCopy();
         for(std::pair<std::string,Svar> it:varCopy){
-            content<<it.second<<std::endl<<std::endl;
+            content<<it.second.as<SvarFunction>()<<std::endl<<std::endl;
         }
     }
     std::string line;
@@ -2335,7 +2343,7 @@ public:
                 .def("update",&SvarObject::update);
 
         SvarClass::Class<SvarFunction>()
-                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
+                .def("__doc__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
 
         SvarClass::Class<SvarClass>()
                 .def("__getitem__",&SvarClass::operator [])

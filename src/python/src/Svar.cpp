@@ -2,8 +2,8 @@
 #include "pybind11/stl.h"
 #include <pybind11/functional.h>
 #define __SVAR_BUILDIN__
-#include "../../src/Svar.h"
-#include "SharedLibrary.h"
+#include "../../Svar/Svar.h"
+#include "../../Svar/SharedLibrary.h"
 
 using namespace GSLAM;
 namespace py = pybind11;

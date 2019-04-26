@@ -12,7 +12,7 @@ from distutils.version import LooseVersion
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         Extension.__init__(self, name, sources=[])
-        self.sourcedir = os.path.abspath(sourcedir)+"/python"
+        self.sourcedir = os.path.abspath(sourcedir)+"/src/python"
 
 
 class CMakeBuild(build_ext):

@@ -1,6 +1,7 @@
 #define __SVAR_BUILDIN__
 #include "Svar.h"
 #include "gtest.h"
+#include "SharedLibrary.h"
 
 using namespace GSLAM;
 
@@ -243,89 +244,68 @@ TEST(Svar,Thread){
     for(auto& it:threads) it.join();
 }
 
-class InterfaceDemo{
-public:
-    InterfaceDemo(){}
-    virtual std::string type()const{return "DIYSLAM";}
-    virtual bool valid()const{return true;}
+void showPlugin(){
+    std::string pluginPath=svar.GetString("plugin");
+    std::string key=svar.GetString("key");
 
-    virtual bool track(Svar& frame);
-
-    virtual void call(const std::string& command,void* arg=NULL);
-
-    virtual void draw();
-
-    virtual bool isDrawable()const{return false;}
-
-    virtual bool setCallback(Svar *cbk);
-
-    void trackingThread();
-
-    void init();
-    void release();
-    void tryFitGPS();
-};
-
-class ApplicationDemo{
-public:
-    ApplicationDemo(std::string name):_name(name){
-        std::cout<<"Application Created.";
+    SharedLibraryPtr plugin(new SharedLibrary(pluginPath));
+    if(!plugin->isLoaded()){
+        std::cerr<<"Unable to load plugin "<<pluginPath<<std::endl;
+        return ;
     }
-    std::string name()const{return _name;}
 
-    std::string gslam_version()const{return "3.2";}
-
-    std::string introduction()const{
-
+    GSLAM::Svar* (*getInst)()=(GSLAM::Svar* (*)())plugin->getSymbol("svarInstance");
+    if(!getInst){
+        std::cerr<<"No svarInstance found in "<<pluginPath<<std::endl;
+        return ;
     }
-    std::string _name;
-};
+    GSLAM::Svar* inst=getInst();
+    if(!inst){
+        std::cerr<<"svarInstance returned null.\n";
+        return ;
+    }
 
-REGISTER_SVAR_MODULE(ApplicationDemo){
-    SvarClass::Class<ApplicationDemo>()
-            .def("__init__",[](std::string name){return ApplicationDemo(name);})
-    .def("name",&ApplicationDemo::name);
-    svar.set("ApplicationDemo",SvarClass::instance<ApplicationDemo>());
-}
+    GSLAM::Svar var=key.empty()?(*inst):inst->get(key,Svar());
 
-void interfaceDemo()
-{
-    Svar ApplicationDemo=svar["ApplicationDemo"];
-    EXPECT_TRUE(ApplicationDemo.isClass());
-    std::cout<<ApplicationDemo.as<SvarClass>();
-    Svar inst=ApplicationDemo("name");
-    EXPECT_EQ(inst.call("name"),"name");
+    if(var.isFunction())
+        std::cout<<var.as<SvarFunction>()<<std::endl;
+    else if(var.isClass())
+        std::cout<<var.as<SvarClass>()<<std::endl;
+    else std::cout<<var;
 }
 
 int main(int argc,char** argv){
-    Svar var;
+    Svar var=svar;
     Svar unParsed=var.parseMain(argc,argv);
-    var.arg<int>("argInt",100,"this is a sample int argument");
-    var.arg<double>("argDouble",100.,"this is a sample double argument");
-    var.arg<std::string>("argString","hello","Sample string argument");
-    var.arg<bool>("argBool",false,"Sample bool argument");
-    var.arg<bool>("child.bool",true,"Child bool");
-    bool interface=var.arg<bool>("interfaceDemo",false,"Show the interface demo.");
-    bool tests=var.arg<bool>("test",false,"Perform google tests.");
-    var.arg<bool>("dumpVar",false,"DumpVar");
-    if(var.get<bool>("help",false)){
+
+    std::string plugin=var.arg<std::string>("plugin","","The svar module plugin wanna to show.");
+    var.arg<std::string>("key","","The name in the module wanna to show");
+    bool tests=var.arg<bool>("tests",false,"Perform google tests.");
+    bool dumpVar=var.arg<bool>("dumpVar",false,"DumpVar");
+
+    if(var.get<bool>("help",false)||argc<2){
         var.help();
         return 0;
     }
 
-    std::cerr<<"Unparsed arguments:"<<unParsed<<std::endl;
+    if(unParsed.length()){
+        std::cerr<<"Unparsed arguments:"<<unParsed<<std::endl;
+        return -1;
+    }
 
-    if(interface){
-        interfaceDemo();
+    if(plugin.size()){
+        showPlugin();
+        return 0;
     }
 
     if(tests){
         testing::InitGoogleTest(&argc,argv);
-        auto ret= RUN_ALL_TESTS();
+        return RUN_ALL_TESTS();
     }
 
-    if(var.Get<bool>("dumpVar")){
+    if(dumpVar){
         std::cout<<var;
     }
+
     return 0;
 }
