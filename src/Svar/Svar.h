@@ -477,7 +477,7 @@ public:
     SvarExeption(const Svar& wt=Svar())
         :_wt(wt){}
 
-    virtual const char* what() const _GLIBCXX_USE_NOEXCEPT{
+    virtual const char* what() const throw(){
         if(_wt.is<std::string>())
             return _wt.as<std::string>().c_str();
         else
@@ -485,13 +485,6 @@ public:
     }
 
     Svar _wt;
-};
-
-class SvarIterEnd: public std::exception{
-public:
-    virtual const char* what() const _GLIBCXX_USE_NOEXCEPT{
-        return "SvarIterEnd";
-    }
 };
 
 class SvarFunction: public SvarValue{
