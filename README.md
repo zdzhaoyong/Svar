@@ -11,7 +11,18 @@
 
 # 1. Why Svar? 把C++变成动态语言的高性能中介！
 
+[Dynamic C++ Proposal](https://www.codeproject.com/Articles/31988/Dynamic-C-Proposal)
+
 C++作为静态类型语言，在执行高效的同时也给使用带来了一系列的麻烦.
+Dynamism brings several advantages, some of these are:
+
+* More abstraction (no FBC).
+* Easy framework development.
+* Easy scripting language integration.
+* Independent external objects.
+* Generic compiled code (discussed later).
+* Faster compiling (discussed later).
+* Less ugly C++ hacks.
 
 使用Svar可以带来以下特性：
 1. 一个动态链接库，可同时作为C++,Python,Node-JS等语言的模块使用;

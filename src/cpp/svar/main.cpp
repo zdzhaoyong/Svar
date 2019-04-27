@@ -20,13 +20,23 @@ TEST(Svar,Variable)
 
     EXPECT_TRUE(Svar("").as<std::string>().empty());
     EXPECT_TRUE(Svar(1.).as<double>()==1.);
-    EXPECT_TRUE(Svar(std::vector<int>({1,2})).isArray());
+    EXPECT_TRUE(Svar({1,2}).isArray());
     EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
 
-    Svar obj(std::map<std::string,int>({{"1",1}}));
+    Svar obj({{"1",1}});
     EXPECT_TRUE(obj.isObject());
     EXPECT_TRUE(obj["1"]==1);
 
+    obj["left"]=Svar("hello");
+    obj["parent"]["child"]=3;
+    EXPECT_EQ(obj["parent"]["child"],3);
+    obj["hello.world"]=false;
+    EXPECT_EQ(obj["hello"]["world"],false);
+
+    Svar vec({0,1,2,3});
+    EXPECT_EQ(vec[1],1);
+    vec[1]=2;
+    EXPECT_EQ(vec[1],2);
 }
 
 std::string add(std::string left,const std::string& r){
@@ -110,6 +120,34 @@ public:
     std::string name_;
 };
 
+TEST(Svar,CBOR){
+    Svar cbor=svar["__builtin__.CBOR"];
+    Svar var={{"i",1},
+              {"bool",false},
+              {"double",434.},
+              {"str","sfd"},
+              {"vec",{1,2,3}},
+              {"map",{{"name","value"}}}
+             };
+
+    std::string file=svar.GetString("test.cbor","");
+    if(!file.empty())
+        var.parseFile(file);
+
+    int bufSize=svar.GetInt("test.cborBufSize",1e6);
+    if(bufSize){
+        std::string *buf=new std::string();
+        buf->resize(bufSize);
+        // should tell svarBuffer to release the buffer
+        SvarBuffer svarBuf(buf->data(),buf->size(),
+                           Svar::create(std::unique_ptr<std::string>(buf)));
+        var.set("binary_buf",svarBuf);
+        cbor.call("dump",var).as<std::vector<char> >();
+    }
+    else
+        std::vector<char> sz=cbor.call("dumpCheck",var).as<std::vector<char> >();
+
+}
 
 TEST(Svar,Class){
     SvarClass::Class<BaseClass>()
@@ -220,6 +258,22 @@ TEST(Svar,Json){
     std::string str=Json::dump(var);
     Svar varCopy=Json::load(str);
     EXPECT_EQ(str,Json::dump(varCopy));
+}
+
+TEST(Svar,Alias){
+    Svar i=1;
+    Svar alias=i;
+    EXPECT_EQ(i,alias);
+    i=2;
+    EXPECT_EQ(i,alias);
+
+    Svar var;
+    var.set("i",i);
+    var.set("alias",i);
+    EXPECT_EQ(var["i"],var["alias"]);
+    i=3;
+    EXPECT_EQ(var["i"],3);
+    EXPECT_EQ(var["i"],var["alias"]);
 }
 
 TEST(Svar,Thread){

@@ -49,6 +49,7 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -156,6 +157,8 @@ class SvarFunction;
 class SvarClass;
 class SvarObject;
 class SvarArray;
+class SvarDict;
+class SvarBuffer;
 class SvarExeption;
 template <typename T>
 class SvarValue_;
@@ -194,6 +197,9 @@ public:
 
     /// Construct a Dict
     Svar(const std::map<Svar,Svar>& m);//Dict
+
+    /// Construct from initializer
+    Svar(const std::initializer_list<Svar>& init);
 
     /// Redirect char array to string
     template <size_t N>
@@ -397,6 +403,12 @@ public:
     bool operator <=(const Svar& rh)const{return ((*this)<rh||(*this)==rh);}//__le__
     bool operator >=(const Svar& rh)const{return !((*this)<rh);}//__ge__
     Svar operator [](const Svar& i) const;//__getitem__
+    Svar& operator[](const Svar& name);// This is not thread safe!
+
+    template <typename T>
+    Svar& operator =(const T& v){set(v);return *this;}
+
+    operator std::string(){castAs<std::string>();}
 
     /// Dump this as Json style outputs
     friend std::ostream& operator <<(std::ostream& ost,const Svar& self);
@@ -727,15 +739,15 @@ public:
 
 //    SvarClass& def_property(const std::string& name,);
 
-    Svar operator [](const std::string& name){
-        Svar c=_methods[name];
+    Svar& operator [](const std::string& name){
+        Svar& c=_methods[name];
         if(!c.isUndefined())  return c;
         for(Svar& p:_parents)
         {
             c=p.as<SvarClass>()[name];
             if(!c.isUndefined()) return c;
         }
-        return Svar::Undefined();
+        return c;
     }
 
     template <typename T>
@@ -958,6 +970,22 @@ public:
     mutable std::mutex _mutex;
 };
 
+class SvarBuffer : public SvarValue
+{
+public:
+    SvarBuffer(const void* ptr,size_t size,Svar holder)
+        : _ptr(ptr),_size(size),_holder(holder){}
+
+    virtual TypeID          cpptype()const{return typeid(SvarBuffer);}
+    virtual const void*     ptr() const{return this;}
+    virtual const Svar&     classObject()const{return SvarClass::instance<SvarBuffer>();}
+    virtual size_t          length() const {return _size;}
+
+    const void*  _ptr;
+    size_t _size;
+    Svar   _holder;
+};
+
 template <typename T>
 inline std::string Svar::toString(const T& def) {
   std::ostringstream sst;
@@ -981,6 +1009,25 @@ inline std::string Svar::toString(const double& def) {
 template <>
 inline std::string Svar::toString(const bool& def) {
   return def ? "true" : "false";
+}
+
+inline Svar::Svar(const std::initializer_list<Svar>& init)
+    :Svar()
+{
+    bool is_an_object = std::all_of(init.begin(), init.end(),
+                                    [](const Svar& ele)
+    {
+        return ele.isArray() && ele.length() == 2 && ele[0].is<std::string>();
+    });
+
+    if(is_an_object){
+        std::map<std::string,Svar> obj;
+        for(const Svar& p:init) obj.insert(std::make_pair(p[0].as<std::string>(),p[1]));
+        set(Svar(obj));
+        return;
+    }
+
+    set(Svar(std::vector<Svar>(init)));
 }
 
 template <typename Return, typename... Args, typename... Extra>
@@ -1194,13 +1241,30 @@ inline size_t            Svar::length() const{
 }
 
 inline Svar Svar::operator[](const Svar& i) const{
-    if(isObject()) return (*std::dynamic_pointer_cast<SvarObject>(_obj))[i.castAs<std::string>()];
+    if(isObject()) return as<SvarObject>()[i.castAs<std::string>()];
     if(classObject().is<void>()) return Undefined();
     const SvarClass& cl=classObject().as<SvarClass>();
     if(cl.__getitem__.isFunction()){
         return cl.__getitem__((*this),i);
     }
     return Undefined();
+}
+
+inline Svar& Svar::operator[](const Svar& name){
+    if(isUndefined()) {
+        set(object());
+    }
+
+    if(isObject())
+        return getOrCreate(name.castAs<std::string>());
+    else if(isArray())
+        return as<SvarArray>()._var[name.castAs<int>()];
+    else if(isDict())
+        return as<SvarDict>()._var[name];
+    else if(isClass())
+        return as<SvarClass>()[name.castAs<std::string>()];
+    throw SvarExeption(typeName()+": Operator [] can't be used as a lvalue.");
+    return *this;
 }
 
 inline Svar Svar::get(const std::string& name,Svar def)
@@ -2340,7 +2404,7 @@ public:
                 .def("__doc__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
 
         SvarClass::Class<SvarClass>()
-                .def("__getitem__",&SvarClass::operator [])
+                .def("__getitem__",[](SvarClass& self,const std::string& i)->Svar{return self[i];})
                 .def("doc",[](Svar self){return Svar::toString(self.as<SvarClass>());});
 
         SvarClass::Class<Json>()
