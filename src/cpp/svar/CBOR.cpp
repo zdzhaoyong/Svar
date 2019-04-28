@@ -42,10 +42,24 @@ public:
     };
 
     struct IStream{
-
+        IStream(std::istream& ist):i(ist),reverse(OStream::little_endianess()){}
+        template<typename T>
+        IStream& operator >>(const T & c){
+            std::array<char,sizeof(T)> a;
+            i.read(a.data(),a.size());
+            if(reverse){
+                std::reverse(a.begin(),a.end());
+                memcpy(a.data(),c,sizeof(T));
+            }
+            else memcpy(a.data(),c,sizeof(T));
+            return *this;
+        }
+        operator std::istream& (){return i;}
+        std::istream& i;
+        bool reverse;
     };
 
-    static nlohmann::json convert(Svar var){
+    static nlohmann::json svar2json(Svar var){
         using namespace nlohmann;
         if(var.isNull()) return json(nullptr);
         else if(var.is<bool>()) return json(var.as<bool>());
@@ -55,13 +69,13 @@ public:
         else if(var.isArray()) {
             json ret=json::array();
             for(Svar& v:var.as<SvarArray>()._var)
-                ret.push_back(convert(v));
+                ret.push_back(svar2json(v));
             return ret;
         }
         else if(var.isObject()){
             json ret=json::object();
             for(auto v:var.as<SvarObject>()._var){
-                ret[v.first]=convert(v.second);
+                ret[v.first]=svar2json(v.second);
             }
             return ret;
         }
@@ -70,12 +84,67 @@ public:
 
     static Svar load(const std::vector<char>& input){
         std::stringstream sst(std::string(input.data(),input.size()));
+        return loadStream(sst);
+    }
 
-        return Svar();
+    static Svar loadStream(std::istream& i){
+        static std::vector<std::function<Svar(u_char)> > funcs;
+        if(funcs.empty()){
+            funcs.resize(256);
+            for(u_char it=0;it<=0x17;it++)
+                funcs[it]=[&i](u_char c){return Svar((int)c);};
+            funcs[0x18]=[&i](u_char c='\0'){uint8_t v;i>>v;return Svar((int)v);};
+            funcs[0x19]=[&i](u_char c='\0'){uint16_t v;i>>v;return Svar((int)v);};
+            funcs[0x1A]=[&i](u_char c='\0'){uint32_t v;i>>v;return Svar((int)v);};
+            funcs[0x1B]=[&i](u_char c='\0'){uint64_t v;i>>v;return Svar((int)v);};//positive int
+            for(u_char it=0x20;it<=0x37;it++)
+                funcs[it]=[&i](u_char c){return Svar((int)(-1-(c-0x20)));};
+            funcs[0x38]=[&i](u_char c='\0'){uint8_t v;i>>v;return Svar((int)(-1-v));};
+            funcs[0x39]=[&i](u_char c='\0'){uint16_t v;i>>v;return Svar((int)(-1-v));};
+            funcs[0x3A]=[&i](u_char c='\0'){uint32_t v;i>>v;return Svar((int)(-1-v));};
+            funcs[0x3B]=[&i](u_char c='\0'){uint64_t v;i>>v;return Svar((int)(-1-v));};//negative int
+            for(u_char it=0x60;it<=0x7B;it++)
+                funcs[it]=[&i](u_char c){
+                    int len = funcs[c-0x60](c-0x60).as<int>();
+                    std::string s; s.resize(len);
+                    for(int j=0;j<len;j++)i>>s[j];
+                    return Svar(s);
+                };//string
+            for(u_char it=0x80;it<=0x9B;it++)
+                funcs[it]=[&i](u_char c){
+                    int len = funcs[c-0x80](c-0x80).as<int>();
+                    std::vector<Svar> vec(len);
+                    for(int j=0;j<len;j++){
+                        uint8_t t;i>>t;
+                        vec[j]=funcs[t](t);
+                    }
+                    return Svar(vec);
+                };//array
+            for(u_char it=0xA0;it<=0xBB;it++)
+                funcs[it]=[&i](u_char c){
+                    int len = funcs[c-0xA0](c-0xA0).as<int>();
+                    std::map<Svar,Svar> m;
+                    for(int j=0;j<len;j++){
+                        uint8_t t1,t2;
+                        i>>t1;
+                        Svar f=funcs[t1](t1);
+                        i>>t2;
+                        m[f]=funcs[t2](t2);
+                    }
+                    return Svar(m);
+                };//map
+            funcs[0xF4]=[&i](u_char c){return Svar(false);};//false
+            funcs[0xF5]=[&i](u_char c){return Svar(true);};//true
+            funcs[0xF6]=[&i](u_char c){return Svar::Undefined();};//null
+            funcs[0xFB]=[&i](u_char c){double d;i>>d;return Svar(d);};//double
+        }
+        u_char c;
+        i>>c;
+        return funcs[c](c);
     }
 
     static std::vector<char> dumpCheck(Svar var){
-        auto js=convert(var);
+        auto js=svar2json(var);
         timer.enter("json_cbor");
         std::vector<char> cbor;
         js.to_cbor(js,cbor);
@@ -107,7 +176,6 @@ public:
     }
 
     static char c(std::uint8_t x){return *reinterpret_cast<char*>(&x);}
-    static Svar loadStream(std::istream& in){}
 
     static OStream& dumpStream(OStream& o,Svar var)
     {
