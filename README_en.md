@@ -24,11 +24,11 @@ Dynamism brings several advantages, some of these are:
 * Less ugly C++ hacks.
 
 
-使用Svar可以带来以下特性：
-1. 一个动态链接库，可同时作为C++,Python,Node-JS等语言的模块使用;
-2. 统一C++库接口，可插件机制调用，发布的库自带文档，再也不用繁琐的*.h头文件接口说明;
-3. 给C++带来动态特性，包裹变量，函数，类到Svar中，可高效转换及调用;
-4. 内置Json支持，参数配置，解析，线程安全读写,模块间数据解耦分享;
+Using Svar brings the following features:
+1. A dynamic link library that can be used as a module in languages such as C++, Python, and Node-JS;
+2. Unified C++ library interface, which can be called as a plug-in module. The released library comes with documentation,  making *.h header file interface description unnecessary;
+3. Dynamic features.It wraps variables, functions, and classes into Svar while maintaining efficiency;
+4. Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
 
 
 # 2. Usage
