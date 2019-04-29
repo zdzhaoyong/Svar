@@ -134,7 +134,7 @@ TEST(Svar,CBOR){
     if(!file.empty())
         var.parseFile(file);
 
-    int bufSize=svar.GetInt("test.cborBufSize",1e6);
+    int bufSize=svar.GetInt("test.cborBufSize",0);
     if(bufSize){
         std::string *buf=new std::string();
         buf->resize(bufSize);
@@ -142,11 +142,15 @@ TEST(Svar,CBOR){
         SvarBuffer svarBuf(buf->data(),buf->size(),
                            Svar::create(std::unique_ptr<std::string>(buf)));
         var.set("binary_buf",svarBuf);
-        cbor.call("dump",var).as<std::vector<char> >();
+        SvarBuffer js=cbor.call("dump",var).as<SvarBuffer>();
+
     }
     else
-        std::vector<char> sz=cbor.call("dumpCheck",var).as<std::vector<char> >();
-
+    {
+        SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
+//        Svar out = cbor.call("load",sz);
+//        std::cout<<out<<std::endl;
+    }
 }
 
 TEST(Svar,Class){

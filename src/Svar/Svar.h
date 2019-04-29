@@ -976,6 +976,11 @@ public:
     SvarBuffer(const void* ptr,size_t size,Svar holder)
         : _ptr(ptr),_size(size),_holder(holder){}
 
+    SvarBuffer(size_t size):_size(size){
+        _holder = Svar::create(std::vector<char>(size));
+        _ptr = _holder.castAs<std::vector<char>>().data();
+    }
+
     virtual TypeID          cpptype()const{return typeid(SvarBuffer);}
     virtual const void*     ptr() const{return this;}
     virtual const Svar&     classObject()const{return SvarClass::instance<SvarBuffer>();}
