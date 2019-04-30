@@ -132,7 +132,7 @@ TEST(Svar,CBOR){
 
     std::string file=svar.GetString("test.cbor","");
     if(!file.empty())
-        var.parseFile(file);
+        var=var.loadFile(file);
 
     int bufSize=svar.GetInt("test.cborBufSize",0);
     if(bufSize){
@@ -148,7 +148,7 @@ TEST(Svar,CBOR){
     else
     {
         SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
-//        Svar out = cbor.call("load",sz);
+        Svar out = cbor.call("load",sz.clone());
 //        std::cout<<out<<std::endl;
     }
 }

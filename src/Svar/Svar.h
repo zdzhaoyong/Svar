@@ -41,6 +41,7 @@
 #define GSLAM_JVAR_H
 
 #include <assert.h>
+#include <string.h>
 #include <cctype>
 #include <iostream>
 #include <iomanip>
@@ -979,6 +980,19 @@ public:
     SvarBuffer(size_t size):_size(size){
         _holder = Svar::create(std::vector<char>(size));
         _ptr = _holder.castAs<std::vector<char>>().data();
+    }
+
+    friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
+        const std::string hex = "0123456789ABCDEF";
+        for(size_t i=0;i<b._size;i++)
+            ost<<hex[((uint8_t*)b._ptr)[i] >> 4] << hex[((uint8_t*)b._ptr)[i] & 0xf];
+        return ost;
+    }
+
+    SvarBuffer clone(){
+        SvarBuffer buf(_size);
+        memcpy(buf._holder.as<std::vector<char>>().data(),_ptr,_size);
+        return buf;
     }
 
     virtual TypeID          cpptype()const{return typeid(SvarBuffer);}
