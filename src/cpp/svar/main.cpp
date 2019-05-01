@@ -85,7 +85,7 @@ TEST(Svar,Function)
         EXPECT_EQ((*cptr),"hello");
     })(s,s,s,s,s,s);
     // cpp function binding
-    EXPECT_EQ(Svar(add)("a",std::string("b")).as<std::string>(),"ab");
+    EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
     // static method function binding
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
@@ -149,7 +149,6 @@ TEST(Svar,CBOR){
     {
         SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
         Svar out = cbor.call("load",sz.clone());
-//        std::cout<<out<<std::endl;
     }
 }
 

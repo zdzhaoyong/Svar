@@ -409,7 +409,7 @@ public:
     template <typename T>
     Svar& operator =(const T& v){set(v);return *this;}
 
-    operator std::string(){castAs<std::string>();}
+    operator std::string(){return castAs<std::string>();}
 
     /// Dump this as Json style outputs
     friend std::ostream& operator <<(std::ostream& ost,const Svar& self);
