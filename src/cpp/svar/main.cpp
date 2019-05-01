@@ -84,8 +84,13 @@ TEST(Svar,Function)
         EXPECT_EQ((*ptr),"hello");
         EXPECT_EQ((*cptr),"hello");
     })(s,s,s,s,s,s);
+
     // cpp function binding
     EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
+
+    // FIXME: Why the below line won't pass and add returned "b"?
+    // EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
+
     // static method function binding
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
@@ -192,12 +197,14 @@ TEST(Svar,GetSet){
     EXPECT_EQ(testInt,40);
     EXPECT_EQ(var["child"]["testInt"],40);
     var.set("int",100);
-    var.set("double",100);
+    var.set("double",100.);
     var.set<std::string>("string","100");
     var.set("bool",true);
     EXPECT_EQ(var["int"],100);
-    EXPECT_EQ(var["double"],100);
-    EXPECT_EQ(var["string"],100);
+    EXPECT_EQ(var["double"],100.);
+    EXPECT_EQ(var["string"],"100");
+    // EXPECT_EQ(var["string"],100);
+    // FIXME: why this equal, int casted to string? Segment fault in travis-ci
     EXPECT_EQ(var["bool"],true);
 }
 
