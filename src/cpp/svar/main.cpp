@@ -37,6 +37,14 @@ TEST(Svar,Variable)
     EXPECT_EQ(vec[1],1);
     vec[1]=2;
     EXPECT_EQ(vec[1],2);
+
+    Svar strlit=R"(
+                {"a":[true,1,12.3,"hello"]}
+                )"_svar;// create from raw string literal
+
+    EXPECT_TRUE(strlit["a"].isArray());
+
+    EXPECT_EQ("[1,2]"_svar .length(),2);
 }
 
 std::string add(std::string left,const std::string& r){
@@ -94,7 +102,6 @@ TEST(Svar,Function)
     // static method function binding
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
-
 }
 
 class BaseClass{

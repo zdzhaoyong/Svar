@@ -175,8 +175,9 @@ public:
         : _obj(v==nullptr?Null().value():
                std::shared_ptr<SvarValue>(v)){}
 
-    Svar(const std::shared_ptr<SvarValue>& v)
-        : _obj(v?v:Null().value()){}
+    /// Wrap an pointer use shared_ptr or unique_ptr
+    template <typename T>
+    Svar(const std::shared_ptr<T>& v);
 
     /// Wrap bool to static instances
     Svar(bool b):Svar(b?True():False()){}
@@ -802,6 +803,21 @@ private:
     SvarValue_(const Svar& v){}
 };
 
+template <typename T,typename H=std::unique_ptr<T> >
+class SvarPtrHolder: public SvarValue{
+public:
+    explicit SvarPtrHolder(T* ptr):_var(ptr){}
+    explicit SvarPtrHolder(const H& v):_var(v){}
+
+    virtual TypeID          cpptype()const{return typeid(T);}
+    virtual const void*     ptr() const{return _var.get();}
+    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+
+    T getCopy()const{return _var;}
+//protected:// FIXME: this should not accessed by outside
+    H _var;
+};
+
 class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
@@ -1105,6 +1121,18 @@ inline Svar::Svar(const std::map<std::string,Svar>& m)
 
 inline Svar::Svar(const std::map<Svar,Svar>& m)
     :_obj(std::make_shared<SvarDict>(m)){}
+
+template <typename T>
+Svar::Svar(const std::shared_ptr<T>& v)
+    : _obj(std::make_shared<SvarPtrHolder<T,std::shared_ptr<T>>>(v)){}
+
+template <>
+inline Svar::Svar(const std::shared_ptr<SvarValue>& v)
+    : _obj(v?v:Null().value()){}
+
+inline Svar operator"" _svar(const char* str,size_t sz){
+    return Svar::instance()["__builtin__"]["Json"].call("load",std::string(str,sz));
+}
 
 template <typename T>
 inline bool Svar::is()const{return _obj->cpptype()==typeid(T);}
