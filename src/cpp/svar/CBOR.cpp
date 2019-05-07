@@ -9,30 +9,42 @@ namespace GSLAM {
 /// Yaml save and load class
 class CBOR final{
 public:
+    struct OSize{
+
+        template <typename T>
+        OSize& operator <<(const T& c){
+            sz+=sizeof(T);
+            return *this;
+        }
+
+        void write(const char* s,size_t length){
+            sz+=length;
+        }
+        size_t sz=0;
+    };
+
     struct OStream{
-        OStream(std::vector<char>& ost):o(ost),reverse(little_endianess()){}
+        OStream(std::vector<char>& ost):o(ost),reverse(little_endianess()),ptr(ost.data()){}
 
         OStream& operator <<(char c){
-            o.push_back(c);
+            *(ptr++)=c;
             return *this;
         }
 
         template <typename T>
         OStream& operator <<(const T& c){
+            std::array<char,sizeof(T)>& a=*(std::array<char,sizeof(T)>*)ptr;
+            memcpy(a.data(),&c,sizeof(T));
             if(reverse){
-                std::array<char,sizeof(T)> a;
-                memcpy(a.data(),&c,sizeof(T));
                 std::reverse(a.begin(), a.end());
-                write(a.data(),a.size());
             }
-            else{
-                write((const char*)&c,sizeof(T));
-            }
+            ptr+=sizeof(T);
             return *this;
         }
 
         void write(const char* s,size_t length){
-            std::copy(s, s + length, std::back_inserter(o));
+            memcpy(ptr,s,length);
+            ptr+=length;
         }
 
         static constexpr bool little_endianess(int num = 1) noexcept
@@ -42,6 +54,7 @@ public:
 
         std::vector<char>& o;
         bool         reverse;
+        char*        ptr;
     };
 
     struct IStream{
@@ -191,12 +204,11 @@ public:
         return svar_cbor;
     }
 
-    static size_t computeSize(Svar var){
-
-    }
-
     static SvarBuffer dump(Svar var){
+        OSize sz;
+        dumpStream(sz,var);
         std::vector<char>* ret=new std::vector<char>();
+        ret->resize(sz.sz);
         OStream ost(*ret);
         dumpStream(ost,var);
         return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::vector<char>>(ret)));
@@ -204,7 +216,8 @@ public:
 
     static char c(std::uint8_t x){return *reinterpret_cast<char*>(&x);}
 
-    static OStream& dumpStream(OStream& o,Svar var)
+    template <typename T>
+    static T& dumpStream(T& o,Svar var)
     {
         if(var.is<bool>())
             return o<<(var.as<bool>()? c(0xF5) : c(0xF4));
