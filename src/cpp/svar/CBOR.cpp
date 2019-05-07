@@ -197,10 +197,6 @@ public:
 
     static SvarBuffer dump(Svar var){
         std::vector<char>* ret=new std::vector<char>();
-        ret->reserve(1e8+100);
-//        if(var.exist("size")){
-//            ret->reserve(var["size"].as<int>());
-//        }
         OStream ost(*ret);
         dumpStream(ost,var);
         return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::vector<char>>(ret)));
@@ -297,9 +293,7 @@ public:
             // LCOV_EXCL_STOP
 
             // step 2: write the string
-            timer.enter("write");
             o.write(reinterpret_cast<const char*>(s._ptr),N);
-            timer.leave("write");
             return o;
         }
 
