@@ -57,7 +57,7 @@ script:
   - cd build
   - pwd
   - cmake .. -DCMAKE_BUILD_TYPE=Release -DTESTS_ENABLED=ON ${CMAKE_OPTIONS}
-  - make -j2
+  - make -j2 VERBOSE=1
   - sudo make install
   - svar -tests
   
