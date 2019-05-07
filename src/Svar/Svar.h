@@ -1209,7 +1209,7 @@ Svar Svar::cast()const{
         }
     }
 
-    SvarClass& destClass=SvarClass::instance<T>().as<SvarClass>();
+    SvarClass& destClass=SvarClass::instance<T>().template as<SvarClass>();
     if(destClass.__init__.isFunction()){
         Svar ret=destClass.__init__(*this);
         if(ret.is<T>()) return ret;
@@ -1223,9 +1223,9 @@ detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,con
 Svar::castAs()const
 {
     auto ret=cast<T>();
-    if(!ret.is<T>())
+    if(!ret.template is<T>())
         throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
-    return ret.as<T>();// let compiler happy
+    return ret.template as<T>();// let compiler happy
 }
 
 template <typename T>
@@ -1254,9 +1254,9 @@ Svar::castAs(){
         return &as<typename std::remove_pointer<T>::type>();
 
     auto ret=cast<T>();
-    if(!ret.is<T>())
+    if(!ret.template is<T>())
         throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
-    return ret.as<T>();// let compiler happy
+    return ret.template as<T>();// let compiler happy
 }
 
 template <>
