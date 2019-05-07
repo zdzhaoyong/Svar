@@ -998,10 +998,31 @@ public:
         _ptr = _holder.castAs<std::vector<char>>().data();
     }
 
+    std::string hex()const{
+        const std::string h = "0123456789ABCDEF";
+        std::string ret;ret.resize(_size*2);
+        for(size_t i=0;i<_size;i++){
+            ret[i<<1]=h[((uint8_t*)_ptr)[i] >> 4];
+            ret[i<<1+1]=h[((uint8_t*)_ptr)[i] & 0xf];
+        }
+        return ret;
+    }
+
+    static SvarBuffer fromHex(const std::string& h){
+        SvarBuffer ret(h.size()>>1);
+
+        return ret;
+    }
+
+    std::string base64()const{return "";}
+
+    static SvarBuffer fromBase64(const std::string& h){
+        SvarBuffer ret(0);
+        return ret;
+    }
+
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
-        const std::string hex = "0123456789ABCDEF";
-        for(size_t i=0;i<b._size;i++)
-            ost<<hex[((uint8_t*)b._ptr)[i] >> 4] << hex[((uint8_t*)b._ptr)[i] & 0xf];
+        ost<<b.hex();
         return ost;
     }
 
