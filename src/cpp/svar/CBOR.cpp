@@ -10,10 +10,10 @@ namespace GSLAM {
 class CBOR final{
 public:
     struct OStream{
-        OStream(std::ostream& ost):o(ost),reverse(little_endianess()){}
+        OStream(std::vector<char>& ost):o(ost),reverse(little_endianess()){}
 
         OStream& operator <<(char c){
-            o.put(c);
+            o.push_back(c);
             return *this;
         }
 
@@ -23,12 +23,16 @@ public:
                 std::array<char,sizeof(T)> a;
                 memcpy(a.data(),&c,sizeof(T));
                 std::reverse(a.begin(), a.end());
-                o.write(a.data(),a.size());
+                write(a.data(),a.size());
             }
             else{
-                o.write((const char*)&c,sizeof(T));
+                write((const char*)&c,sizeof(T));
             }
             return *this;
+        }
+
+        void write(const char* s,size_t length){
+            std::copy(s, s + length, std::back_inserter(o));
         }
 
         static constexpr bool little_endianess(int num = 1) noexcept
@@ -36,8 +40,7 @@ public:
             return *reinterpret_cast<char*>(&num) == 1;
         }
 
-        operator std::ostream& (){return o;}
-        std::ostream& o;
+        std::vector<char>& o;
         bool         reverse;
     };
 
@@ -188,16 +191,18 @@ public:
         return svar_cbor;
     }
 
-    static SvarBuffer dump(Svar var){
-        std::stringstream sst;
-        OStream ost(sst);
-        dumpStream(ost,var).o.flush();
+    static size_t computeSize(Svar var){
 
-        sst.seekg (0, sst.end);
-        int length = sst.tellg();
-        sst.seekg (0, sst.beg);
-        std::vector<char>* ret=new std::vector<char>(length);
-        sst.read (ret->data(),length);
+    }
+
+    static SvarBuffer dump(Svar var){
+        std::vector<char>* ret=new std::vector<char>();
+        ret->reserve(1e8+100);
+//        if(var.exist("size")){
+//            ret->reserve(var["size"].as<int>());
+//        }
+        OStream ost(*ret);
+        dumpStream(ost,var);
         return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::vector<char>>(ret)));
     }
 
@@ -292,7 +297,9 @@ public:
             // LCOV_EXCL_STOP
 
             // step 2: write the string
-            o.o.write(reinterpret_cast<const char*>(s._ptr),N);
+            timer.enter("write");
+            o.write(reinterpret_cast<const char*>(s._ptr),N);
+            timer.leave("write");
             return o;
         }
 
@@ -325,7 +332,7 @@ public:
             // LCOV_EXCL_STOP
 
             // step 2: write the string
-            o.o.write(reinterpret_cast<const char*>(s.data()),N);
+            o.write(reinterpret_cast<const char*>(s.data()),N);
             return o;
         }
 

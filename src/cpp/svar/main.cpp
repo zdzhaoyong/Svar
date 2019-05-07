@@ -2,6 +2,7 @@
 #include "Svar.h"
 #include "gtest.h"
 #include "SharedLibrary.h"
+#include "Timer.h"
 
 using namespace GSLAM;
 
@@ -154,7 +155,16 @@ TEST(Svar,CBOR){
         SvarBuffer svarBuf(buf->data(),buf->size(),
                            Svar::create(std::unique_ptr<std::string>(buf)));
         var.set("binary_buf",svarBuf);
-        SvarBuffer js=cbor.call("dump",var).as<SvarBuffer>();
+
+        timer.enter("dump_cbor");
+        SvarBuffer bin=cbor.call("dump",var).as<SvarBuffer>();
+        timer.leave("dump_cbor");
+
+        timer.enter("load_cbor");
+        Svar ret=cbor.call("load",bin);
+        timer.leave("load_cbor");
+
+        EXPECT_TRUE(ret["binary_buf"].is<SvarBuffer>());
 
     }
     else
