@@ -997,7 +997,7 @@ public:
         _holder = Svar::create(std::vector<char>(size));
         _ptr = _holder.castAs<std::vector<char>>().data();
     }
-
+//transformation between hex and SvarBuffer
     std::string hex()const{
         const std::string h = "0123456789ABCDEF";
         std::string ret;ret.resize(_size*2);
@@ -1007,19 +1007,102 @@ public:
         }
         return ret;
     }
-
     static SvarBuffer fromHex(const std::string& h){
-        SvarBuffer ret(h.size()>>1);
-
+        size_t n = h.size()>>1;
+        SvarBuffer ret(n);
+        for(size_t i=0;i < n;i++){
+            ((uint8_t*)ret._ptr)[i]=( (h[i]<<4) | (h[i+1] & 0xf) );
+        }
         return ret;
     }
+//transformation between base64 and string
+    static const std::string chars;
+    static inline bool is_base64(unsigned char c) {
+      return (isalnum(c) || (c == '+') || (c == '/'));
+    }
+    std::string encode(const unsigned char * bytes_to_encode, size_t in_len) const {
+      std::string ret;
+      int i = 0;
+      int j = 0;
+      unsigned char char_array_3[3];
+      unsigned char char_array_4[4];
 
-    std::string base64()const{return "";}
+      while (in_len--) {
+        char_array_3[i++] = *(bytes_to_encode++);
+        if (i == 3) {
+          char_array_4[0] = (unsigned char) ((char_array_3[0] & 0xfc) >> 2);
+          char_array_4[1] = (unsigned char) ( ( ( char_array_3[0] & 0x03 ) << 4 ) + ( ( char_array_3[1] & 0xf0 ) >> 4 ) );
+          char_array_4[2] = (unsigned char) ( ( ( char_array_3[1] & 0x0f ) << 2 ) + ( ( char_array_3[2] & 0xc0 ) >> 6 ) );
+          char_array_4[3] = (unsigned char) ( char_array_3[2] & 0x3f );
 
+          for(i = 0; (i <4) ; i++)
+            ret += chars[char_array_4[i]];
+          i = 0;
+        }
+      }
+
+      if (i)
+      {
+        for(j = i; j < 3; j++)
+          char_array_3[j] = '\0';
+
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+        char_array_4[3] = char_array_3[2] & 0x3f;
+
+        for (j = 0; (j < i + 1); j++)
+          ret += chars[char_array_4[j]];
+
+        while((i++ < 3))
+          ret += '=';
+
+      }
+
+      return ret;
+    }
+    std::string base64()const{return encode((unsigned  char*)_ptr,_size);}
     static SvarBuffer fromBase64(const std::string& h){
-        SvarBuffer ret(0);
-        return ret;
+        size_t in_len = h.size();
+        size_t i = 0;
+        size_t j = 0;
+        int in_ = 0;
+        unsigned char char_array_4[4], char_array_3[3];
+        std::string* ret = new std::string();//unfinished???
+
+        while (in_len-- && ( h[in_] != '=') && is_base64(h[in_])) {
+          char_array_4[i++] = h[in_]; in_++;
+          if (i ==4) {
+            for (i = 0; i <4; i++)
+              char_array_4[i] = (unsigned char) chars.find( char_array_4[i] );
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+              ret += char_array_3[i];
+            i = 0;
+          }
+        }
+
+        if (i) {
+          for (j = i; j <4; j++)
+            char_array_4[j] = 0;
+
+          for (j = 0; j <4; j++)
+            char_array_4[j] = (unsigned char) chars.find( char_array_4[j] );
+
+          char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+          char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+          char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+          for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
+        }
+
+        return SvarBuffer();
     }
+
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
         ost<<b.hex();
@@ -1041,7 +1124,7 @@ public:
     size_t _size;
     Svar   _holder;
 };
-
+const std::string SvarBuffer::chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 template <typename T>
 inline std::string Svar::toString(const T& def) {
   std::ostringstream sst;
