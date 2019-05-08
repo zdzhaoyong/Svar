@@ -1068,7 +1068,7 @@ public:
         size_t j = 0;
         int in_ = 0;
         unsigned char char_array_4[4], char_array_3[3];
-        std::string* ret = new std::string();//unfinished???
+        std::string* ret = new std::string;
 
         while (in_len-- && ( h[in_] != '=') && is_base64(h[in_])) {
           char_array_4[i++] = h[in_]; in_++;
@@ -1081,7 +1081,7 @@ public:
             char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
             for (i = 0; (i < 3); i++)
-              ret += char_array_3[i];
+              *ret += char_array_3[i];
             i = 0;
           }
         }
@@ -1097,10 +1097,10 @@ public:
           char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
           char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
-          for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
+          for (j = 0; (j < i - 1); j++) *ret += char_array_3[j];
         }
 
-        return SvarBuffer();
+        return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::string>(ret)));
     }
 
 
