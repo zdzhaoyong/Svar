@@ -998,6 +998,13 @@ public:
         _ptr = _holder.castAs<std::vector<char>>().data();
     }
 
+    SvarBuffer(const void* ptr,size_t size,const std::vector<int>& shape,
+               const std::string& format,Svar holder)
+        : _ptr(ptr),_size(size)
+    {
+        _holder={{"holder",holder},{"format",format},{"shape",shape}};
+    }
+
     std::string hex()const{
         const std::string h = "0123456789ABCDEF";
         std::string ret;ret.resize(_size*2);
