@@ -58,6 +58,7 @@
 #include <functional>
 #ifdef __GNUC__
 #include <cxxabi.h>
+#include "md5.h"
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
@@ -1003,7 +1004,7 @@ public:
         std::string ret;ret.resize(_size*2);
         for(size_t i=0;i<_size;i++){
             ret[i<<1]=h[((uint8_t*)_ptr)[i] >> 4];
-            ret[i<<1+1]=h[((uint8_t*)_ptr)[i] & 0xf];
+            ret[(i<<1)+1]=h[((uint8_t*)_ptr)[i] & 0xf];
         }
         return ret;
     }
@@ -1011,16 +1012,16 @@ public:
         size_t n = h.size()>>1;
         SvarBuffer ret(n);
         for(size_t i=0;i < n;i++){
-            ((uint8_t*)ret._ptr)[i]=( (h[i]<<4) | (h[i+1] & 0xf) );
+            ((uint8_t*)(ret._ptr))[i]=strtol(h.substr(i<<1,2).c_str(),nullptr,16);
         }
         return ret;
     }
 //transformation between base64 and string
-    static const std::string chars;
     static inline bool is_base64(unsigned char c) {
       return (isalnum(c) || (c == '+') || (c == '/'));
     }
     std::string encode(const unsigned char * bytes_to_encode, size_t in_len) const {
+      const std::string chars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";;
       std::string ret;
       int i = 0;
       int j = 0;
@@ -1063,6 +1064,7 @@ public:
     }
     std::string base64()const{return encode((unsigned  char*)_ptr,_size);}
     static SvarBuffer fromBase64(const std::string& h){
+        const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";;
         size_t in_len = h.size();
         size_t i = 0;
         size_t j = 0;
@@ -1102,8 +1104,10 @@ public:
 
         return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::string>(ret)));
     }
-
-
+//md5
+    std::string md5(){
+        return MD5(hex()).toStr();
+    }
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
         ost<<b.hex();
         return ost;
@@ -1124,7 +1128,6 @@ public:
     size_t _size;
     Svar   _holder;
 };
-const std::string SvarBuffer::chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 template <typename T>
 inline std::string Svar::toString(const T& def) {
   std::ostringstream sst;
