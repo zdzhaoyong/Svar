@@ -58,7 +58,6 @@
 #include <functional>
 #ifdef __GNUC__
 #include <cxxabi.h>
-#include "md5.h"
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
@@ -1006,7 +1005,29 @@ public:
         _holder={{"holder",holder},{"format",format},{"shape",shape}};
     }
 
-//transformation between hex and SvarBuffer
+    static SvarBuffer load(std::string path){
+        std::ifstream in(path);
+        if(in.is_open()){
+            std::istreambuf_iterator<char> istreamptr(in);
+            std::string* file = new std::string( (std::istreambuf_iterator<char>(in)) , std::istreambuf_iterator<char>() );
+            in.close();
+            return SvarBuffer(file->data(),file->size(),Svar::create(std::unique_ptr<std::string>(file)));
+        }
+        std::cout<<"Wrong path!"<<std::endl;
+        return SvarBuffer(nullptr,0,Svar::Null());
+    }
+
+    bool save(std::string path){
+        std::ofstream out(path,std::ios_base::out);
+        if(out.is_open()){
+            out.write((const char*)_ptr,_size);
+            out.close();
+            return true;
+        }
+        return false;
+    }
+
+    /// Transformation between hex and SvarBuffer
     std::string hex()const{
         const std::string h = "0123456789ABCDEF";
         std::string ret;ret.resize(_size*2);
@@ -1016,6 +1037,7 @@ public:
         }
         return ret;
     }
+
     static SvarBuffer fromHex(const std::string& h){
         size_t n = h.size()>>1;
         SvarBuffer ret(n);
@@ -1024,53 +1046,53 @@ public:
         }
         return ret;
     }
-//transformation between base64 and string
-    static inline bool is_base64(unsigned char c) {
-      return (isalnum(c) || (c == '+') || (c == '/'));
-    }
-    std::string encode(const unsigned char * bytes_to_encode, size_t in_len) const {
-      const std::string chars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";;
-      std::string ret;
-      int i = 0;
-      int j = 0;
-      unsigned char char_array_3[3];
-      unsigned char char_array_4[4];
 
-      while (in_len--) {
-        char_array_3[i++] = *(bytes_to_encode++);
-        if (i == 3) {
-          char_array_4[0] = (unsigned char) ((char_array_3[0] & 0xfc) >> 2);
-          char_array_4[1] = (unsigned char) ( ( ( char_array_3[0] & 0x03 ) << 4 ) + ( ( char_array_3[1] & 0xf0 ) >> 4 ) );
-          char_array_4[2] = (unsigned char) ( ( ( char_array_3[1] & 0x0f ) << 2 ) + ( ( char_array_3[2] & 0xc0 ) >> 6 ) );
-          char_array_4[3] = (unsigned char) ( char_array_3[2] & 0x3f );
+    /// Transformation between base64 and string
+    std::string base64() const {
+        const unsigned char * bytes_to_encode=(unsigned  char*)_ptr;
+        size_t in_len=_size;
+        const std::string chars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";;
+        std::string ret;
+        int i = 0;
+        int j = 0;
+        unsigned char char_array_3[3];
+        unsigned char char_array_4[4];
 
-          for(i = 0; (i <4) ; i++)
-            ret += chars[char_array_4[i]];
-          i = 0;
+        while (in_len--) {
+            char_array_3[i++] = *(bytes_to_encode++);
+            if (i == 3) {
+                char_array_4[0] = (unsigned char) ((char_array_3[0] & 0xfc) >> 2);
+                char_array_4[1] = (unsigned char) ( ( ( char_array_3[0] & 0x03 ) << 4 ) + ( ( char_array_3[1] & 0xf0 ) >> 4 ) );
+                char_array_4[2] = (unsigned char) ( ( ( char_array_3[1] & 0x0f ) << 2 ) + ( ( char_array_3[2] & 0xc0 ) >> 6 ) );
+                char_array_4[3] = (unsigned char) ( char_array_3[2] & 0x3f );
+
+                for(i = 0; (i <4) ; i++)
+                    ret += chars[char_array_4[i]];
+                i = 0;
+            }
         }
-      }
 
-      if (i)
-      {
-        for(j = i; j < 3; j++)
-          char_array_3[j] = '\0';
+        if (i)
+        {
+            for(j = i; j < 3; j++)
+                char_array_3[j] = '\0';
 
-        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-        char_array_4[3] = char_array_3[2] & 0x3f;
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
 
-        for (j = 0; (j < i + 1); j++)
-          ret += chars[char_array_4[j]];
+            for (j = 0; (j < i + 1); j++)
+                ret += chars[char_array_4[j]];
 
-        while((i++ < 3))
-          ret += '=';
+            while((i++ < 3))
+                ret += '=';
 
-      }
+        }
 
-      return ret;
+        return ret;
     }
-    std::string base64()const{return encode((unsigned  char*)_ptr,_size);}
+
     static SvarBuffer fromBase64(const std::string& h){
         const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";;
         size_t in_len = h.size();
@@ -1079,6 +1101,9 @@ public:
         int in_ = 0;
         unsigned char char_array_4[4], char_array_3[3];
         std::string* ret = new std::string;
+        auto is_base64=[](unsigned char c) {
+            return (isalnum(c) || (c == '+') || (c == '/'));
+        };
 
         while (in_len-- && ( h[in_] != '=') && is_base64(h[in_])) {
           char_array_4[i++] = h[in_]; in_++;
@@ -1112,10 +1137,104 @@ public:
 
         return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::string>(ret)));
     }
-//md5
+
+    /// MD5 value
     std::string md5(){
-        return MD5(hex()).toStr();
+        const uint32_t A = 0x67452301;
+        const uint32_t B = 0xefcdab89;
+        const uint32_t C = 0x98badcfe;
+        const uint32_t D = 0x10325476;
+        const std::string hexs = "0123456789ABCDEF";
+        uint32_t atemp=A,btemp=B,ctemp=C,dtemp=D;
+        const unsigned int k[]={
+                0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,
+                0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,
+                0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,
+                0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,
+                0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,
+                0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,
+                0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,
+                0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,
+                0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,
+                0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,
+                0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,
+                0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,
+                0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391
+        };//64
+        const unsigned int s[]={7,12,17,22,7,12,17,22,7,12,17,22,7,
+                12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+                4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,
+                15,21,6,10,15,21,6,10,15,21,6,10,15,21};
+
+        std::function<uint32_t(uint32_t,uint32_t)> shift = [](uint32_t x,uint32_t n){
+            return (x<<n)|(x>>(32-n));
+        };
+        std::vector<std::function<uint32_t(uint32_t,uint32_t,uint32_t)> > funcs ={
+                [](uint32_t x,uint32_t y,uint32_t z){return (x & y)| (~x & z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (x & z)| (y & ~z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (x ^ y ^ z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (y ^ (x | ~z));}};
+        std::vector<std::function<uint8_t(uint8_t)> > func_g ={
+                [](uint8_t i){return i;},
+                [](uint8_t i){return (5*i+1)%16;},
+                [](uint8_t i){return (3*i+5)%16;},
+                [](uint8_t i){return (7*i)%16;}};
+
+        std::function<void(std::vector<uint32_t>&,int) > mainloop = [&](std::vector<uint32_t>& v,int step) -> void{
+            unsigned int f,g;
+            unsigned int a=atemp;
+            unsigned int b=btemp;
+            unsigned int c=ctemp;
+            unsigned int d=dtemp;
+            for(uint8_t i;i<64;i++){
+                f=funcs[i>>4](b,c,d);
+                g=func_g[i>>4](i);
+                unsigned int tmp=d;
+                d=c;
+                c=b;
+                b=b+shift((a+f+k[i]+v[step*16+g]),s[i]);
+                a=tmp;
+            }
+            atemp=a+atemp;
+            btemp=b+btemp;
+            ctemp=c+ctemp;
+            dtemp=d+dtemp;
+        };
+        std::function<std::string(int)> int2hexstr = [&](int i) -> std::string {
+            std::string s;
+            s.resize(8);
+            for(int j=0;j<4;j++){
+                uint8_t b = (i>>(j*8))%(1<<8);
+                s[2*j] = hexs[b>>4];
+                s[2*j+1] = hexs[b%16];
+            }
+            return s;
+        };
+
+
+        //fill data
+        int total_groups = (_size+8)/64+1;
+        int total_ints = total_groups*16;
+        std::vector<uint> vec(total_ints,0);
+        for(size_t i = 0; i < _size; i++)
+            vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
+        vec[_size>>2] |= 0x80 << (_size%4*8);
+        uint64_t size = _size*8;
+        vec[total_ints-2] = size & UINT_LEAST32_MAX;
+        vec[total_ints-1] = size>>32;
+
+        //loop calculate
+        for(int i = 0; i < total_groups; i++){
+            mainloop(vec,i);
+        }
+        return int2hexstr(atemp)\
+        .append(int2hexstr(btemp))\
+        .append(int2hexstr(ctemp))\
+        .append(int2hexstr(dtemp));
     }
+
+
+
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
         ost<<b.hex();
         return ost;
@@ -1633,7 +1752,7 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   using namespace std;
   // save main cmd things
   GetInt("argc") = argc;
-  GetPointer("argv", NULL) = argv;
+  set("argv",argv);
   set("ProgramName",getFileName(argv[0]));
   auto setvar=[this](std::string s)->bool{
       // Execution failed. Maybe its an assignment.
