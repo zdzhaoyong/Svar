@@ -1189,7 +1189,7 @@ public:
             ctemp=c+ctemp;
             dtemp=d+dtemp;
         };
-        std::function<std::string(int)> int2hexstr=[&](int i) -> std::string {
+        std::function<std::string(int)> int2hexstr = [&](int i) -> std::string {
             std::string s;
             s.resize(8);
             for(int j=0;j<4;j++){
