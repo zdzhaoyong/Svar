@@ -58,7 +58,6 @@
 #include <functional>
 #ifdef __GNUC__
 #include <cxxabi.h>
-#include "md5.h"
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
@@ -998,6 +997,30 @@ public:
         _holder = Svar::create(std::vector<char>(size));
         _ptr = _holder.castAs<std::vector<char>>().data();
     }
+
+//load&save file
+    static SvarBuffer load(std::string path){
+        std::ifstream in(path);
+        if(in.is_open()){
+            std::istreambuf_iterator<char> istreamptr(in);
+            std::string* file = new std::string( (std::istreambuf_iterator<char>(in)) , std::istreambuf_iterator<char>() );
+            in.close();
+            return SvarBuffer(file->data(),file->size(),Svar::create(std::unique_ptr<std::string>(file)));
+        }
+        std::cout<<"Wrong path!"<<std::endl;
+        return SvarBuffer(nullptr,0,Svar::Null());
+    }
+
+    bool save(std::string path){
+        std::ofstream out(path,std::ios_base::out);
+        if(out.is_open()){
+            out.write((unsigned char*)_ptr,_size);
+            out.close();
+            return true;
+        }
+        return false;
+    }
+
 //transformation between hex and SvarBuffer
     std::string hex()const{
         const std::string h = "0123456789ABCDEF";
@@ -1106,8 +1129,97 @@ public:
     }
 //md5
     std::string md5(){
-        return MD5(hex()).toStr();
+        const uint32_t A = 0x67452301;
+        const uint32_t B = 0xefcdab89;
+        const uint32_t C = 0x98badcfe;
+        const uint32_t D = 0x10325476;
+        const std::string hexs = "0123456789ABCDEF";
+        uint32_t atemp=A,btemp=B,ctemp=C,dtemp=D;
+        const unsigned int k[]={
+                0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,
+                0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,
+                0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,
+                0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,
+                0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,
+                0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,
+                0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,
+                0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,
+                0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,
+                0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,
+                0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,
+                0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,
+                0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391
+        };//64
+        const unsigned int s[]={7,12,17,22,7,12,17,22,7,12,17,22,7,
+                12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+                4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,
+                15,21,6,10,15,21,6,10,15,21,6,10,15,21};
+
+        std::function<uint32_t(uint32_t,uint32_t)> shift = [](uint32_t x,uint32_t n){
+            return (x<<n)|(x>>(32-n));
+        };
+    std::vector<std::function<uint32_t(uint32_t,uint32_t,uint32_t)> > funcs ={
+            [](uint32_t x,uint32_t y,uint32_t z){return (x & y)| (~x & z);},
+            [](uint32_t x,uint32_t y,uint32_t z){return (x & z)| (y & ~z);},
+            [](uint32_t x,uint32_t y,uint32_t z){return (x ^ y ^ z);},
+            [](uint32_t x,uint32_t y,uint32_t z){return (y ^ (x | ~z));}};
+    std::vector<std::function<uint8_t(uint8_t)> > func_g ={
+            [](uint8_t i){return i;},
+            [](uint8_t i){return (5*i+1)%16;},
+            [](uint8_t i){return (3*i+5)%16;},
+            [](uint8_t i){return (7*i)%16;}};
+
+    std::funciton<void(std::vector<uint32_t>&)> mainloop = [&](std::vector<uint32_t>& v,int step){
+        unsigned int f,g;
+        unsigned int a=atemp;
+        unsigned int b=btemp;
+        unsigned int c=ctemp;
+        unsigned int d=dtemp;
+        for(int i;i<64;i++){
+            f=funcs[i>>4];
+            g=func_g[i>>4](i);
+            unsigned int tmp=d;
+            d=c;
+            c=b;
+            b=b+shift((a+f+k[i]+v[step*16+g]),s[i]);
+            a=tmp;
+        }
+        atemp=a+atemp;
+        btemp=b+btemp;
+        ctemp=c+ctemp;
+        dtemp=d+dtemp;
+    };
+    std::funciton<std::string(uint32_t)> int2hexstr=[](uint32_t i) -> std::string {
+        std::string s;
+        s.resize(8);
+        for(int j=0;j<4;j++){
+            s[2*j] = hexs[(i>>((3-j)*8))%256>>4];
+            s[2*j+1] = hexs[(i>>((3-j)*8))%256%16];
+        }
+        return s;
+    };
+
+
+        //fill data
+        int total_groups = (_size+8)/64+1;
+        int total_ints = total_groups*16;
+        std::vector<uint> vec(total_ints,0);
+        for(int i = 0; i < _size; i++)
+            vec[i>>2] |= ((unsigned char* )_ptr[i]) << ((i%4)*8);
+        vec[_size>>2] |= 0x80 << (_size%4*8);
+        uint64_t size = _size*8;
+        vec[total_ints-2] = size | UINT_LEAST32_MAX;
+        vec[total_ints-1] = size>>32;
+
+        //loop calculate
+        for(int i = 0; i < total_groups; i++){
+            mainloop(vec,i);
+        }
+        return int2hexstr(atemp)+int2hexstr(btemp)+int2hexstr(ctemp)+int2hexstr(dtemp);
     }
+
+
+
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
         ost<<b.hex();
         return ost;
