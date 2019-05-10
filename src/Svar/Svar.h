@@ -1140,12 +1140,9 @@ public:
 
     /// MD5 value
     std::string md5(){
-        const uint32_t A = 0x67452301;
-        const uint32_t B = 0xefcdab89;
-        const uint32_t C = 0x98badcfe;
-        const uint32_t D = 0x10325476;
         const std::string hexs = "0123456789ABCDEF";
-        uint32_t atemp=A,btemp=B,ctemp=C,dtemp=D;
+        uint32_t atemp=0x67452301,btemp=0xefcdab89,
+                 ctemp=0x98badcfe,dtemp=0x10325476;
         const unsigned int k[]={
                 0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,
                 0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,
@@ -1232,8 +1229,6 @@ public:
         .append(int2hexstr(ctemp))\
         .append(int2hexstr(dtemp));
     }
-
-
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarBuffer& b){
         ost<<b.hex();
