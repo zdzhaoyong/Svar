@@ -186,7 +186,7 @@ TEST(Svar,HexAndBase64){
     SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
     EXPECT_EQ(sz.hex(),SvarBuffer::fromHex(sz.hex()).hex());
     EXPECT_EQ(sz.base64(),SvarBuffer::fromBase64(sz.base64()).base64());
-    SvarBuffer md = SvarBuffer::load(svar["argv"].as<char**>()[0]);
+    SvarBuffer md = SvarBuffer::load(svar.GetString("md5",svar["argv"].as<char**>()[0]));
     LOG(INFO)<<md.length();
     std::cout<<md.md5()<<std::endl;
 }
