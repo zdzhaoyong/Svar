@@ -1333,13 +1333,13 @@ inline Svar Svar::create(T && t)
 }
 
 template <>
-inline Svar Svar::create(const Svar & t)
+inline Svar Svar::create<Svar>(const Svar & t)
 {
     return t;
 }
 
 template <>
-inline Svar Svar::create( Svar && t)
+inline Svar Svar::create<Svar>( Svar && t)
 {
     return std::move(t);
 }
