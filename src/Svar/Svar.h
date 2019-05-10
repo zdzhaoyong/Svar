@@ -1014,7 +1014,7 @@ public:
     bool save(std::string path){
         std::ofstream out(path,std::ios_base::out);
         if(out.is_open()){
-            out.write((unsigned char*)_ptr,_size);
+            out.write((const char*)_ptr,_size);
             out.close();
             return true;
         }
@@ -1158,64 +1158,68 @@ public:
         std::function<uint32_t(uint32_t,uint32_t)> shift = [](uint32_t x,uint32_t n){
             return (x<<n)|(x>>(32-n));
         };
-    std::vector<std::function<uint32_t(uint32_t,uint32_t,uint32_t)> > funcs ={
-            [](uint32_t x,uint32_t y,uint32_t z){return (x & y)| (~x & z);},
-            [](uint32_t x,uint32_t y,uint32_t z){return (x & z)| (y & ~z);},
-            [](uint32_t x,uint32_t y,uint32_t z){return (x ^ y ^ z);},
-            [](uint32_t x,uint32_t y,uint32_t z){return (y ^ (x | ~z));}};
-    std::vector<std::function<uint8_t(uint8_t)> > func_g ={
-            [](uint8_t i){return i;},
-            [](uint8_t i){return (5*i+1)%16;},
-            [](uint8_t i){return (3*i+5)%16;},
-            [](uint8_t i){return (7*i)%16;}};
+        std::vector<std::function<uint32_t(uint32_t,uint32_t,uint32_t)> > funcs ={
+                [](uint32_t x,uint32_t y,uint32_t z){return (x & y)| (~x & z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (x & z)| (y & ~z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (x ^ y ^ z);},
+                [](uint32_t x,uint32_t y,uint32_t z){return (y ^ (x | ~z));}};
+        std::vector<std::function<uint8_t(uint8_t)> > func_g ={
+                [](uint8_t i){return i;},
+                [](uint8_t i){return (5*i+1)%16;},
+                [](uint8_t i){return (3*i+5)%16;},
+                [](uint8_t i){return (7*i)%16;}};
 
-    std::funciton<void(std::vector<uint32_t>&)> mainloop = [&](std::vector<uint32_t>& v,int step){
-        unsigned int f,g;
-        unsigned int a=atemp;
-        unsigned int b=btemp;
-        unsigned int c=ctemp;
-        unsigned int d=dtemp;
-        for(int i;i<64;i++){
-            f=funcs[i>>4];
-            g=func_g[i>>4](i);
-            unsigned int tmp=d;
-            d=c;
-            c=b;
-            b=b+shift((a+f+k[i]+v[step*16+g]),s[i]);
-            a=tmp;
-        }
-        atemp=a+atemp;
-        btemp=b+btemp;
-        ctemp=c+ctemp;
-        dtemp=d+dtemp;
-    };
-    std::funciton<std::string(uint32_t)> int2hexstr=[](uint32_t i) -> std::string {
-        std::string s;
-        s.resize(8);
-        for(int j=0;j<4;j++){
-            s[2*j] = hexs[(i>>((3-j)*8))%256>>4];
-            s[2*j+1] = hexs[(i>>((3-j)*8))%256%16];
-        }
-        return s;
-    };
+        std::function<void(std::vector<uint32_t>&,int) > mainloop = [&](std::vector<uint32_t>& v,int step) -> void{
+            unsigned int f,g;
+            unsigned int a=atemp;
+            unsigned int b=btemp;
+            unsigned int c=ctemp;
+            unsigned int d=dtemp;
+            for(uint8_t i;i<64;i++){
+                f=funcs[i>>4](b,c,d);
+                g=func_g[i>>4](i);
+                unsigned int tmp=d;
+                d=c;
+                c=b;
+                b=b+shift((a+f+k[i]+v[step*16+g]),s[i]);
+                a=tmp;
+            }
+            atemp=a+atemp;
+            btemp=b+btemp;
+            ctemp=c+ctemp;
+            dtemp=d+dtemp;
+        };
+        std::function<std::string(int)> int2hexstr=[&](int i) -> std::string {
+            std::string s;
+            s.resize(8);
+            for(int j=0;j<4;j++){
+                uint8_t b = (i>>(j*8))%(1<<8);
+                s[2*j] = hexs[b>>4];
+                s[2*j+1] = hexs[b%16];
+            }
+            return s;
+        };
 
 
         //fill data
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
         std::vector<uint> vec(total_ints,0);
-        for(int i = 0; i < _size; i++)
-            vec[i>>2] |= ((unsigned char* )_ptr[i]) << ((i%4)*8);
+        for(size_t i = 0; i < _size; i++)
+            vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
         uint64_t size = _size*8;
-        vec[total_ints-2] = size | UINT_LEAST32_MAX;
+        vec[total_ints-2] = size & UINT_LEAST32_MAX;
         vec[total_ints-1] = size>>32;
 
         //loop calculate
         for(int i = 0; i < total_groups; i++){
             mainloop(vec,i);
         }
-        return int2hexstr(atemp)+int2hexstr(btemp)+int2hexstr(ctemp)+int2hexstr(dtemp);
+        return int2hexstr(atemp)\
+        .append(int2hexstr(btemp))\
+        .append(int2hexstr(ctemp))\
+        .append(int2hexstr(dtemp));
     }
 
 
