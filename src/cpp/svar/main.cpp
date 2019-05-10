@@ -174,6 +174,20 @@ TEST(Svar,CBOR){
     }
 }
 
+TEST(Svar,HexAndBase64){
+    Svar cbor=svar["__builtin__.CBOR"];
+    Svar var={{"i",1},
+              {"bool",false},
+              {"double",434.},
+              {"str","sfd"},
+              {"vec",{1,2,3}},
+              {"map",{{"name","value"}}}
+             };
+    SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
+    EXPECT_EQ(sz.hex(),SvarBuffer::fromHex(sz.hex()).hex());
+    EXPECT_EQ(sz.base64(),SvarBuffer::fromBase64(sz.base64()).base64());
+}
+
 TEST(Svar,Class){
     SvarClass::Class<BaseClass>()
             .def_static("__init__",[](){return BaseClass();})
