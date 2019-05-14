@@ -179,6 +179,9 @@ public:
     template <typename T>
     Svar(const std::shared_ptr<T>& v);
 
+    template <typename T>
+    Svar(std::unique_ptr<T>&& v);
+
     /// Wrap bool to static instances
     Svar(bool b):Svar(b?True():False()){}
 
@@ -803,11 +806,11 @@ private:
     SvarValue_(const Svar& v){}
 };
 
-template <typename T,typename H=std::unique_ptr<T> >
+template <typename T,typename H=std::shared_ptr<T> >
 class SvarPtrHolder: public SvarValue{
 public:
-    explicit SvarPtrHolder(T* ptr):_var(ptr){}
-    explicit SvarPtrHolder(const H& v):_var(v){}
+    explicit SvarPtrHolder(const H& v):_var(v){
+    }
 
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return _var.get();}
@@ -816,6 +819,21 @@ public:
     T getCopy()const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     H _var;
+};
+
+template <typename T>
+class SvarPtrHolder<T,std::unique_ptr<T>>: public SvarValue{
+public:
+    explicit SvarPtrHolder(std::unique_ptr<T>&& v):_var(std::move(v)){
+    }
+
+    virtual TypeID          cpptype()const{return typeid(T);}
+    virtual const void*     ptr() const{return _var.get();}
+    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+
+    T getCopy()const{return _var;}
+//protected:// FIXME: this should not accessed by outside
+    std::unique_ptr<T> _var;
 };
 
 class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
@@ -1354,6 +1372,10 @@ inline Svar::Svar(const std::map<Svar,Svar>& m)
 template <typename T>
 Svar::Svar(const std::shared_ptr<T>& v)
     : _obj(std::make_shared<SvarPtrHolder<T,std::shared_ptr<T>>>(v)){}
+
+template <typename T>
+Svar::Svar(std::unique_ptr<T>&& v)
+    : _obj(std::make_shared<SvarPtrHolder<T,std::unique_ptr<T>>>(std::move(v))){}
 
 template <>
 inline Svar::Svar(const std::shared_ptr<SvarValue>& v)

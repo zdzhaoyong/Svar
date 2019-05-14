@@ -46,6 +46,9 @@ TEST(Svar,Variable)
     EXPECT_TRUE(strlit["a"].isArray());
 
     EXPECT_EQ("[1,2]"_svar .length(),2);
+
+    EXPECT_TRUE(Svar(std::shared_ptr<std::mutex>(new std::mutex())).is<std::mutex>());
+    EXPECT_TRUE(Svar(std::unique_ptr<std::mutex>(new std::mutex())).is<std::mutex>());
 }
 
 std::string add(std::string left,const std::string& r){
@@ -175,20 +178,30 @@ TEST(Svar,CBOR){
 }
 
 TEST(Svar,HexAndBase64){
-    Svar cbor=svar["__builtin__.CBOR"];
-    Svar var={{"i",1},
-              {"bool",false},
-              {"double",434.},
-              {"str","sfd"},
-              {"vec",{1,2,3}},
-              {"map",{{"name","value"}}}
-             };
-    SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
-    EXPECT_EQ(sz.hex(),SvarBuffer::fromHex(sz.hex()).hex());
-    EXPECT_EQ(sz.base64(),SvarBuffer::fromBase64(sz.base64()).base64());
-    SvarBuffer md = SvarBuffer::load(svar.GetString("md5",svar["argv"].as<char**>()[0]));
-    LOG(INFO)<<md.length();
-    std::cout<<md.md5()<<std::endl;
+    SvarBuffer buf=SvarBuffer::load(svar.GetString("md5",svar["argv"].as<char**>()[0]));
+
+    EXPECT_EQ(buf.hex(),SvarBuffer::fromHex(buf.hex()).hex());
+    EXPECT_EQ(buf.base64(),SvarBuffer::fromBase64(buf.base64()).base64());
+    LOG(INFO)<<buf.length();
+    std::cout<<buf.md5()<<std::endl;
+
+    std::string str;
+    {
+        ScopedTimer tm("HexEncode");
+        str=buf.hex();
+    }
+    {
+        ScopedTimer tm("HexDecode");
+        buf=SvarBuffer::fromHex(str);
+    }
+    {
+        ScopedTimer tm("Base64Encode");
+        str=buf.base64();
+    }
+    {
+        ScopedTimer tm("Base64Decode");
+        buf=SvarBuffer::fromBase64(str);
+    }
 }
 
 TEST(Svar,Class){
