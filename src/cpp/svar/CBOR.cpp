@@ -49,7 +49,7 @@ public:
 
         static constexpr bool little_endianess() noexcept
         {
-            return 0x78 == (char)0x12345678
+            return 0x78 == (char)0x12345678;
         }
 
         std::vector<char>& o;
