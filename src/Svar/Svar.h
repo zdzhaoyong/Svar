@@ -1346,13 +1346,13 @@ inline Svar Svar::create(T && t)
 }
 
 template <>
-inline Svar Svar::create<Svar>(const Svar & t)
+inline Svar Svar::create(const Svar & t)
 {
     return t;
 }
 
 template <>
-inline Svar Svar::create<Svar>( Svar && t)
+inline Svar Svar::create( Svar && t)
 {
     return std::move(t);
 }
@@ -1430,6 +1430,59 @@ inline Svar& Svar::as<Svar>(){
     return *this;
 }
 
+template <typename T>
+class caster{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<T>()) return var;
+
+        Svar cl=var.classObject();
+        if(cl.isClass()){
+            SvarClass& srcClass=cl.as<SvarClass>();
+            Svar cvt=srcClass._methods["__"+Svar::type_id<T>()+"__"];
+            if(cvt.isFunction()){
+                Svar ret=cvt(var);
+                if(ret.is<T>()) return ret;
+            }
+        }
+
+        SvarClass& destClass=SvarClass::instance<T>().template as<SvarClass>();
+        if(destClass.__init__.isFunction()){
+            Svar ret=destClass.__init__(var);
+            if(ret.is<T>()) return ret;
+        }
+
+        return Svar::Undefined();
+    }
+
+    static Svar to(const T& var){
+        return Svar::create(var);
+    }
+};
+
+template <typename T>
+class caster<std::vector<T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::vector<T>>()) return var;
+
+        if(var.isArray()) return  Svar::Undefined();
+
+        std::vector<T> ret;
+        ret.reserve(var.length());
+        for(const Svar& v:var.as<SvarArray>()._var)
+        {
+            ret.push_back(v.castAs<T>());
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::vector<T>& var){
+        return Svar::create(var);
+    }
+};
+
 inline Svar Svar::cast(const std::string& typeStr)const
 {
     if(is(typeStr)) return (*this);
@@ -1448,23 +1501,8 @@ inline Svar Svar::cast(const std::string& typeStr)const
 
 template <typename T>
 Svar Svar::cast()const{
-    if(is<T>()) return (*this);
-
-    Svar cl=_obj->classObject();
-    if(cl.isClass()){
-        SvarClass& srcClass=cl.as<SvarClass>();
-        Svar cvt=srcClass._methods["__"+type_id<T>()+"__"];
-        if(cvt.isFunction()){
-            Svar ret=cvt(*this);
-            if(ret.is<T>()) return ret;
-        }
-    }
-
-    SvarClass& destClass=SvarClass::instance<T>().template as<SvarClass>();
-    if(destClass.__init__.isFunction()){
-        Svar ret=destClass.__init__(*this);
-        if(ret.is<T>()) return ret;
-    }
+    Svar ret=caster<T>::from(*this);
+    if(ret.is<T>()) return ret;
 
     return Undefined();
 }
