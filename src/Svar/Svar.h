@@ -249,7 +249,7 @@ public:
 
     /// Create any other c++ type instance, T need to be a copyable type
     template <class T>
-    static Svar create(const T & t);
+    static Svar create(T & t);
     template <class T>
     static Svar create(T && t);
 
@@ -1334,9 +1334,9 @@ Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
 template <class T>
-inline Svar Svar::create(const T & t)
+inline Svar Svar::create(T & t)
 {
-    return (SvarValue*)new SvarValue_<T>(t);
+    return (SvarValue*)new SvarValue_<const T>(t);
 }
 
 template <class T>
@@ -1346,7 +1346,13 @@ inline Svar Svar::create(T && t)
 }
 
 template <>
-inline Svar Svar::create<Svar>(const Svar & t)
+inline Svar Svar::create<const Svar>(const Svar & t)
+{
+    return t;
+}
+
+template <>
+inline Svar Svar::create<Svar>(Svar & t)
 {
     return t;
 }
