@@ -21,7 +21,10 @@ TEST(Svar,Variable)
 
     EXPECT_TRUE(Svar("").as<std::string>().empty());
     EXPECT_TRUE(Svar(1.).as<double>()==1.);
-    EXPECT_TRUE(Svar({1,2}).isArray());
+    auto l = {1,2};
+    auto u = Svar({1,2});
+    auto i = Svar(l);
+    EXPECT_TRUE(i.isArray());
     EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
 
     Svar obj({{"1",1}});
