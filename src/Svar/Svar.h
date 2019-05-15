@@ -205,7 +205,7 @@ public:
 
     /// Construct from initializer
     Svar(const std::initializer_list<Svar>& init);
-
+    Svar(const std::initializer_list<int>& init);
     /// Redirect char array to string
     template <size_t N>
     Svar(const char (&t)[N])
@@ -1317,7 +1317,13 @@ inline Svar::Svar(const std::initializer_list<Svar>& init)
 
     set(Svar(std::vector<Svar>(init)));
 }
-
+inline Svar::Svar(const std::initializer_list<int>& init)
+    :Svar()
+{
+    std::vector<Svar> temp(init.size(),Svar::Undefined());
+    std::transform(init.begin(),init.end(),temp.begin(),[](int i){return Svar(i);});
+    set(Svar(temp));
+}
 template <typename Return, typename... Args, typename... Extra>
 Svar::Svar(Return (*f)(Args...), const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
