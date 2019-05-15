@@ -1336,7 +1336,7 @@ Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
 template <class T>
 inline Svar Svar::create(T & t)
 {
-    return (SvarValue*)new SvarValue_<const T>(t);
+    return (SvarValue*)new SvarValue_<typename std::remove_const<T>::type >(const_cast<T&>(t));
 }
 
 template <class T>
