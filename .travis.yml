@@ -51,7 +51,7 @@ script:
       git clone https://github.com/zdzhaoyong/Svar.git
     fi
   - cd Svar
-  - git checkout ${TRAVIS_BRANCH}
+  - git checkout chenlin
   - git pull
   - mkdir -p build
   - cd build
