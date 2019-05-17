@@ -22,7 +22,7 @@ TEST(Svar,Variable)
     EXPECT_TRUE(Svar("").as<std::string>().empty());
     EXPECT_TRUE(Svar(1.).as<double>()==1.);
     EXPECT_TRUE(Svar({1,2}).isArray());
-    EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
+//    EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
 
     Svar obj({{"1",1}});
     EXPECT_TRUE(obj.isObject());
@@ -128,7 +128,7 @@ TEST(Svar,CBOR){
         buf->resize(bufSize);
         // should tell svarBuffer to release the buffer
         SvarBuffer svarBuf(buf->data(),buf->size(),
-                           Svar::create(std::unique_ptr<std::string>(buf)));
+                           std::unique_ptr<std::string>(buf));
         var.set("binary_buf",svarBuf);
 
         timer.enter("dump_cbor");

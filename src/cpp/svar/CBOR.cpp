@@ -136,7 +136,7 @@ public:
                 funcs[it]=[](u_char c,IStream& i){
                     int len = funcs[c-0x40](c-0x40,i).as<int>();
                     std::string* buf=new std::string((char*)i.read(len),len);
-                    return Svar::create(SvarBuffer(buf->data(),buf->size(),Svar::create(std::unique_ptr<std::string>(buf))));
+                    return Svar::create(SvarBuffer(buf->data(),buf->size(),std::unique_ptr<std::string>(buf)));
                 };//binary string
             for(u_char it=0x60;it<=0x7B;it++)
                 funcs[it]=[](u_char c,IStream& i){
@@ -211,7 +211,7 @@ public:
         ret->resize(sz.sz);
         OStream ost(*ret);
         dumpStream(ost,var);
-        return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::vector<char>>(ret)));
+        return SvarBuffer(ret->data(),ret->size(),std::unique_ptr<std::vector<char>>(ret));
     }
 
     static char c(std::uint8_t x){return *reinterpret_cast<char*>(&x);}

@@ -172,8 +172,7 @@ public:
 
     /// Wrap nullptr as Null() and construct from SvarValue pointer
     Svar(SvarValue* v)
-        : _obj(v==nullptr?Null().value():
-               std::shared_ptr<SvarValue>(v)){}
+        : _obj(std::shared_ptr<SvarValue>(v)){}
 
     /// Wrap an pointer use shared_ptr or unique_ptr
     template <typename T>
@@ -192,7 +191,7 @@ public:
     Svar(double  d):Svar(create(d)){}
 
     /// Wrap a string
-    Svar(const std::string& m);
+    Svar(const std::string& str);
 
     /// Construct an Array
     Svar(const std::vector<Svar>& vec);//Array
@@ -206,30 +205,12 @@ public:
     /// Construct from initializer
     Svar(const std::initializer_list<Svar>& init);
 
-    /// Redirect char array to string
-    template <size_t N>
-    Svar(const char (&t)[N])
-        : Svar(std::string(t)) {
-    }
-
-    /// Object translation support
-    template <class M, typename std::enable_if<
-        std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value,
-            int>::type = 0>
-    Svar(const M & m) : Svar(std::map<std::string,Svar>(m.begin(), m.end())) {}
-
-    /// Dict translation support
-    template <class M, typename std::enable_if<
-                  !std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value
-                  &&std::is_constructible<Svar, decltype(std::declval<M>().begin()->first)>::value,
-            int>::type = 0>
-    Svar(const M & m) : Svar(std::map<Svar,Svar>(m.begin(), m.end())) {}
-
-    /// Array translation support
-    template <class V, typename std::enable_if<
-        std::is_constructible<Svar, decltype(*std::declval<V>().begin())>::value,
-            int>::type = 0>
-    Svar(const V & v) : Svar(std::vector<Svar>(v.begin(), v.end())) {}
+//    /// Dict translation support
+//    template <class M, typename std::enable_if<
+//                  !std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value
+//                  &&std::is_constructible<Svar, decltype(std::declval<M>().begin()->first)>::value,
+//            int>::type = 0>
+//    Svar(const M & m) : Svar(std::map<Svar,Svar>(m.begin(), m.end())) {}
 
     /// Construct a cpp_function from a vanilla function pointer
     template <typename Return, typename... Args, typename... Extra>
@@ -246,6 +227,9 @@ public:
     /// Construct a cpp_function from a class method (const)
     template <typename Return, typename Class, typename... arg, typename... Extra>
     Svar(Return (Class::*f)(arg...) const, const Extra&... extra);
+
+    template <typename T>
+    Svar(const T& var);
 
     /// Create any other c++ type instance, T need to be a copyable type
     template <class T>
@@ -589,7 +573,7 @@ public:
     template <typename... Args>
     Svar call(Args... args)const{
         std::vector<Svar> argv = {
-                (Svar::create(std::move(args)))...
+                (Svar(std::move(args)))...
         };
         return Call(argv);
     }
@@ -1038,7 +1022,7 @@ public:
             std::istreambuf_iterator<char> istreamptr(in);
             std::string* file = new std::string( (std::istreambuf_iterator<char>(in)) , std::istreambuf_iterator<char>() );
             in.close();
-            return SvarBuffer(file->data(),file->size(),Svar::create(std::unique_ptr<std::string>(file)));
+            return SvarBuffer(file->data(),file->size(),std::unique_ptr<std::string>(file));
         }
         std::cout<<"Wrong path!"<<std::endl;
         return SvarBuffer(nullptr,0,Svar::Null());
@@ -1162,7 +1146,7 @@ public:
           for (j = 0; (j < i - 1); j++) *ret += char_array_3[j];
         }
 
-        return SvarBuffer(ret->data(),ret->size(),Svar::create(std::unique_ptr<std::string>(ret)));
+        return SvarBuffer(ret->data(),ret->size(),std::unique_ptr<std::string>(ret));
     }
 
     /// MD5 value
@@ -1486,7 +1470,7 @@ public:
     static Svar from(const Svar& var){
         if(var.is<std::vector<T>>()) return var;
 
-        if(var.isArray()) return  Svar::Undefined();
+        if(!var.isArray()) return Svar::Undefined();
 
         std::vector<T> ret;
         ret.reserve(var.length());
@@ -1502,6 +1486,53 @@ public:
         return Svar::create(var);
     }
 };
+
+
+template <typename T>
+class caster<std::map<std::string,T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::map<std::string,T> >()) return var;
+
+        if(!var.isObject()) return  Svar::Undefined();
+
+        std::map<std::string,T> ret;
+        for(const std::pair<std::string,Svar>& v:var.as<SvarObject>()._var)
+        {
+            ret.insert(std::make_pair(v.first,v.second.castAs<T>()));
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::map<std::string,T>& var){
+        return Svar::object(std::map<std::string,Svar>(var.begin(),var.end()));
+    }
+};
+
+template <>
+class caster<std::nullptr_t >{
+public:
+    static Svar from(const Svar& var){
+        return var;
+    }
+
+    static Svar to(std::nullptr_t v){
+        return Svar::Null();
+    }
+};
+
+template <int sz>
+class caster<char[sz]>{
+public:
+    static Svar to(const char* v){
+        return Svar(std::string(v));
+    }
+};
+
+template <typename T>
+Svar::Svar(const T& var):Svar(caster<T>::to(var))
+{}
 
 inline Svar Svar::cast(const std::string& typeStr)const
 {
