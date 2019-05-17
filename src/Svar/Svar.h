@@ -680,29 +680,9 @@ public:
 
 
         if(__init__.is<void>()&&name=="__init__") __init__=function;
-        if(__int__.is<void>()&&name=="__int__") __int__=function;
-        if(__double__.is<void>()&&name=="__double__") __double__=function;
         if(__str__.is<void>()&&name=="__str__") __str__=function;
-        if(__neg__.is<void>()&&name=="__neg__") __neg__=function;
-        if(__add__.is<void>()&&name=="__add__") __add__=function;
-        if(__sub__.is<void>()&&name=="__sub__") __sub__=function;
-        if(__mul__.is<void>()&&name=="__mul__") __mul__=function;
-        if(__div__.is<void>()&&name=="__div__") __div__=function;
-        if(__mod__.is<void>()&&name=="__mod__") __mod__=function;
-        if(__xor__.is<void>()&&name=="__xor__") __xor__=function;
-        if(__or__.is<void>()&&name=="__or__") __or__=function;
-        if(__and__.is<void>()&&name=="__and__") __and__=function;
-        if(__le__.is<void>()&&name=="__le__") __le__=function;
-        if(__lt__.is<void>()&&name=="__lt__") __lt__=function;
-        if(__ne__.is<void>()&&name=="__ne__") __ne__=function;
-        if(__eq__.is<void>()&&name=="__eq__") __eq__=function;
-        if(__ge__.is<void>()&&name=="__ge__") __ge__=function;
-        if(__gt__.is<void>()&&name=="__gt__") __gt__=function;
-        if(__len__.is<void>()&&name=="__len__") __len__=function;
         if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
         if(__setitem__.is<void>()&&name=="__setitem__") __setitem__=function;
-        if(__iter__.is<void>()&&name=="__iter__") __iter__=function;
-        if(__next__.is<void>()&&name=="__next__") __next__=function;
         return *this;
     }
 
@@ -789,11 +769,7 @@ public:
     friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
 
     /// buildin functions
-    Svar __int__,__double__,__str__;
-    Svar __init__,__neg__,__add__,__sub__,__mul__,__div__,__mod__;
-    Svar __xor__,__or__,__and__;
-    Svar __le__,__lt__,__ne__,__eq__,__ge__,__gt__;
-    Svar __len__,__getitem__,__setitem__,__iter__,__next__;
+    Svar __init__,__str__,__getitem__,__setitem__;
 
     std::string  __name__;
     std::type_index _cpptype;
@@ -2051,20 +2027,14 @@ inline std::string Svar::printTable(
 
 inline Svar Svar::operator -()const
 {
-    auto cls=classPtr();
-    if(!cls) throw SvarExeption(typeName()+" has not class to operator __neg__.");
-    if(!cls->__neg__.isFunction()) throw SvarExeption("class "+cls->__name__+" does not have operator __neg__");
-    Svar ret=cls->__neg__((*this));
-    if(ret.isUndefined()) throw SvarExeption(cls->__name__+" operator __neg__ returned Undefined.");
-    return ret;
+    return classPtr()->call(*this,"__neg__");
 }
 
 #define DEF_SVAR_OPERATOR_IMPL(SNAME)\
 {\
     auto cls=classPtr();\
     if(!cls) throw SvarExeption(typeName()+" has not class to operator "#SNAME".");\
-    if(!cls->SNAME.isFunction()) throw SvarExeption("class "+cls->__name__+" does not have operator "#SNAME);\
-    Svar ret=cls->SNAME((*this),rh);\
+    Svar ret=cls->call(*this,#SNAME,rh);\
     if(ret.isUndefined()) throw SvarExeption(cls->__name__+" operator "#SNAME" with rh: "+rh.typeName()+"returned Undefined.");\
     return ret;\
 }
@@ -2094,9 +2064,9 @@ inline Svar Svar::operator &(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__and__)
 
 inline bool Svar::operator ==(const Svar& rh)const{
-    const Svar& clsobj=classObject();
+    Svar clsobj=classObject();
     if(!clsobj.isClass()) return _obj->ptr()==rh.value()->ptr();
-    Svar eq_func=clsobj.as<SvarClass>().__eq__;
+    Svar eq_func=clsobj.as<SvarClass>()["__eq__"];
     if(!eq_func.isFunction()) return _obj->ptr()==rh.value()->ptr();
     Svar ret=eq_func(*this,rh);
     assert(ret.is<bool>());
@@ -2104,9 +2074,9 @@ inline bool Svar::operator ==(const Svar& rh)const{
 }
 
 inline bool Svar::operator <(const Svar& rh)const{
-    const Svar& clsobj=classObject();
+    Svar clsobj=classObject();
     if(!clsobj.isClass()) return _obj->ptr()<rh.value()->ptr();
-    Svar lt_func=clsobj.as<SvarClass>().__lt__;
+    Svar lt_func=clsobj.as<SvarClass>()["__lt__"];
     if(!lt_func.isFunction()) return _obj->ptr()<rh.value()->ptr();
     Svar ret=lt_func(*this,rh);
     assert(ret.is<bool>());
