@@ -1548,9 +1548,7 @@ inline Svar Svar::castAs<Svar>()const{
 }
 
 inline std::string Svar::typeName()const{
-    if(classPtr())
-        return classPtr()->name();
-    return "Undefined";
+    return classPtr()->name();
 }
 
 inline SvarValue::TypeID Svar::cpptype()const{

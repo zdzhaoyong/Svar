@@ -34,6 +34,9 @@ TEST(Svar,Variable)
     obj["hello.world"]=false;
     EXPECT_EQ(obj["hello"]["world"],false);
 
+    std::map<std::string,Svar> cMap=obj.castAs<std::map<std::string,Svar> >();
+    EXPECT_EQ(cMap["1"],1);
+
     Svar vec({0,1,2,3});
     EXPECT_EQ(vec[1],1);
     vec[1]=2;
@@ -52,6 +55,7 @@ TEST(Svar,Variable)
 
     std::vector<int> rvec=vec.castAs<std::vector<int>>();
     EXPECT_EQ(rvec[0],0);
+
 
     Svar svarMtx(std::shared_ptr<std::mutex>(new std::mutex()));
     auto mtx=svarMtx.castAs<std::shared_ptr<std::mutex>>();
