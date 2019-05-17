@@ -722,11 +722,11 @@ public:
         return def(name,Svar::lambda(f),false);
     }
 
-    template <typename Base>
+    template <typename Base,typename ChildType>
     SvarClass& inherit(){
         Svar base={SvarClass::instance<Base>(),
-                   Svar::lambda([](Svar v){
-                       return (Base*)&v.as<Base>();
+                   Svar::lambda([](ChildType* v){
+                       return dynamic_cast<Base*>(v);
                    })};
         _parents.push_back(base);
         return *this;
