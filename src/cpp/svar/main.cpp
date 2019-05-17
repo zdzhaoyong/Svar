@@ -22,7 +22,7 @@ TEST(Svar,Variable)
     EXPECT_TRUE(Svar("").as<std::string>().empty());
     EXPECT_TRUE(Svar(1.).as<double>()==1.);
     EXPECT_TRUE(Svar({1,2}).isArray());
-//    EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
+    EXPECT_TRUE(Svar(std::map<int,Svar>({{1,2}})).isDict());
 
     Svar obj({{"1",1}});
     EXPECT_TRUE(obj.isObject());
@@ -49,6 +49,14 @@ TEST(Svar,Variable)
 
     EXPECT_TRUE(Svar(std::shared_ptr<std::mutex>(new std::mutex())).is<std::mutex>());
     EXPECT_TRUE(Svar(std::unique_ptr<std::mutex>(new std::mutex())).is<std::mutex>());
+
+    std::vector<int> rvec=vec.castAs<std::vector<int>>();
+    EXPECT_EQ(rvec[0],0);
+
+    Svar svarMtx(std::shared_ptr<std::mutex>(new std::mutex()));
+    auto mtx=svarMtx.castAs<std::shared_ptr<std::mutex>>();
+    mtx->lock();
+    mtx->unlock();
 }
 
 std::string add(std::string left,const std::string& r){
@@ -213,7 +221,7 @@ public:
     InheritClass(int age,std::string name):BaseClass(age),name_(name){}
 
     std::string name()const{return name_;}
-    std::string setName(std::string name){name_=name;}
+    void setName(std::string name){name_=name;}
 
     virtual std::string intro() const{return BaseClass::intro()+", name:"+name_;}
     std::string name_;

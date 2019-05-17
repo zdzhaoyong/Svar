@@ -194,8 +194,10 @@ public:
 
         SvarBuffer tmp=svar_cbor.clone();
         timer.enter("load_cbor_svar");
-        load(svar_cbor);
+//        std::cout<<load(svar_cbor)<<std::endl;
         timer.leave("load_cbor_svar");
+//        std::cout<<tmp<<std::endl;
+//        std::cout<<svar_cbor<<std::endl;
         assert(memcmp(tmp._ptr,svar_cbor._ptr,tmp.length())==0);
 
         timer.enter("load_cbor_json");

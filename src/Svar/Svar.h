@@ -170,14 +170,15 @@ public:
     /// Default is Undefined
     Svar():Svar(Undefined()){}
 
-    /// Wrap nullptr as Null() and construct from SvarValue pointer
+    /// Construct from SvarValue pointer
     Svar(SvarValue* v)
         : _obj(std::shared_ptr<SvarValue>(v)){}
 
-    /// Wrap an pointer use shared_ptr or unique_ptr
+    /// Wrap any thing with template caster for user customize
     template <typename T>
-    Svar(const std::shared_ptr<T>& v);
+    Svar(const T& var);
 
+    /// Wrap an pointer use unique_ptr
     template <typename T>
     Svar(std::unique_ptr<T>&& v);
 
@@ -205,13 +206,6 @@ public:
     /// Construct from initializer
     Svar(const std::initializer_list<Svar>& init);
 
-//    /// Dict translation support
-//    template <class M, typename std::enable_if<
-//                  !std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value
-//                  &&std::is_constructible<Svar, decltype(std::declval<M>().begin()->first)>::value,
-//            int>::type = 0>
-//    Svar(const M & m) : Svar(std::map<Svar,Svar>(m.begin(), m.end())) {}
-
     /// Construct a cpp_function from a vanilla function pointer
     template <typename Return, typename... Args, typename... Extra>
     Svar(Return (*f)(Args...), const Extra&... extra);
@@ -227,9 +221,6 @@ public:
     /// Construct a cpp_function from a class method (const)
     template <typename Return, typename Class, typename... arg, typename... Extra>
     Svar(Return (Class::*f)(arg...) const, const Extra&... extra);
-
-    template <typename T>
-    Svar(const T& var);
 
     /// Create any other c++ type instance, T need to be a copyable type
 #if (__GNUC__>=5)||defined(__clang__)
@@ -285,7 +276,7 @@ public:
 
     /// Cast to c++ type T and return, throw SvarException when failed
     template <typename T>
-    detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,const T&>
+    detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,T>
     castAs()const;
 
     bool isUndefined()const{return is<void>();}
@@ -323,16 +314,6 @@ public:
     /// Set the child "name" to "create<T>(def)"
     template <typename T>
     void set(const std::string& name,const T& def);
-
-    /// Set to "Svar(def)" when T is constructible
-    template <typename T, typename std::enable_if<
-                  std::is_constructible<Svar,T>::value,int>::type = 0>
-    void set(const T& def);
-
-    /// Set to "create<T>(def)" when T is not constructible
-    template <typename T, typename std::enable_if<
-                  !std::is_constructible<Svar,T>::value,int>::type = 0>
-    void set(const T& def);
 
     /// For Object: dot compute and find the member
     /// For Array, Dict and Class, check if the item is not Undefined without dot compute
@@ -401,7 +382,11 @@ public:
     Svar& operator[](const Svar& name);// This is not thread safe!
 
     template <typename T>
-    Svar& operator =(const T& v){set(v);return *this;}
+    Svar& operator =(const T& v){
+        if(is<T>()) as<T>()=v;
+        else (*this)=Svar(v);
+        return *this;
+    }
 
     operator std::string(){return castAs<std::string>();}
 
@@ -657,7 +642,7 @@ public:
     SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
         assert(function.isFunction());
-        Svar* dest=&_methods.getOrCreate(name);
+        Svar* dest=&_methods[name];
         while(dest->isFunction())
         {
             if(dest->as<SvarFunction>().signature==function.as<SvarFunction>().signature)
@@ -1012,7 +997,7 @@ public:
 
     SvarBuffer(size_t size):_size(size){
         _holder = Svar::create(std::vector<char>(size));
-        _ptr = _holder.castAs<std::vector<char>>().data();
+        _ptr = _holder.as<std::vector<char>>().data();
     }
 
     SvarBuffer(const void* ptr,size_t size,const std::vector<int>& shape,
@@ -1254,7 +1239,7 @@ public:
 
     SvarBuffer clone(){
         SvarBuffer buf(_size);
-        memcpy(buf._holder.as<std::vector<char>>().data(),_ptr,_size);
+        memcpy((void*)buf._ptr,_ptr,_size);
         return buf;
     }
 
@@ -1315,11 +1300,11 @@ inline Svar::Svar(const std::initializer_list<Svar>& init)
     if(is_an_object){
         std::map<std::string,Svar> obj;
         for(const Svar& p:init) obj.insert(std::make_pair(p[0].as<std::string>(),p[1]));
-        set(Svar(obj));
+        *this=Svar(obj);
         return;
     }
 
-    set(Svar(std::vector<Svar>(init)));
+    *this=Svar(std::vector<Svar>(init));
 }
 
 template <typename Return, typename... Args, typename... Extra>
@@ -1400,10 +1385,6 @@ inline Svar::Svar(const std::map<std::string,Svar>& m)
 
 inline Svar::Svar(const std::map<Svar,Svar>& m)
     :_obj(std::make_shared<SvarDict>(m)){}
-
-template <typename T>
-Svar::Svar(const std::shared_ptr<T>& v)
-    : _obj(std::make_shared<SvarPtrHolder<T,std::shared_ptr<T>>>(v)){}
 
 template <typename T>
 Svar::Svar(std::unique_ptr<T>&& v)
@@ -1493,72 +1474,6 @@ public:
 };
 
 template <typename T>
-class caster<std::vector<T> >{
-public:
-    static Svar from(const Svar& var){
-        if(var.is<std::vector<T>>()) return var;
-
-        if(!var.isArray()) return Svar::Undefined();
-
-        std::vector<T> ret;
-        ret.reserve(var.length());
-        for(const Svar& v:var.as<SvarArray>()._var)
-        {
-            ret.push_back(v.castAs<T>());
-        }
-
-        return Svar::create(ret);
-    }
-
-    static Svar to(const std::vector<T>& var){
-        return Svar::create(var);
-    }
-};
-
-
-template <typename T>
-class caster<std::map<std::string,T> >{
-public:
-    static Svar from(const Svar& var){
-        if(var.is<std::map<std::string,T> >()) return var;
-
-        if(!var.isObject()) return  Svar::Undefined();
-
-        std::map<std::string,T> ret;
-        for(const std::pair<std::string,Svar>& v:var.as<SvarObject>()._var)
-        {
-            ret.insert(std::make_pair(v.first,v.second.castAs<T>()));
-        }
-
-        return Svar::create(ret);
-    }
-
-    static Svar to(const std::map<std::string,T>& var){
-        return Svar::object(std::map<std::string,Svar>(var.begin(),var.end()));
-    }
-};
-
-template <>
-class caster<std::nullptr_t >{
-public:
-    static Svar from(const Svar& var){
-        return var;
-    }
-
-    static Svar to(std::nullptr_t v){
-        return Svar::Null();
-    }
-};
-
-template <int sz>
-class caster<char[sz]>{
-public:
-    static Svar to(const char* v){
-        return Svar(std::string(v));
-    }
-};
-
-template <typename T>
 Svar::Svar(const T& var):Svar(caster<T>::to(var))
 {}
 
@@ -1587,7 +1502,7 @@ Svar Svar::cast()const{
 }
 
 template <typename T>
-detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,const T&>
+detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,T>
 Svar::castAs()const
 {
     auto ret=cast<T>();
@@ -1628,7 +1543,7 @@ Svar::castAs(){
 }
 
 template <>
-inline const Svar& Svar::castAs<Svar>()const{
+inline Svar Svar::castAs<Svar>()const{
     return *this;
 }
 
@@ -1669,7 +1584,7 @@ inline Svar Svar::operator[](const Svar& i) const{
 
 inline Svar& Svar::operator[](const Svar& name){
     if(isUndefined()) {
-        set(object());
+        *this=object();
     }
 
     if(isObject())
@@ -1693,7 +1608,7 @@ inline Svar Svar::get(const std::string& name,Svar def)
     Svar var;
 
     if(isUndefined())
-        set(object());// force to be an object
+        *this=object();// force to be an object
     else if(isObject())
     {
         var=as<SvarObject>()[name];
@@ -1716,7 +1631,7 @@ T& Svar::get(const std::string& name,T def){
     Svar var;
 
     if(isUndefined())
-        set(object());// force to be an object
+        *this=object();// force to be an object
     else if(isObject())
     {
         var=as<SvarObject>()[name];
@@ -1728,7 +1643,7 @@ T& Svar::get(const std::string& name,T def){
     if(!var.isUndefined()){
         Svar casted=var.cast<T>();
         if(casted.is<T>()){
-            var.set(casted);
+            var=casted;
         }
     }
     else
@@ -1746,7 +1661,7 @@ inline Svar& Svar::getOrCreate(const std::string& name)
       return getOrCreate(name.substr(0, idx)).getOrCreate(name.substr(idx + 1));
     }
     if(isUndefined()) {
-        set(object());
+        *this=object();
     }
     if(!isObject())
         throw SvarExeption("Svar::Get can only be called with an object, got "+ typeName());
@@ -1770,7 +1685,7 @@ inline void Svar::set(const std::string& name,const T& def){
       return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
     }
     if(isUndefined()){
-        set(object({{name,Svar::create(def)}}));
+        *this=object({{name,Svar::create(def)}});
         return;
     }
     assert(isObject());
@@ -1779,21 +1694,6 @@ inline void Svar::set(const std::string& name,const T& def){
         var.as<T>()=def;
     else
         as<SvarObject>().set(name,Svar::create(def));
-}
-
-template <typename T, typename std::enable_if<
-              std::is_constructible<Svar,T>::value,int>::type>
-void Svar::set(const T& def)
-{
-    if(is<T>()) as<T>()=def;
-    else (*this)=Svar(def);
-}
-
-template <typename T, typename std::enable_if<
-              !std::is_constructible<Svar,T>::value,int>::type>
-void Svar::set(const T& def){
-    if(is<T>()) as<T>()=def;
-    else (*this)=Svar::create(def);
 }
 
 inline bool Svar::exist(const Svar& id)const
@@ -2003,7 +1903,7 @@ template <typename T>
 T& Svar::arg(const std::string& name, T def, const std::string& help) {
     Svar argInfo=array({name,Svar::create(def),help});
     Svar& args=getOrCreate("__builtin__.args");
-    if(!args.isArray()) args.set(array());
+    if(!args.isArray()) args=array();
     args.push_back(argInfo);
     return get(name,def);
 }
@@ -2246,6 +2146,114 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     while(std::getline(content,line)){ost<<"|  "<<line<<std::endl;}
     return ost;
 }
+
+
+
+template <typename T>
+class caster<std::vector<T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::vector<T>>()) return var;
+
+        if(!var.isArray()) return Svar::Undefined();
+
+        std::vector<T> ret;
+        ret.reserve(var.length());
+        for(const Svar& v:var.as<SvarArray>()._var)
+        {
+            ret.push_back(v.castAs<T>());
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::vector<T>& var){
+        return Svar::create(var);
+    }
+};
+
+
+template <typename T>
+class caster<std::map<std::string,T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::map<std::string,T> >()) return var;
+
+        if(!var.isObject()) return  Svar::Undefined();
+
+        std::map<std::string,T> ret;
+        for(const std::pair<std::string,Svar>& v:var.as<SvarObject>()._var)
+        {
+            ret.insert(std::make_pair(v.first,v.second.castAs<T>()));
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::map<std::string,T>& var){
+        return Svar::object(std::map<std::string,Svar>(var.begin(),var.end()));
+    }
+};
+
+template <typename K,typename T>
+class caster<std::map<K,T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::map<K,T> >()) return var;
+
+        if(!var.isDict()) return  Svar::Undefined();
+
+        std::map<K,T> ret;
+        for(const std::pair<Svar,Svar>& v:var.as<SvarObject>()._var)
+        {
+            ret.insert(std::make_pair(v.first.castAs<K>(),v.second.castAs<T>()));
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::map<K,T>& var){
+        return Svar::dict(std::map<Svar,Svar>(var.begin(),var.end()));
+    }
+};
+
+
+template <typename T>
+class caster<std::shared_ptr<T> >{
+    using H=std::shared_ptr<T>;
+public:
+    static Svar from(const Svar& var){
+        if(var.is<H>()) return var;
+
+        auto h=dynamic_cast<SvarPtrHolder<T,H>*>(var.value().get());
+        if(!h) return  Svar::Undefined();
+        return Svar::create(h->_var);
+    }
+
+    static Svar to(const std::shared_ptr<T>& var){
+        return Svar((SvarValue*)new SvarPtrHolder<T,std::shared_ptr<T>>(var));
+    }
+};
+
+template <>
+class caster<std::nullptr_t >{
+public:
+    static Svar from(const Svar& var){
+        return var;
+    }
+
+    static Svar to(std::nullptr_t v){
+        return Svar::Null();
+    }
+};
+
+template <int sz>
+class caster<char[sz]>{
+public:
+    static Svar to(const char* v){
+        return Svar(std::string(v));
+    }
+};
 
 #ifdef __SVAR_BUILDIN__
 
