@@ -23,7 +23,7 @@ public:
     std::string gslam_version()const{return "3.2";}
 
     std::string introduction()const{
-
+        return "";
     }
     std::string _name;
 };

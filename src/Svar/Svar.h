@@ -232,8 +232,14 @@ public:
     Svar(const T& var);
 
     /// Create any other c++ type instance, T need to be a copyable type
+#if (__GNUC__>=5)||defined(__clang__)
+    template <class T>
+    static Svar create(T & t);
+#else
     template <class T>
     static Svar create(const T & t);
+#endif
+
     template <class T>
     static Svar create(T && t);
 
@@ -1337,11 +1343,39 @@ template <typename Return, typename Class, typename... Args, typename... Extra>
 Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
+#if (__GNUC__>=5)||defined(__clang__)
+template <class T>
+inline Svar Svar::create(T & t)
+{
+    return (SvarValue*)new SvarValue_<typename std::remove_const<T>::type >(const_cast<T&>(t));
+}
+
+template <>
+inline Svar Svar::create<const Svar>(const Svar & t)
+{
+    return t;
+}
+
+template <>
+inline Svar Svar::create<Svar>(Svar & t)
+{
+    return t;
+}
+
+#else
 template <class T>
 inline Svar Svar::create(const T & t)
 {
     return (SvarValue*)new SvarValue_<T>(t);
 }
+
+template <>
+inline Svar Svar::create(const Svar & t)
+{
+    return t;
+}
+#endif
+
 
 template <class T>
 inline Svar Svar::create(T && t)
@@ -1350,13 +1384,7 @@ inline Svar Svar::create(T && t)
 }
 
 template <>
-inline Svar Svar::create(const Svar & t)
-{
-    return t;
-}
-
-template <>
-inline Svar Svar::create( Svar && t)
+inline Svar Svar::create<Svar>( Svar && t)
 {
     return std::move(t);
 }

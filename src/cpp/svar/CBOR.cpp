@@ -47,9 +47,9 @@ public:
             ptr+=length;
         }
 
-        static constexpr bool little_endianess(int num = 1) noexcept
+        static constexpr bool little_endianess() noexcept
         {
-            return *reinterpret_cast<char*>(&num) == 1;
+            return 0x78 == (char)0x12345678;
         }
 
         std::vector<char>& o;
