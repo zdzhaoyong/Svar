@@ -421,9 +421,9 @@ public:
 REGISTER_SVAR_MODULE(CBOR){
 
         SvarClass::Class<CBOR>()
-                .def("load",&CBOR::load)
-                .def("dump",&CBOR::dump)
-                .def("dumpCheck",&CBOR::dumpCheck);
+                .def_static("load",&CBOR::load)
+                .def_static("dump",&CBOR::dump)
+                .def_static("dumpCheck",&CBOR::dumpCheck);
 
         Svar::instance().set("__builtin__.CBOR",SvarClass::instance<CBOR>());
 }

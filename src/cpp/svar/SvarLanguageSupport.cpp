@@ -154,8 +154,8 @@ class SvarMapHolder{
 
   virtual std::string getStatsAsText(const size_t column_width = 80) {
       std::ostringstream ost;
-      std::string key_name=Svar::typeName(typeid(KeyType).name());
-      std::string type_name=Svar::typeName(typeid(VarType).name());
+      std::string key_name=Svar::type_id<KeyType>();
+      std::string type_name=Svar::type_id<VarType>();
       type_name="map<"+key_name+","+type_name+">";
       int gap=std::max<int>((column_width-type_name.size())/2-1,0);
       for(int i=0;i<gap;i++) ost<<'-';ost<<type_name;

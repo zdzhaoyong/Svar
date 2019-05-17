@@ -260,7 +260,7 @@ TEST(Svar,GetSet){
 
 TEST(Svar,Call){
     EXPECT_EQ(Svar(1).call("__str__"),"1");// Call as member methods
-    EXPECT_EQ(SvarClass::instance<int>().call("__str__",1),"1");// Call as static function
+    EXPECT_THROW(SvarClass::instance<int>().call("__str__",1),SvarExeption);// Call as static function
 }
 
 TEST(Svar,Cast){
