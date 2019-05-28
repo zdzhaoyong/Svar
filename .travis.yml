@@ -175,13 +175,25 @@ matrix:
         packages: ['g++-6', 'clang-7', 'ninja-build']
 
 script:
-  - cmake --version
-  - git branch
-  - mkdir -p build
-  - cd build
-  - pwd
-  - cmake .. -DCMAKE_BUILD_TYPE=Release -DTESTS_ENABLED=ON ${CMAKE_OPTIONS}
-  - make -j2 VERBOSE=1
+# get CMake and Ninja (only for systems with brew - macOS)
+  - |
+     if [[ (-x $(which brew)) ]]; then
+       brew update
+       brew install cmake ninja
+       brew upgrade cmake
+       cmake --version
+     fi
+
+  # make sure CXX is correctly set
+  - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
+
+  # show OS/compiler version
+  - uname -a
+  - $CXX --version
+
+  # compile and execute unit tests
+  - mkdir -p build && cd build
+  - cmake .. ${CMAKE_OPTIONS} -GNinja && cmake --build . --config Release
   - sudo make install
   - svar -tests
   
