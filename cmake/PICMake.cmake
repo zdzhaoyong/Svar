@@ -422,7 +422,7 @@ function(pi_add_target_f TARGET_NAME TARGET_TYPE)
   #message("TARGET_REQUIRED: ${TARGET_REQUIRED}")
   #message("TARGET_COMPILEFLAGS: ${TARGET_COMPILEFLAGS}")
 
-  target_compile_definitions(${TARGET_NAME} PRIVATE ${TARGET_DEFINITIONS})
+  target_compile_options(${TARGET_NAME} PUBLIC ${TARGET_DEFINITIONS})
   target_link_libraries(${TARGET_NAME} ${TARGET_LINKFLAGS} ${TARGET_DEPENDENCY})
   list(APPEND TARGET_MODULES ${TARGET_REQUIRED})
   if("${TARGET_MODULES} ${TARGET_REQUIRED}" MATCHES "Qt|QT|qt")
@@ -430,6 +430,18 @@ function(pi_add_target_f TARGET_NAME TARGET_TYPE)
       set_target_properties(${TARGET_NAME} PROPERTIES AUTOMOC TRUE AUTORCC TRUE AUTOUIC TRUE)
   endif()
   set_property( GLOBAL APPEND PROPERTY TARGETS2COMPILE  ${TARGET_NAME})
+  if (NOT MSVC AND NOT ${CMAKE_BUILD_TYPE} MATCHES Debug)
+      # Strip unnecessary sections of the binary on Linux/Mac OS
+      if(CMAKE_STRIP)
+        if(APPLE)
+          add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                             COMMAND ${CMAKE_STRIP} -x $<TARGET_FILE:${TARGET_NAME}>)
+        else()
+          add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                             COMMAND ${CMAKE_STRIP} $<TARGET_FILE:${TARGET_NAME}>)
+        endif()
+      endif()
+    endif()
 
 endfunction(pi_add_target_f)
 

@@ -1008,11 +1008,9 @@ public:
     }
 
     static SvarBuffer load(std::string path){
-        std::ifstream in(path);
+        std::ifstream in(path,std::ios::in|std::ios::binary);
         if(in.is_open()){
-            std::istreambuf_iterator<char> istreamptr(in);
             std::string* file = new std::string( (std::istreambuf_iterator<char>(in)) , std::istreambuf_iterator<char>() );
-            in.close();
             return SvarBuffer(file->data(),file->size(),std::unique_ptr<std::string>(file));
         }
         std::cout<<"Wrong path!"<<std::endl;

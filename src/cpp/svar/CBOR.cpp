@@ -201,7 +201,7 @@ public:
         assert(memcmp(tmp._ptr,svar_cbor._ptr,tmp.length())==0);
 
         timer.enter("load_cbor_json");
-        js.from_cbor(cbor);
+        js=js.from_cbor(cbor);
         timer.leave("load_cbor_json");
         return svar_cbor;
     }
