@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(Svar)
 include(cmake/PICMake.cmake)
 
-set(CMAKE_CXX_FLAGS -std=c++11)
+set(CMAKE_CXX_STANDARD 11)
 INCLUDE_DIRECTORIES(src/Svar)
 
 pi_add_target(svar BIN src/cpp/svar REQUIRED System LTO)
