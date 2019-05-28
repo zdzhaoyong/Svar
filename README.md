@@ -2,6 +2,7 @@
 
 ---
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/4c098f7126ae473eaf5fef69a746e949)](https://app.codacy.com/app/zdzhaoyong/Svar?utm_source=github.com&utm_medium=referral&utm_content=zdzhaoyong/Svar&utm_campaign=Badge_Grade_Dashboard)
 [![Build Status](https://travis-ci.org/zdzhaoyong/Svar.svg?branch=master)](https://travis-ci.org/zdzhaoyong/Svar)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](./LICENSE)
 [![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
