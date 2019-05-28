@@ -45,14 +45,8 @@ before_script:
 
 script:
   - cmake --version
-  - cd build
-  - |
-    if [[ -z "$(ls -A Svar)" ]]; then
-      git clone https://github.com/zdzhaoyong/Svar.git
-    fi
   - cd Svar
-  - git checkout ${TRAVIS_BRANCH}
-  - git pull
+  - git branch
   - mkdir -p build
   - cd build
   - pwd
