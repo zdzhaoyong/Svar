@@ -45,7 +45,6 @@ before_script:
 
 script:
   - cmake --version
-  - cd Svar
   - git branch
   - mkdir -p build
   - cd build

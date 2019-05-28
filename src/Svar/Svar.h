@@ -2682,10 +2682,7 @@ public:
 
         SvarClass::Class<int>()
                 .def("__init__",&SvarBuiltin::int_create)
-                .def("__double__",[](int i){
-            std::cerr<<"int.__double__("<<i<<std::endl;
-            return (double)i;
-        })
+                .def("__double__",[](int i){return (double)i;})
                 .def("__bool__",[](int i){return (bool)i;})
                 .def("__str__",[](int i){return Svar::toString(i);})
                 .def("__eq__",[](int self,int rh){return self==rh;})
@@ -2725,9 +2722,7 @@ public:
                 .def("__eq__",[](bool self,bool rh){return self==rh;});
 
         SvarClass::Class<double>()
-                .def("__int__",[](double d){
-            std::cerr<<"double.__int__("<<d<<std::endl;
-            return (int)d;})
+                .def("__int__",[](double d){return (int)d;})
                 .def("__bool__",[](double d){return (bool)d;})
                 .def("__str__",[](double d){return Svar::toString(d);})
                 .def("__eq__",[](double self,double rh){return self==rh;})
