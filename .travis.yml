@@ -193,7 +193,7 @@ script:
 
   # compile and execute unit tests
   - mkdir -p build && cd build
-  - cmake .. ${CMAKE_OPTIONS} -GNinja && cmake --build . --config Release
+  - cmake .. ${CMAKE_OPTIONS} && cmake --build . --config Release
   - sudo make install
   - svar -tests
   
