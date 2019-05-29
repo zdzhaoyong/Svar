@@ -2687,17 +2687,17 @@ public:
                 .def("__str__",[](int i){return Svar::toString(i);})
                 .def("__eq__",[](int self,int rh){return self==rh;})
                 .def("__lt__",[](int self,int rh){return self<rh;})
-                .def("__add__",[](int self,Svar rh){
+                .def("__add__",[](int self,Svar rh)->Svar{
             if(rh.is<int>()) return Svar(self+rh.as<int>());
             if(rh.is<double>()) return Svar(self+rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__sub__",[](int self,Svar rh){
+                .def("__sub__",[](int self,Svar rh)->Svar{
             if(rh.is<int>()) return Svar(self-rh.as<int>());
             if(rh.is<double>()) return Svar(self-rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__mul__",[](int self,Svar rh){
+                .def("__mul__",[](int self,Svar rh)->Svar{
             if(rh.is<int>()) return Svar(self*rh.as<int>());
             if(rh.is<double>()) return Svar(self*rh.as<double>());
             return Svar::Undefined();
@@ -2760,7 +2760,7 @@ public:
         })
                 .def("__delitem__",&SvarArray::erase)
                 .def("__str__",[](Svar self){return Svar::toString(self.as<SvarArray>());})
-                .def("__iter__",[](Svar self){
+                .def("__iter__",[](Svar self)->Svar{
             static Svar arrayinteratorClass;
             if(!arrayinteratorClass.isClass()){
                 SvarClass* cls=new SvarClass("arrayiterator",typeid(SvarObject));

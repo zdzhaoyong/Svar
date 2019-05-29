@@ -375,20 +375,21 @@ TEST(Svar,Thread){
     auto readThread=[](){
         while(!svar.get<bool>("shouldstop",false)){
             double& d=svar.get<double>("thread.Double",100);
-            usleep(1);
+            GSLAM::Rate::sleep(1e-4);
         }
     };
     auto writeThread=[](){
         svar.set<double>("thread.Double",svar.GetDouble("thread.Double")++);
         while(!svar.get<bool>("shouldstop",false)){
             svar.set<int>("thread.Double",10);// use int instead of double to violately testing robustness
-            usleep(1);
+            GSLAM::Rate::sleep(1e-4);
         }
     };
     std::vector<std::thread> threads;
     for(int i=0;i<svar.GetInt("readThreads",4);i++) threads.push_back(std::thread(readThread));
     for(int i=0;i<svar.GetInt("writeThreads",4);i++) threads.push_back(std::thread(writeThread));
-    sleep(1);
+
+    GSLAM::Rate::sleep(1);
     svar.set("shouldstop",true);
     for(auto& it:threads) it.join();
 }
