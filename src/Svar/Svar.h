@@ -630,7 +630,8 @@ public:
     SvarClass(const std::string& name,std::type_index cpp_type,
               std::vector<Svar> parents={})
         : __name__(name),_cpptype(cpp_type),
-          _methods(Svar::object()),_parents(parents){}
+          _methods(Svar::object()),_attr(Svar::object()),
+          _parents(parents){}
 
     virtual TypeID          cpptype()const{return typeid(SvarClass);}
     virtual const void*     ptr() const{return this;}
@@ -746,9 +747,9 @@ public:
     /// buildin functions
     Svar __init__,__str__,__getitem__,__setitem__;
 
-    std::string  __name__;
+    std::string  __name__,__doc__;
     std::type_index _cpptype;
-    Svar _methods,_doc;
+    Svar _methods,_attr;
     std::vector<Svar> _parents;
 };
 
@@ -2129,7 +2130,7 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     ost<<"class "<<rh.__name__<<"():\n";
     std::stringstream  content;
     if(rh.__init__.isFunction()) content<<rh.__init__.as<SvarFunction>()<<std::endl<<std::endl;
-    if(rh._doc.is<std::string>()) content<<rh._doc.as<std::string>()<<std::endl;
+    if(!rh.__doc__.empty()) content<<rh.__doc__<<std::endl;
     if(rh._methods.isObject()&&rh._methods.length()){
         content<<"Methods defined here:\n";
         const SvarObject& methods=rh._methods.as<SvarObject>();
