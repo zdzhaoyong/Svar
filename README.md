@@ -2,10 +2,8 @@
 
 ---
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/4c098f7126ae473eaf5fef69a746e949)](https://app.codacy.com/app/zdzhaoyong/Svar?utm_source=github.com&utm_medium=referral&utm_content=zdzhaoyong/Svar&utm_campaign=Badge_Grade_Dashboard)
 [![Build Status](https://travis-ci.org/zdzhaoyong/Svar.svg?branch=master)](https://travis-ci.org/zdzhaoyong/Svar)
 [![Build Status](https://circleci.com/gh/zdzhaoyong/Svar.svg?style=svg)](https://circleci.com/gh/zdzhaoyong/Svar)
-[![Coverage Status](https://img.shields.io/coveralls/zdzhaoyong/Svar.svg)](https://coveralls.io/r/zdzhaoyong/Svar)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9f6efa9443de498fa91a4e99f632dbd2)](https://www.codacy.com/app/zdzhaoyong/Svar)
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](./LICENSE)
 [![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
