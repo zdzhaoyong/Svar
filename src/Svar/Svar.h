@@ -64,11 +64,13 @@
 
 #define svar GSLAM::Svar::instance()
 #define GSLAM_VERSION 0x000100 // 0.1.0
+
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
     public: SVAR_MODULE_##MODULE_NAME();\
     }SVAR_MODULE_##MODULE_NAME##instance;\
     SVAR_MODULE_##MODULE_NAME::SVAR_MODULE_##MODULE_NAME()
+
 #  if defined(WIN32) || defined(_WIN32)
 #    define SVAR_EXPORT __declspec(dllexport)
 #  else
@@ -585,6 +587,7 @@ public:
             using indices = detail::make_index_sequence<sizeof...(Args)>;
             return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
         };
+        is_constructor=false;
     }
 
     template <typename Func, typename Return, typename... Args,size_t... Is>
@@ -620,9 +623,9 @@ public:
     std::string   name,signature;
     std::size_t   nargs;
     Svar          next;
-    bool          is_method;
 
     std::function<Svar(std::vector<Svar>&)> _func;
+    bool          is_method,is_constructor;
 };
 
 class SvarClass: public SvarValue{
@@ -655,7 +658,10 @@ public:
         dest->as<SvarFunction>().name=__name__+"."+name;
 
 
-        if(__init__.is<void>()&&name=="__init__") __init__=function;
+        if(__init__.is<void>()&&name=="__init__") {
+            __init__=function;
+            dest->as<SvarFunction>().is_constructor=true;
+        }
         if(__str__.is<void>()&&name=="__str__") __str__=function;
         if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
         if(__setitem__.is<void>()&&name=="__setitem__") __setitem__=function;
@@ -2809,13 +2815,6 @@ public:
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
 
-        Svar::instance().set("__builtin__.int",SvarClass::instance<int>());
-        Svar::instance().set("__builtin__.double",SvarClass::instance<double>());
-        Svar::instance().set("__builtin__.bool",SvarClass::instance<bool>());
-        Svar::instance().set("__builtin__.str",SvarClass::instance<std::string>());
-        Svar::instance().set("__builtin__.dict",SvarClass::instance<SvarDict>());
-        Svar::instance().set("__builtin__.object",SvarClass::instance<SvarObject>());
-        Svar::instance().set("__builtin__.array",SvarClass::instance<SvarArray>());
         Svar::instance().set("__builtin__.Json",SvarClass::instance<Json>());
         Svar::instance().set("__builtin__.version",GSLAM_VERSION);
 
