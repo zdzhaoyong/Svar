@@ -33,12 +33,16 @@ REGISTER_SVAR_MODULE(sample)
     svar.def("obtainInfo",obtainInfo);
     svar.def("dtos",dtos);
     svar.def("add",add);
+    svar["__name__"]=std::string("sample_module");
     svar.Set<std::string>("__doc__","This is a demo to show how to export a module using svar.");
 
 
     using namespace GSLAM;
-    SvarClass::Class<ApplicationDemo>()
-            .def("__init__",[](std::string name){return ApplicationDemo(name);})
-    .def("name",&ApplicationDemo::name);
+    Class_<ApplicationDemo>()
+            .construct<std::string>()
+            .def("name",&ApplicationDemo::name)
+            .def("introduction",&ApplicationDemo::introduction)
+            .def("gslam_version",&ApplicationDemo::gslam_version);
+
     svar.set("ApplicationDemo",SvarClass::instance<ApplicationDemo>());
 }

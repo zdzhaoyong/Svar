@@ -394,6 +394,7 @@ public:
 
     /// Dump this as Json style outputs
     friend std::ostream& operator <<(std::ostream& ost,const Svar& self);
+    friend std::istream& operator >>(std::istream& ist,Svar& self);
 
     /// Undefined is the default value when Svar is not assigned a valid value
     /// It corrosponding to the c++ void and means no return
@@ -757,6 +758,57 @@ public:
     std::type_index _cpptype;
     Svar _methods,_attr;
     std::vector<Svar> _parents;
+};
+
+template <typename C>
+class Class_
+{
+public:
+    Class_(SvarClass& cls):_cls(cls){}
+
+    Class_():_cls(SvarClass::Class<C>()){}
+
+    Class_(const std::string& name)
+        :_cls(SvarClass::Class<C>()){
+        _cls.setName(name);
+    }
+
+    Class_& def(const std::string& name,const Svar& function,bool isMethod=true)
+    {
+        _cls.def(name,function,isMethod);
+        return *this;
+    }
+
+    Class_& def_static(const std::string& name,const Svar& function)
+    {
+        return def(name,function,false);
+    }
+
+    template <typename Func>
+    Class_& def(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),true);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func>
+    Class_& def_static(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),false);
+    }
+
+    template <typename ChildType>
+    Class_& inherit(){
+        _cls.inherit<C,ChildType>();
+        return *this;
+    }
+
+    template <typename... Args>
+    Class_& construct(){
+        return def("__init__",[](Args... args){
+            return C(args...);
+        });
+    }
+
+    SvarClass& _cls;
 };
 
 template <typename T>
@@ -1324,13 +1376,13 @@ Svar Svar::lambda(Func &&f, const Extra&... extra)
 }
 
 /// Construct a cpp_function from a class method (non-const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
-Svar::Svar(Return (Class::*f)(Args...), const Extra&... extra)
+template <typename Return, typename Class_, typename... Args, typename... Extra>
+Svar::Svar(Return (Class_::*f)(Args...), const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
 /// Construct a cpp_function from a class method (const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
-Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
+template <typename Return, typename Class_, typename... Args, typename... Extra>
+Svar::Svar(Return (Class_::*f)(Args...) const, const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
 #if (__GNUC__>=5)||defined(__clang__)
@@ -2065,7 +2117,6 @@ inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
     return ost;
 }
 
-
 inline const Svar& Svar::True(){
     static Svar v((SvarValue*)new SvarValue_<bool>(true));
     return v;
@@ -2258,7 +2309,14 @@ public:
     }
 };
 
-#ifdef __SVAR_BUILDIN__
+inline std::istream& operator >>(std::istream& ist,Svar& self)
+{
+    Svar json=svar["__builtin__.Json"];
+    self=json.call("load",std::string( (std::istreambuf_iterator<char>(ist)) , std::istreambuf_iterator<char>() ));
+    return ist;
+}
+
+#if defined(__SVAR_BUILDIN__)
 
 /// Json save and load class
 class Json final {
@@ -2661,7 +2719,6 @@ private:
         return fail("expected value, got " + esc(ch));
     }
 };
-
 
 class SvarBuiltin{
 public:
