@@ -38,7 +38,7 @@ REGISTER_SVAR_MODULE(sample)
 
 
     using namespace GSLAM;
-    Class_<ApplicationDemo>()
+    Class<ApplicationDemo>()
             .construct<std::string>()
             .def("name",&ApplicationDemo::name)
             .def("introduction",&ApplicationDemo::introduction)

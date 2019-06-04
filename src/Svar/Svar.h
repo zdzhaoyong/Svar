@@ -761,48 +761,48 @@ public:
 };
 
 template <typename C>
-class Class_
+class Class
 {
 public:
-    Class_(SvarClass& cls):_cls(cls){}
+    Class(SvarClass& cls):_cls(cls){}
 
-    Class_():_cls(SvarClass::Class<C>()){}
+    Class():_cls(SvarClass::Class<C>()){}
 
-    Class_(const std::string& name)
+    Class(const std::string& name)
         :_cls(SvarClass::Class<C>()){
         _cls.setName(name);
     }
 
-    Class_& def(const std::string& name,const Svar& function,bool isMethod=true)
+    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
         _cls.def(name,function,isMethod);
         return *this;
     }
 
-    Class_& def_static(const std::string& name,const Svar& function)
+    Class& def_static(const std::string& name,const Svar& function)
     {
         return def(name,function,false);
     }
 
     template <typename Func>
-    Class_& def(const std::string& name,Func &&f){
+    Class& def(const std::string& name,Func &&f){
         return def(name,Svar::lambda(f),true);
     }
 
     /// Construct a cpp_function from a lambda function (possibly with internal state)
     template <typename Func>
-    Class_& def_static(const std::string& name,Func &&f){
+    Class& def_static(const std::string& name,Func &&f){
         return def(name,Svar::lambda(f),false);
     }
 
     template <typename ChildType>
-    Class_& inherit(){
+    Class& inherit(){
         _cls.inherit<C,ChildType>();
         return *this;
     }
 
     template <typename... Args>
-    Class_& construct(){
+    Class& construct(){
         return def("__init__",[](Args... args){
             return C(args...);
         });
@@ -1376,13 +1376,13 @@ Svar Svar::lambda(Func &&f, const Extra&... extra)
 }
 
 /// Construct a cpp_function from a class method (non-const)
-template <typename Return, typename Class_, typename... Args, typename... Extra>
-Svar::Svar(Return (Class_::*f)(Args...), const Extra&... extra)
+template <typename Return, typename Class, typename... Args, typename... Extra>
+Svar::Svar(Return (Class::*f)(Args...), const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
 /// Construct a cpp_function from a class method (const)
-template <typename Return, typename Class_, typename... Args, typename... Extra>
-Svar::Svar(Return (Class_::*f)(Args...) const, const Extra&... extra)
+template <typename Return, typename Class, typename... Args, typename... Extra>
+Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
 #if (__GNUC__>=5)||defined(__clang__)

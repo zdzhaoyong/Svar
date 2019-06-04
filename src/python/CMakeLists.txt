@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 11)
 include(../../cmake/PICMake.cmake)
 include_directories(..)
 
+set(Python_ADDITIONAL_VERSIONS 3.7 3.6 3.5 3.4)
+
 pi_add_target(svar SHARED src REQUIRED Python System LTO)
 
 set_target_properties(svar PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}")

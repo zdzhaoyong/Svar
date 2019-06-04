@@ -1,4 +1,4 @@
-# Svar, A Tiny Header Brings Dynamic C++ Interface
+# Svar, A Tiny Modern C++ Header Brings Unified Interface for Different Languages
 
 ---
 
@@ -9,14 +9,37 @@
 [![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
 
 ---
-[English](./README_en.md)
 
-# 1. Why Svar? 把C++变成动态语言的高性能中介！
+# 1. Why Svar? 
 
-[Dynamic C++ Proposal](https://www.codeproject.com/Articles/31988/Dynamic-C-Proposal)
+By Using Svar, your C++ library can be called easily with different languages like C++, Python and Javascript.
 
-C++作为静态类型语言，在执行高效的同时也给使用带来了一系列的麻烦.
-Dynamism brings several advantages, some of these are:
+Svar brings the following features:
+1. A dynamic link library that can be used as a module in languages such as C++, Python, and Node-JS;
+2. Unified C++ library interface, which can be called as a plug-in module. The released library comes with documentation,  making *.h header file interface description unnecessary;
+3. Dynamic features. It wraps variables, functions, and classes into Svar while maintaining efficiency;
+4. Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
+
+## 1.1. Svar vs pybind11
+
+Here is a small [benchmark](./src/python/benchmark/test.py) between Svar and pybind11 to demonstrate some differences.
+
+![benchmark](./doc/images/svar_vs_pybind11.png)
+
+1. More elegent, more light-weighted, more efficient.
+2. Svar auto support everything, while pybind11 need to declare every used classes.
+3. The Svar module not needed to have python dependency and support different version of python at the same time.
+
+
+## 1.2. Svar vs nbind
+
+TODO
+
+
+## 1.3. Svar vs Old Style C++ Libraries
+
+
+According to [Dynamic C++ Proposal](https://www.codeproject.com/Articles/31988/Dynamic-C-Proposal). Dynamism brings several advantages, some of these are:
 
 * More abstraction (no FBC).
 * Easy framework development.
@@ -26,12 +49,12 @@ Dynamism brings several advantages, some of these are:
 * Faster compiling (discussed later).
 * Less ugly C++ hacks.
 
-使用Svar可以带来以下特性：
-1. 一个动态链接库，可同时作为C++,Python,Node-JS等语言的模块使用;
-2. 统一C++库接口，可插件机制调用，发布的库自带文档，再也不用繁琐的*.h头文件接口说明;
-3. 给C++带来动态特性，包裹变量，函数，类到Svar中，可高效转换及调用;
-4. 内置Json支持，参数配置，解析，线程安全读写,模块间数据解耦分享;
+Svar use modern C++ features and brings language level dynamism based on c++11 standard.
 
+1. High level dynamic features. Variables, functions, and classes are all treated as Svar object.
+2. The Svar module library explains itself, no extra headers needed anymore. Just call c++ functions like python!
+3. Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
+4. Only one single header less than 5k lines used, very easy to use.
 
 # 2. Usage
 
@@ -95,8 +118,7 @@ help(svar)
 sample=svar.load("libsample_module.so")
 # Show the help of sample module
 help(sample)
-result_svar=sample.add(2,3)
-result_py=result_svar.py()
+result=sample.add(2,3)
 ```
 
 ## 2.4. Node-JS Users
@@ -111,8 +133,7 @@ Use with existed svar sample module:
 svar=require("svar")
 # Import a svar module as a js module
 sample=svar.load("libsample_module.so")
-result_svar=sample.add(2,3)
-result_js=result_svar.js()
+result=sample.add(2,3)
 ```
 
 
