@@ -383,10 +383,16 @@ public:
     Svar operator [](const Svar& i) const;//__getitem__
     Svar& operator[](const Svar& name);// This is not thread safe!
 
-    template <typename T>
+    template <typename T,detail::enable_if_t<std::is_copy_assignable<T>::value>>
     Svar& operator =(const T& v){
         if(is<T>()) as<T>()=v;
         else (*this)=Svar(v);
+        return *this;
+    }
+
+    template <typename T,detail::enable_if_t<!std::is_copy_assignable<T>::value>>
+    Svar& operator =(const T& v){
+        (*this)=Svar(v);
         return *this;
     }
 

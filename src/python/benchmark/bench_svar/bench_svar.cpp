@@ -27,8 +27,9 @@ SVAR_PYTHON_IMPL(bench){
             .def("get",&BenchClass::get);
 
     svar["BenchClass"]=SvarClass::instance<BenchClass>();
-    svar["sampleCFunc"]=Svar(sampleCFunc);
+    svar["sampleCFunc"]=sampleCFunc;
     svar["sampleVariable"]=1;
+    svar["versionInfo"]="1.0";
 
     return SvarPy::getModule(svar);
 }
