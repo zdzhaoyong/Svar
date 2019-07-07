@@ -42,6 +42,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <cstdlib>
 #include <cctype>
 #include <iostream>
 #include <iomanip>
@@ -745,6 +746,34 @@ public:
         throw SvarExeption("Class "+__name__+" has no function "+function);
         return Svar::Undefined();
     }
+
+        Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
+        {
+            Svar f=_methods[function];
+            if(f.isFunction())
+            {
+                SvarFunction& func=f.as<SvarFunction>();
+                if(func.is_method){
+                    args.insert(args.begin(),inst);
+                    return func.Call(args);
+                }
+                else return func.Call(args);
+            }
+
+            for(const Svar& p:_parents){
+                try{
+                    if(p.isClass()){
+                        return p.as<SvarClass>().Call(inst,function,args);
+                    }
+                    return p[0].as<SvarClass>().Call(p[1](inst),function,args);
+                }
+                catch(SvarExeption e){
+                    continue;
+                }
+            }
+            throw SvarExeption("Class "+__name__+" has no function "+function);
+            return Svar::Undefined();
+        }
 
     template <typename T>
     static Svar& instance();
@@ -2885,7 +2914,7 @@ public:
 
     static Svar int_create(Svar rh){
         if(rh.is<int>()) return rh;
-        if(rh.is<std::string>()) return (Svar)std::stoi(rh.as<std::string>());
+        if(rh.is<std::string>()) return (Svar)std::atoi(rh.as<std::string>().c_str());
         if(rh.is<double>()) return (Svar)(int)rh.as<double>();
         if(rh.is<bool>()) return (Svar)(int)rh.as<bool>();
 
