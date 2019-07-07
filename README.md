@@ -12,7 +12,7 @@
 
 # 1. Why Svar? 
 
-By Using Svar, your C++ library can be called easily with different languages like C++, Python and Javascript.
+By Using Svar, your C++ library can be called easily with different languages like C++, Java, Python and Javascript.
 
 Svar brings the following features:
 1. A dynamic link library that can be used as a module in languages such as C++, Python, and Node-JS;
@@ -35,7 +35,6 @@ Here is a small [benchmark](./src/python/benchmark/test.py) between Svar and pyb
 
 TODO
 
-
 ## 1.3. Svar vs Old Style C++ Libraries
 
 
@@ -55,6 +54,13 @@ Svar use modern C++ features and brings language level dynamism based on c++11 s
 2. The Svar module library explains itself, no extra headers needed anymore. Just call c++ functions like python!
 3. Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
 4. Only one single header less than 5k lines used, very easy to use.
+
+
+## 1.4. Svar vs Original JNI
+
+Since Svar treat any C++ things as Svar object, we only need to provide a JNI interface for Svar class to acess anything else in C++ libraries.
+We now provides a demo project shows how to [access c++ libraries in Java using Svar](./src/java/SvarAndroid). 
+
 
 # 2. Usage
 
