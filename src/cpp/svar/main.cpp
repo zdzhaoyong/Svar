@@ -1,7 +1,7 @@
 #define __SVAR_BUILDIN__
 #include "Svar.h"
 #include "gtest.h"
-#include "SharedLibrary.h"
+#include "Registry.h"
 #include "Timer.h"
 
 using namespace GSLAM;
@@ -408,24 +408,8 @@ void showPlugin(){
     std::string pluginPath=svar.GetString("plugin");
     std::string key=svar.GetString("key");
 
-    SharedLibraryPtr plugin(new SharedLibrary(pluginPath));
-    if(!plugin->isLoaded()){
-        std::cerr<<"Unable to load plugin "<<pluginPath<<std::endl;
-        return ;
-    }
-
-    GSLAM::Svar* (*getInst)()=(GSLAM::Svar* (*)())plugin->getSymbol("svarInstance");
-    if(!getInst){
-        std::cerr<<"No svarInstance found in "<<pluginPath<<std::endl;
-        return ;
-    }
-    GSLAM::Svar* inst=getInst();
-    if(!inst){
-        std::cerr<<"svarInstance returned null.\n";
-        return ;
-    }
-
-    GSLAM::Svar var=key.empty()?(*inst):inst->get(key,Svar());
+    Svar inst=Registry::load(pluginPath);
+    GSLAM::Svar var=key.empty()?(inst):inst.get(key,Svar());
 
     if(var.isFunction())
         std::cout<<var.as<SvarFunction>()<<std::endl;
