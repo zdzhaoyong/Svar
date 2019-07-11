@@ -57,8 +57,10 @@ int main(int argc,char** argv){
 
     Svar sampleModule=Registry::load("sample_module");
 
-
     Svar ApplicationDemo=sampleModule["ApplicationDemo"];
+
+    Svar instance=ApplicationDemo("zhaoyong");
+    std::cout<<instance.call("gslam_version");
 
     std::cout<<ApplicationDemo.as<SvarClass>();
     return 0;
