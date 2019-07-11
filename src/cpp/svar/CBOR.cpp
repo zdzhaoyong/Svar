@@ -116,6 +116,7 @@ public:
     }
 
     static Svar loadStream(IStream& i){
+        typedef unsigned char u_char;
         static std::vector<std::function<Svar(u_char,IStream&)> > funcs;
         if(funcs.empty()){
             funcs.resize(256);

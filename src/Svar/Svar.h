@@ -1306,7 +1306,7 @@ public:
         //fill data
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
-        std::vector<uint> vec(total_ints,0);
+        std::vector<uint32_t> vec(total_ints,0);
         for(size_t i = 0; i < _size; i++)
             vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
