@@ -1,4 +1,3 @@
-#define __SVAR_BUILDIN__
 #include "Svar.h"
 #include "gtest.h"
 #include "Registry.h"

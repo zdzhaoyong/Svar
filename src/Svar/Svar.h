@@ -65,7 +65,7 @@
 
 #define svar GSLAM::Svar::instance()
 #define GSLAM_VERSION 0x000100 // 0.1.0
-
+#define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
     public: SVAR_MODULE_##MODULE_NAME();\
@@ -536,7 +536,7 @@ public:
         const SvarFunction* overload=this;
         std::vector<SvarExeption> catches;
         for(;true;overload=&overload->next.as<SvarFunction>()){
-            if(overload->nargs!=argv.size())
+            if(overload->arg_types.size()!=argv.size())
             {
                 if(!overload->next.isFunction()) {
                     overload=nullptr;break;
@@ -581,22 +581,7 @@ public:
 
     /// Special internal constructor for functors, lambda functions, methods etc.
     template <typename Func, typename Return, typename... Args, typename... Extra>
-    void initialize(Func &&f, Return (*)(Args...), const Extra&... extra)
-    {
-        std::vector<std::string> types={Svar::type_id<Args>()...};
-        std::stringstream signature;signature<<"(";
-        for(size_t i=0;i<types.size();i++)
-            signature<<types[i]<<(i+1==types.size()?"":",");
-        signature<<")->";
-        signature<<Svar::type_id<Return>();
-        this->signature=signature.str();
-        nargs=types.size();
-        _func=[this,f](std::vector<Svar>& args)->Svar{
-            using indices = detail::make_index_sequence<sizeof...(Args)>;
-            return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
-        };
-        is_constructor=false;
-    }
+    void initialize(Func &&f, Return (*)(Args...), const Extra&... extra);
 
     template <typename Func, typename Return, typename... Args,size_t... Is>
     detail::enable_if_t<std::is_void<Return>::value, Svar>
@@ -629,7 +614,7 @@ public:
     void        initName(const std::string& nm){if(name.empty()) name=nm;}
 
     std::string   name,signature;
-    std::size_t   nargs;
+    std::vector<Svar> arg_types;
     Svar          next;
 
     std::function<Svar(std::vector<Svar>&)> _func;
@@ -1346,7 +1331,26 @@ public:
 };
 
 
-    inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<void>();}
+inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<void>();}
+
+/// Special internal constructor for functors, lambda functions, methods etc.
+template <typename Func, typename Return, typename... Args, typename... Extra>
+void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... extra)
+{
+    std::vector<Svar> types={SvarClass::instance<Args>()...};
+    std::stringstream signature;signature<<"(";
+    for(size_t i=0;i<types.size();i++)
+        signature<<types[i].as<SvarClass>().name()<<(i+1==types.size()?"":",");
+    signature<<")->";
+    signature<<Svar::type_id<Return>();
+    this->signature=signature.str();
+    this->arg_types=types;
+    _func=[this,f](std::vector<Svar>& args)->Svar{
+        using indices = detail::make_index_sequence<sizeof...(Args)>;
+        return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
+    };
+    is_constructor=false;
+}
 
 template <typename T>
 inline std::string Svar::toString(const T& def) {
@@ -2351,7 +2355,7 @@ inline std::istream& operator >>(std::istream& ist,Svar& self)
     return ist;
 }
 
-#if defined(__SVAR_BUILDIN__)
+#if !defined(__SVAR_NOBUILTIN__)
 
 /// Json save and load class
 class Json final {
@@ -2961,7 +2965,6 @@ public:
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;
-extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #endif
 
 }

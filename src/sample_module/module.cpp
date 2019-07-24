@@ -1,4 +1,3 @@
-#define __SVAR_BUILDIN__
 #include "Svar.h"
 
 GSLAM::Svar obtainInfo(GSLAM::Svar pyobj){
@@ -46,3 +45,5 @@ REGISTER_SVAR_MODULE(sample)
 
     svar.set("ApplicationDemo",SvarClass::instance<ApplicationDemo>());
 }
+
+EXPORT_SVAR_INSTANCE
