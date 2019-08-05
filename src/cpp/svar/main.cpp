@@ -30,7 +30,7 @@ TEST(Svar,Variable)
     obj["left"]=Svar("hello");
     obj["parent"]["child"]=3;
     EXPECT_EQ(obj["parent"]["child"],3);
-    obj["hello.world"]=false;
+    obj["hello"]["world"]=false;
     EXPECT_EQ(obj["hello"]["world"],false);
 
     std::map<std::string,Svar> cMap=obj.castAs<std::map<std::string,Svar> >();
@@ -273,13 +273,13 @@ TEST(Svar,Class){
 
 TEST(Svar,GetSet){
     Svar var;
-    int& testInt=var.GetInt("child.testInt",20);
+    int& testInt=var.GetInt("testInt",20);
     EXPECT_EQ(testInt,20);
     testInt=30;
-    EXPECT_EQ(var.GetInt("child.testInt"),30);
-    var.set("child.testInt",40);
+    EXPECT_EQ(var.GetInt("testInt"),30);
+    var["testInt"]=40;
     EXPECT_EQ(testInt,40);
-    EXPECT_EQ(var["child"]["testInt"],40);
+    EXPECT_EQ(var["testInt"],40);
     var.set("int",100);
     var.set("double",100.);
     var.set<std::string>("string","100");

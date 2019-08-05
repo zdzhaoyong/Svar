@@ -1695,10 +1695,12 @@ inline Svar& Svar::operator[](const Svar& name){
 
 inline Svar Svar::get(const std::string& name,Svar def)
 {
+#ifdef SVAR_PARSE_DOT
     auto idx = name.find_last_of(".");
     if (idx != std::string::npos) {
       return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def);
     }
+#endif
     Svar var;
 
     if(isUndefined())
@@ -1718,10 +1720,12 @@ inline Svar Svar::get(const std::string& name,Svar def)
 
 template <typename T>
 T& Svar::get(const std::string& name,T def){
+#ifdef SVAR_PARSE_DOT
     auto idx = name.find_last_of(".");
     if (idx != std::string::npos) {
       return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def);
     }
+#endif
     Svar var;
 
     if(isUndefined())
@@ -1750,10 +1754,12 @@ T& Svar::get(const std::string& name,T def){
 
 inline Svar& Svar::getOrCreate(const std::string& name)
 {
+#ifdef SVAR_PARSE_DOT
     auto idx = name.find_last_of('.');
     if (idx != std::string::npos) {
       return getOrCreate(name.substr(0, idx)).getOrCreate(name.substr(idx + 1));
     }
+#endif
     if(isUndefined()) {
         *this=object();
     }
@@ -1774,10 +1780,12 @@ inline Svar& Svar::getOrCreate(const std::string& name)
 
 template <typename T>
 inline void Svar::set(const std::string& name,const T& def){
+#ifdef SVAR_PARSE_DOT
     auto idx = name.find(".");
     if (idx != std::string::npos) {
       return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
     }
+#endif
     if(isUndefined()){
         *this=object({{name,Svar::create(def)}});
         return;
@@ -1795,11 +1803,13 @@ inline bool Svar::exist(const Svar& id)const
     if(isObject())
     {
         std::string name=id.castAs<std::string>();
+#ifdef SVAR_PARSE_DOT
         auto idx = name.find('.');
         if (idx != std::string::npos) {
             Svar child=as<SvarObject>()[name.substr(0, idx)];
             return child.exist(name.substr(idx + 1));
         }
+#endif
         return as<SvarObject>().exist(name);
     }
     return !(*this)[id].isUndefined();
@@ -1810,11 +1820,13 @@ inline void Svar::erase(const Svar& id)
     if(isObject())
     {
         std::string name=id.castAs<std::string>();
+#ifdef SVAR_PARSE_DOT
         auto idx = name.find('.');
         if (idx != std::string::npos) {
             Svar child=as<SvarObject>()[name.substr(0, idx)];
             return child.erase(name.substr(idx + 1));
         }
+#endif
         return as<SvarObject>().erase(name);
     }
     call("__delitem__",id);
@@ -2755,6 +2767,15 @@ private:
             return data;
         }
 
+        if (ch == '<'){
+            while (1) {
+                ch = get_next_token();
+                if (ch == '>')
+                    break;
+            }
+            return Svar();
+        }
+
         return fail("expected value, got " + esc(ch));
     }
 };
@@ -2911,9 +2932,8 @@ public:
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
 
-        Svar::instance().set("__builtin__.Json",SvarClass::instance<Json>());
-        Svar::instance().set("__builtin__.version",GSLAM_VERSION);
-
+        Svar::instance()["__builtin__"]["Json"]=SvarClass::instance<Json>();
+        Svar::instance()["__builtin__"]["version"]=GSLAM_VERSION;
     }
 
     static Svar int_create(Svar rh){

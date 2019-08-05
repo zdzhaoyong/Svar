@@ -23,6 +23,7 @@
 #   1.2.4 2018.04.16 : enable auto CUDA support
 #   1.2.5 2018.09.17 : add GLOBAL value TARGETS2COMPILE, let add_definition only for one target
 #   1.2.6 2018.11.19 : add AUTORCC AUTOUIC support and compile flags tips when reporting targets
+#   1.2.7 2019.07.27 : auto strip for MinSizeRel and support dependency compile option
 ######################################################################################
 #                               FUNCTIONS
 # pi_collect_packagenames(<RESULT_NAME>　[VERBOSE] [path1 path2 ...])
