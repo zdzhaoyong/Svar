@@ -291,6 +291,7 @@ public:
     bool isArray()const;
     bool isDict()const;
 
+    Svar                    clone(int depth=0)const;
 
     /// Return the value typename
     std::string             typeName()const;
@@ -469,6 +470,7 @@ public:
     virtual const Svar&     classObject()const;
     virtual size_t          length() const {return 0;}
     virtual std::mutex*     accessMutex()const{return nullptr;}
+    virtual Svar            clone(int depth=0)const{return Svar();}
 };
 
 class SvarExeption: public std::exception{
@@ -857,8 +859,7 @@ public:
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return &_var;}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
-
-    T getCopy()const{return _var;}
+    virtual Svar            clone(int depth=0)const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     T _var;
 };
@@ -878,8 +879,7 @@ public:
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual const void*     ptr() const{return _var.get();}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
-
-    T getCopy()const{return _var;}
+    virtual Svar            clone(int depth=0)const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     H _var;
 };
@@ -894,7 +894,6 @@ public:
     virtual const void*     ptr() const{return _var.get();}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
 
-    T getCopy()const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     std::unique_ptr<T> _var;
 };
@@ -910,6 +909,17 @@ public:
     virtual const Svar&     classObject()const{
         if(_class.isClass()) return _class;
         return SvarClass::instance<SvarObject>();
+    }
+
+    virtual Svar            clone(int depth=0)const{
+        std::unique_lock<std::mutex> lock(_mutex);
+        if(!depth)
+            return _var;
+        std::map<std::string,Svar> var=_var;
+        for(auto it=var.begin();it!=var.end();it++){
+            it->second=it->second.clone(depth-1);
+        }
+        return var;
     }
 
     Svar operator[](const std::string &key)const {//get
@@ -929,7 +939,7 @@ public:
     void update(Svar rh){
         if(!rh.isObject()) return;
         std::unique_lock<std::mutex> lock(_mutex);
-        auto cp=rh.as<SvarObject>().getCopy();
+        auto cp=rh.as<SvarObject>()._var;
         for(auto it:cp){
             auto old=_var.find(it.first);
             if(old==_var.end())
@@ -1005,6 +1015,17 @@ public:
         std::unique_lock<std::mutex> lock(_mutex);
         if(i<_var.size()) return _var[i];
         return Svar::Undefined();
+    }
+
+    virtual Svar            clone(int depth=0)const{
+        std::unique_lock<std::mutex> lock(_mutex);
+        if(!depth)
+            return _var;
+        std::vector<Svar> var=_var;
+        for(auto& it:var){
+            it=it.clone();
+        }
+        return var;
     }
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarArray& rh){
@@ -1643,6 +1664,8 @@ inline Svar Svar::castAs<Svar>()const{
     return *this;
 }
 
+inline Svar Svar::clone(int depth)const{return _obj->clone(depth);}
+
 inline std::string Svar::typeName()const{
     return classPtr()->name();
 }
@@ -2242,7 +2265,7 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     if(rh._methods.isObject()&&rh._methods.length()){
         content<<"Methods defined here:\n";
         const SvarObject& methods=rh._methods.as<SvarObject>();
-        auto varCopy=methods.getCopy();
+        auto varCopy=methods._var;
         for(std::pair<std::string,Svar> it:varCopy){
             content<<it.second.as<SvarFunction>()<<std::endl<<std::endl;
         }
