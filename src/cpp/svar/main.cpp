@@ -133,7 +133,7 @@ TEST(Svar,CBOR){
     if(!file.empty())
         var=var.loadFile(file);
 
-    int bufSize=svar.GetInt("test.cborBufSize",0);
+    int bufSize=svar.GetInt("test.cborBufSize",1e6);
     if(bufSize){
         std::string *buf=new std::string();
         buf->resize(bufSize);
@@ -152,11 +152,6 @@ TEST(Svar,CBOR){
 
         EXPECT_TRUE(ret["binary_buf"].is<SvarBuffer>());
 
-    }
-    else
-    {
-        SvarBuffer sz=cbor.call("dumpCheck",var).as<SvarBuffer>();
-        Svar out = cbor.call("load",sz.clone());
     }
 }
 

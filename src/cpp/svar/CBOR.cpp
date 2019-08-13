@@ -1,6 +1,5 @@
 #include <Svar.h>
 #include <sstream>
-#include "json.hpp"
 
 #include "Timer.h"
 
@@ -87,29 +86,6 @@ public:
         bool        reverse;
     };
 
-    static nlohmann::json svar2json(Svar var){
-        using namespace nlohmann;
-        if(var.isNull()) return json(nullptr);
-        else if(var.is<bool>()) return json(var.as<bool>());
-        else if(var.is<int>()) return json(var.as<int>());
-        else if(var.is<double>()) return json(var.as<double>());
-        else if(var.is<std::string>()) return json(var.as<std::string>());
-        else if(var.isArray()) {
-            json ret=json::array();
-            for(Svar& v:var.as<SvarArray>()._var)
-                ret.push_back(svar2json(v));
-            return ret;
-        }
-        else if(var.isObject()){
-            json ret=json::object();
-            for(auto v:var.as<SvarObject>()._var){
-                ret[v.first]=svar2json(v.second);
-            }
-            return ret;
-        }
-        return json();
-    }
-
     static Svar load(SvarBuffer input){
         IStream i(input);
         return loadStream(i);
@@ -175,36 +151,6 @@ public:
         u_char c;
         i>>c;
         return funcs[c](c,i);
-    }
-
-    static SvarBuffer dumpCheck(Svar var){
-        auto js=svar2json(var);
-        timer.enter("json_cbor");
-        std::vector<char> cbor;
-        js.to_cbor(js,cbor);
-        timer.leave("json_cbor");
-
-        timer.enter("svar_cbor");
-        SvarBuffer svar_cbor=dump(var);
-        timer.leave("svar_cbor");
-
-        assert(cbor.size()==svar_cbor._size);
-        for(int i=0;i<cbor.size();i++){
-            assert(cbor[i]==*((const char*)(svar_cbor._ptr)+i));
-        }
-
-        SvarBuffer tmp=svar_cbor.clone();
-        timer.enter("load_cbor_svar");
-//        std::cout<<load(svar_cbor)<<std::endl;
-        timer.leave("load_cbor_svar");
-//        std::cout<<tmp<<std::endl;
-//        std::cout<<svar_cbor<<std::endl;
-        assert(memcmp(tmp._ptr,svar_cbor._ptr,tmp.length())==0);
-
-        timer.enter("load_cbor_json");
-        js=js.from_cbor(cbor);
-        timer.leave("load_cbor_json");
-        return svar_cbor;
     }
 
     static SvarBuffer dump(Svar var){
@@ -425,8 +371,7 @@ REGISTER_SVAR_MODULE(CBOR){
 
         SvarClass::Class<CBOR>()
                 .def_static("load",&CBOR::load)
-                .def_static("dump",&CBOR::dump)
-                .def_static("dumpCheck",&CBOR::dumpCheck);
+                .def_static("dump",&CBOR::dump);
 
         Svar::instance().set("__builtin__.CBOR",SvarClass::instance<CBOR>());
 }
