@@ -1,5 +1,7 @@
 #include <Svar.h>
 #include <sstream>
+#include <algorithm> // transform
+#include <array> // array
 
 #include "Timer.h"
 
