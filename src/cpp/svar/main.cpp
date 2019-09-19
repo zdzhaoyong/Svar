@@ -444,12 +444,11 @@ int main(int argc,char** argv){
 
     std::string plugin=var.arg<std::string>("plugin","","The svar module plugin wanna to show.");
     var.arg<std::string>("key","","The name in the module wanna to show");
-    bool tests=var.arg<bool>("tests",false,"Perform google tests.");
-    bool dumpVar=var.arg<bool>("dumpVar",false,"DumpVar");
+    bool tests=var.arg("tests",false,"Perform google tests.");
+    bool dumpVar=var.arg("dumpVar",false,"DumpVar");
 
-    if(var.get<bool>("help",false)||argc<2){
-        var.help();
-        return 0;
+    if(var.get("help",false)||argc<2){
+        return var.help();
     }
 
     if(unParsed.length()){

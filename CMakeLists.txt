@@ -11,3 +11,9 @@ pi_add_target(sample_use BIN src/cpp/sample_use REQUIRED System LTO)
 
 pi_report_targets()
 pi_install(TARGETS svar HEADERS src/Svar)
+
+#####################################################################
+# Add Tab Completion Support
+if(UNIX)
+    install(SCRIPT ${CMAKE_CURRENT_LIST_DIR}/cmake/tab_completion.cmake)
+endif()
