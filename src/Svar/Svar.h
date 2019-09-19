@@ -28,14 +28,17 @@
 //
 // Author: zd5945@126.com (Yong Zhao) 353184965@qq.com(Guochen Liu)
 //
-// Svar: A light-weight, efficient, thread-safe parameter setting, dynamic
-// variable sharing and command calling util class.
-// Features:
-// * Arguments parsing with help information
-// * Support a very tiny script language with variable, function and condition
-// * Thread-safe variable binding and sharing
-// * Function binding and calling with Scommand
-// * Support tree structure presentation, save&load with XML, JSON and YAML formats
+// By Using Svar, your C++ library can be called easily with different
+// languages like C++, Java, Python and Javascript.
+//
+// Svar brings the following features:
+// 1. A dynamic link library that can be used as a module in languages
+//    such as C++, Python, and Node-JS;
+// 2. Unified C++ library interface, which can be called as a plug-in module.
+//    The released library comes with documentation, making *.h header file interface description unnecessary;
+// 3. Dynamic features. It wraps variables, functions, and classes into Svar while maintaining efficiency;
+// 4. Built-in Json support, parameter configuration parsing, thread-safe reading and writing,
+//    data decoupling sharing between modules, etc.
 
 #ifndef GSLAM_JVAR_H
 #define GSLAM_JVAR_H
@@ -64,7 +67,7 @@
 #endif
 
 #define svar GSLAM::Svar::instance()
-#define GSLAM_VERSION 0x000100 // 0.1.0
+#define SVAR_VERSION 0x000100 // 0.1.0
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
@@ -80,6 +83,7 @@
 
 namespace GSLAM {
 
+#ifndef DOXYGEN_IGNORE_INTERNAL
 namespace detail {
 template <bool B, typename T = void> using enable_if_t = typename std::enable_if<B, T>::type;
 template <bool B, typename T, typename F> using conditional_t = typename std::conditional<B, T, F>::type;
@@ -154,6 +158,7 @@ struct has_stream_operators {
 };
 
 }
+#endif
 
 class Svar;
 class SvarValue;
@@ -166,6 +171,392 @@ class SvarBuffer;
 class SvarExeption;
 template <typename T>
 class SvarValue_;
+
+/**
+@brief The Svar class, A Tiny Modern C++ Header Brings Unified Interface for Different Languages
+
+By Using Svar, your C++ library can be called easily with different languages like C++, Java, Python and Javascript.
+
+Svar brings the following features:
+
+- A dynamic link library that can be used as a module in languages such as C++, Python, and Node-JS;
+- Unified C++ library interface, which can be called as a plug-in module. The released library comes with documentation, making *.h header file interface description unnecessary;
+- Dynamic features. It wraps variables, functions, and classes into Svar while maintaining efficiency;
+- Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
+
+\section s_svar_json Use Svar like JSON
+
+Svar natually support JSON and here is some basic usage demo:
+\code
+Svar null=nullptr;
+Svar b=false;
+Svar i=1;
+Svar d=2.1;
+Svar s="hello world";
+Svar v={1,2,3}
+Svar m={"b",false,"s","hello world"}
+
+Svar obj;
+obj["m"]=m;
+obj["pi"]=3.14159;
+
+std::cout<<obj;
+
+std::stringstream sst("[2,3,4]");
+sst>>obj;
+std::cout<<obj;
+
+// use string literal
+Svar lit="[false,3]"_svar;
+
+if(s.is<std::string>()) // use is to check type
+    std::cout<<"raw string is "<<s.as<std::string>(); // use as to force cast, never throw
+
+double d=i.castAs<double>();// use castAs, this may throw SvarException
+
+\endcode
+
+\section s_svar_arguments Use Svar for Argument Parsing
+
+Svar provides argument parsing functional with JSON configuration loading.
+Here is a small demo shows how to use Svar for argument parsing:
+
+@code
+#include <GSLAM/core/Svar.h>
+
+int main(int argc,char** argv)
+{
+    svar.parseMain(argc,argv);
+
+    int argInt=svar.arg<int>("i",0,"This is a demo int parameter");
+    svar.arg<bool>("b",false,"Here is the bool description");
+
+    if(svar.get<bool>("help",false)){
+        svar.help();
+        return 0;
+    }
+    return 0;
+}
+
+@endcode
+
+When you use "--help" or "-help", the terminal should show the below introduction:
+@code
+-> sample_use --help
+Usage:
+sample_use [--help] [-conf configure_file] [-arg_name arg_value]...
+
+Using Svar supported argument parsing. The following table listed several argume
+nt introductions.
+
+Argument        Type(default->setted)           Introduction
+--------------------------------------------------------------------------------
+-i              int(0)                          This is a demo int parameter
+-b              bool(false)                     Here is the bool description
+-conf           str("Default.cfg")              The default configure file going
+                                                 to parse.
+-help           bool(false->true)               Show the help information.
+@endcode
+"help" and "conf" is two default parameters and users can use "conf" to load JSON file for configuration loading.
+
+
+Svar supports the following parsing styles:
+- "-arg value": two '-' such as "--arg value" is the same
+- "-arg=value": two "--" such as "--arg=value" is the same
+- "arg=value"
+- "-arg" : this is the same with "arg=true", but the next argument should not be a value
+
+\section s_svar_cppelements Use Svar to Hold Other C++ Elements
+
+Svar can not only hold JSON types, but also any other c++ elements including functions, classes and objects.
+
+\subsection s_svar_cppelements_sample A tiny sample of Svar holding functions and classes.
+
+@code
+#include <GSLAM/core/Svar.h>
+
+int c_func(int a,int b){return a+b;}
+
+class DemoClass{
+public:
+    DemoClass(const std::string& name):_name(name){}
+    std::string getName()const{return _name;}
+    void setName(std::string name){_name=name}
+
+    static DemoClass create(std::string name){return DemoClass(name);}
+
+    std::string _name;
+};
+
+int main(int argc,char** argv)
+{
+    Svar add=c_func;// hold a function
+    int  c=add(a,b).castAs<int>();// use the function
+
+    Svar create(&DemoClass::create);// hold a static member function
+    DemoClass inst=create("hello svar").as<DemoClass>();// call a static member function
+
+    Svar(&DemoClass::setName)(&inst,"I changed name");// call a member function
+
+    Svar cls=SvarClass::instance<DemoClass>();
+    Class<DemoClass>()
+        .construct<const std::string&>()
+        .def("getName",&DemoClass::getName)
+        .def("setName",&DemoClass::setName)
+        .def_static("create",&DemoClass::create);
+
+    Svar inst2=cls("I am another instance");// construct a instance
+    std::string name=inst2.call("getName").as<std::string>();
+    inst2.call("setName","changed name with svar");
+}
+@endcode
+
+\subsection s_svar_class Define Class Members with Svar
+Svar does not do magic, so users need to bind functions mannually like boost or pybind11 did.
+Fortunately, Svar provided utils to bind those functions very conveniencely.
+
+As used in last section, there are three types of functions: constructor,
+member function and static member function.
+And Svar also support lambda expression of functions so that users able to extend functions more easily.
+@code
+    Class<DemoClass>("Demo")             // change the name to Demo
+        .construct<const std::string&>() // constructor
+        .def("getName",&DemoClass::getName) // const member function
+        .def("setName",&DemoClass::setName) // member function
+        .def_static("create",&DemoClass::create)// static function
+        .def("print",[](DemoClass& self){std::cerr<<self._name;})// lambda function
+        .def_static("none",[](){});// static lambda function
+@endcode
+
+@todo Svar does not support field now, maybe it's a future work.
+
+\subsection s_svar_operators Operators of Svar
+
+Svar supports to call functions with operators, such as for int,
+we got some math operators and we want to use it directly with Svar:
+@code
+    Svar a=4;
+    Svar b=5;
+    auto c=a+b;
+    EXPECT_TRUE(c.is<int>())
+    EXPECT_EQ(c,20)
+@endcode
+
+The above operation is available because Svar builtin defined as following:
+@code
+    SvarClass::Class<int>()
+    .def("__init__",&SvarBuiltin::int_create)
+    .def("__double__",[](int i){return (double)i;})
+    .def("__bool__",[](int i){return (bool)i;})
+    .def("__str__",[](int i){return Svar::toString(i);})
+    .def("__eq__",[](int self,int rh){return self==rh;})
+    .def("__lt__",[](int self,int rh){return self<rh;})
+    .def("__add__",[](int self,Svar rh)->Svar{
+        if(rh.is<int>()) return Svar(self+rh.as<int>());
+        if(rh.is<double>()) return Svar(self+rh.as<double>());
+        return Svar::Undefined();
+    })
+    .def("__sub__",[](int self,Svar rh)->Svar{
+        if(rh.is<int>()) return Svar(self-rh.as<int>());
+        if(rh.is<double>()) return Svar(self-rh.as<double>());
+        return Svar::Undefined();
+    })
+    .def("__mul__",[](int self,Svar rh)->Svar{
+        if(rh.is<int>()) return Svar(self*rh.as<int>());
+        if(rh.is<double>()) return Svar(self*rh.as<double>());
+        return Svar::Undefined();
+    })
+    .def("__div__",[](int self,Svar rh){
+        if(rh.is<int>()) return Svar(self/rh.as<int>());
+        if(rh.is<double>()) return Svar(self/rh.as<double>());
+        return Svar::Undefined();
+    })
+    .def("__mod__",[](int self,int rh){
+        return self%rh;
+    })
+    .def("__neg__",[](int self){return -self;})
+    .def("__xor__",[](int self,int rh){return self^rh;})
+    .def("__or__",[](int self,int rh){return self|rh;})
+    .def("__and__",[](int self,int rh){return self&rh;});
+@endcode
+
+If you want your own class support these operators, you need to define you own implementations.
+The following table listed some operators that often used.
+
+| Operator |  Function Name |
+|    --    |  --            |
+|    +     |  "__add__"     |
+|    -     |  "__sub__"     |
+|    *     |  "__mul__"     |
+|    /     |  "__div__"     |
+|    %     |  "__mod__"     |
+|    &     |  "__and__"     |
+|    \|    |  "__or__"      |
+|    ^     |  "__xor__"     |
+|    =     |  "__eq__"      |
+|    !=    |  "__nq__"      |
+|    <     |  "__lt__"      |
+|    >     |  "__gt__"      |
+|    <=    |  "__le__"      |
+|    >=    |  "__ge__"      |
+|    []    |  "__getitem__" |
+
+\subsection s_svar_inherit Inherit of Classes
+
+@code
+#include <GSLAM/core/Svar.h>
+
+using namespace GSLAM;
+
+class BBase{
+public:
+    virtual bool isBBase(){return true;}
+};
+
+class BaseClass: public BBase{
+public:
+    BaseClass(int age):age_(age){}
+
+    int getAge()const{return age_;}
+    void setAge(int a){age_=a;}
+
+    virtual bool isBBase(){return false;}
+
+    int age_;
+};
+
+int main(int argc,char** argv)
+{
+    Class<BBase>()
+        .def("isBBase",&BBase::isBBase);
+
+    Class<BaseClass>()
+        .inherit<BBase,BaseClass>() // use this to inherit
+        .def_static("__init__",[](int age){return BaseClass(age);})// replace construct<int>()
+        .def("getAge",&BaseClass::getAge)
+        .def("setAge",&BaseClass::setAge);
+
+    Svar cls=SvarClass::instance<BaseClass>();
+    Svar obj=cls(10);// ten years old?
+    assert(!obj.call("isBBase).as<bool>());
+    return 0;
+}
+
+@endcode
+
+\section s_svar_plugin Export & Import Svar Module with C++ Shared Library
+
+One of the most important design target of Svar is to export a shared library that
+can be used by different languages.
+
+\subsection s_svar_export Export Svar Module
+
+The only thing needs to do is to put what you want to the singleton of Svar: Svar::instance(),
+which is defined as 'svar', and expose the symbol with macro EXPORT_SVAR_INSTANCE.
+
+@code
+#include "GSLAM/core/Svar.h"
+
+using namespace GSLAM;
+
+int add(int a,int b){
+    return a+b;
+}
+
+class ApplicationDemo{
+public:
+    ApplicationDemo(std::string name):_name(name){
+        std::cout<<"Application Created.";
+    }
+    std::string name()const{return _name;}
+    std::string gslam_version()const{return "3.2";}
+    std::string _name;
+};
+
+REGISTER_SVAR_MODULE(sample)// see, so easy, haha
+{
+    svar["__name__"]="sample_module";
+    svar["__doc__"]="This is a demo to show how to export a module using svar.";
+    svar["add"]=add;
+
+    Class<ApplicationDemo>()
+            .construct<std::string>()
+            .def("name",&ApplicationDemo::name)
+            .def("gslam_version",&ApplicationDemo::gslam_version);
+
+    svar["ApplicationDemo"]=SvarClass::instance<ApplicationDemo>();
+}
+
+EXPORT_SVAR_INSTANCE // export the symbol of Svar::instance
+@endcode
+
+Compile this file to a shared library "libsample.so" or "sample.dll", and we are going to access this module with Svar later.
+
+\subsection s_svar_doc Documentation of Svar Module
+A Svar module is designed to be self maintained, which means the module can be called without header or documentation.
+Since SvarFunction auto generated function signatures, so that users are able to know how to call Svar functions.
+
+One can use the 'svar' application from https://github.com/zdzhaoyong/Svar,
+or the "gslam" application of https://github.com/zdzhaoyong/GSLAM to access the context.
+
+@code
+-> gslam doc -plugin sample
+{
+  "ApplicationDemo" : <class at 0x15707d0>,
+  "__builtin__" : {
+    "Json" : <class at 0x156fd80>,
+    "version" : 256
+  },
+  "__doc__" : "This is a demo to show how to export a module using svar.",
+  "__name__" : "sample_module",
+  "add" : <function at 0x15706e0>
+}
+-> gslam doc -plugin sample -key ApplicationDemo
+class ApplicationDemo():
+|  ApplicationDemo.__init__(...)
+|      ApplicationDemo.__init__(str)->ApplicationDemo
+|
+|
+|  Methods defined here:
+|  ApplicationDemo.__init__(...)
+|      ApplicationDemo.__init__(str)->ApplicationDemo
+|
+|
+|  ApplicationDemo.gslam_version(...)
+|      ApplicationDemo.gslam_version(ApplicationDemo const*)->str
+|
+|
+|  ApplicationDemo.name(...)
+|      ApplicationDemo.name(ApplicationDemo const*)->str
+|
+|
+@endcode
+
+\subsection s_svar_usecpp Use Svar Module in C++
+We are able to load the Svar instance exported by marco with EXPORT_SVAR_INSTANCE
+using Registry::load().
+
+@code
+#include "GSLAM/core/Svar.h"
+#include "GSLAM/core/Registry.h"
+
+using namespace GSLAM;
+
+int main(int argc,char** argv){
+    Svar sampleModule=Registry::load("sample");
+
+    Svar ApplicationDemo=sampleModule["ApplicationDemo"];
+
+    Svar instance=ApplicationDemo("zhaoyong");
+    std::cout<<instance.call("gslam_version");
+
+    std::cout<<ApplicationDemo.as<SvarClass>();
+    return 0;
+}
+
+@endcode
+
+ */
 
 class Svar{
 public:
@@ -246,6 +637,11 @@ public:
     /// Create a Dict instance
     static Svar dict(const std::map<Svar,Svar>& m={}){return Svar(m);}
 
+    /// Create from Json String
+    static Svar json(const std::string& str){
+        return svar["__builtin__"]["Json"].call("load",str);
+    }
+
     /// Is holding a type T value?
     template <typename T>
     bool is()const;
@@ -307,17 +703,18 @@ public:
 
     /// Return the item numbers when it is an array, object or dict.
     size_t                  length() const;
+    size_t                  size()const{return length();}
 
     /// Force to return the children as type T, cast is performed,
     /// otherwise the old value will be droped and set to the value "def"
     template <typename T>
-    T& get(const std::string& name,T def);
+    T& get(const std::string& name,T def,bool parse_dot=false);
 
-    Svar get(const std::string& name,Svar def);
+    Svar get(const std::string& name,Svar def,bool parse_dot=false);
 
     /// Set the child "name" to "create<T>(def)"
     template <typename T>
-    void set(const std::string& name,const T& def);
+    void set(const std::string& name,const T& def,bool parse_dot=false);
 
     /// For Object: dot compute and find the member
     /// For Array, Dict and Class, check if the item is not Undefined without dot compute
@@ -354,7 +751,7 @@ public:
 
     /// Register default required arguments
     template <typename T>
-    T& arg(const std::string& name, T def, const std::string& help);
+    T arg(const std::string& name, T def, const std::string& help);
 
     /// Format print version, usages and arguments as string
     std::string helpInfo();
@@ -425,7 +822,7 @@ public:
     const std::shared_ptr<SvarValue>& value()const{return _obj;}
 
     /// This is dangerous since the returned Svar may be free by other threads, TAKE CARE!
-    Svar& getOrCreate(const std::string& name);// FIXME: Not thread safe
+    Svar& getOrCreate(const std::string& name,bool parse_dot=false);// FIXME: Not thread safe
 
     template <typename T>
     T& Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
@@ -460,6 +857,8 @@ public:
     std::shared_ptr<SvarValue> _obj;
 };
 
+
+#ifndef DOXYGEN_IGNORE_INTERNAL
 class SvarValue{
 public:
     SvarValue(){}
@@ -833,6 +1232,7 @@ public:
     SvarClass& _cls;
 };
 
+
 template <typename T>
 Svar& SvarClass::instance()
 {
@@ -1092,7 +1492,7 @@ public:
 class SvarBuffer : public SvarValue
 {
 public:
-    SvarBuffer(const void* ptr,size_t size,Svar holder)
+    SvarBuffer(const void* ptr,size_t size,Svar holder=Svar())
         : _ptr(ptr),_size(size),_holder(holder){}
 
     SvarBuffer(size_t size):_size(size){
@@ -1716,14 +2116,15 @@ inline Svar& Svar::operator[](const Svar& name){
     return *this;
 }
 
-inline Svar Svar::get(const std::string& name,Svar def)
+inline Svar Svar::get(const std::string& name,Svar def,bool parse_dot)
 {
-#ifdef SVAR_PARSE_DOT
-    auto idx = name.find_last_of(".");
-    if (idx != std::string::npos) {
-      return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def);
+    if(parse_dot){
+        auto idx = name.find_first_of(".");
+        if (idx != std::string::npos) {
+            return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def,parse_dot);
+        }
     }
-#endif
+
     Svar var;
 
     if(isUndefined())
@@ -1742,13 +2143,13 @@ inline Svar Svar::get(const std::string& name,Svar def)
 }
 
 template <typename T>
-T& Svar::get(const std::string& name,T def){
-#ifdef SVAR_PARSE_DOT
-    auto idx = name.find_last_of(".");
-    if (idx != std::string::npos) {
-      return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def);
+T& Svar::get(const std::string& name,T def,bool parse_dot){
+    if(parse_dot){
+        auto idx = name.find_first_of(".");
+        if (idx != std::string::npos) {
+            return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def,parse_dot);
+        }
     }
-#endif
     Svar var;
 
     if(isUndefined())
@@ -1775,14 +2176,14 @@ T& Svar::get(const std::string& name,T def){
 }
 
 
-inline Svar& Svar::getOrCreate(const std::string& name)
+inline Svar& Svar::getOrCreate(const std::string& name,bool parse_dot)
 {
-#ifdef SVAR_PARSE_DOT
-    auto idx = name.find_last_of('.');
-    if (idx != std::string::npos) {
-      return getOrCreate(name.substr(0, idx)).getOrCreate(name.substr(idx + 1));
+    if(parse_dot){
+        auto idx = name.find_last_of('.');
+        if (idx != std::string::npos) {
+            return getOrCreate(name.substr(0, idx),parse_dot).getOrCreate(name.substr(idx + 1));
+        }
     }
-#endif
     if(isUndefined()) {
         *this=object();
     }
@@ -1802,13 +2203,13 @@ inline Svar& Svar::getOrCreate(const std::string& name)
 }
 
 template <typename T>
-inline void Svar::set(const std::string& name,const T& def){
-#ifdef SVAR_PARSE_DOT
-    auto idx = name.find(".");
-    if (idx != std::string::npos) {
-      return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
+inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
+    if(parse_dot){
+        auto idx = name.find(".");
+        if (idx != std::string::npos) {
+            return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
+        }
     }
-#endif
     if(isUndefined()){
         *this=object({{name,Svar::create(def)}});
         return;
@@ -2029,9 +2430,9 @@ inline bool Svar::parseFile(const std::string& file_path)
 }
 
 template <typename T>
-T& Svar::arg(const std::string& name, T def, const std::string& help) {
+T Svar::arg(const std::string& name, T def, const std::string& help) {
     Svar argInfo=array({name,Svar::create(def),help});
-    Svar& args=getOrCreate("__builtin__.args");
+    Svar& args=(*this)["__builtin__"]["args"];
     if(!args.isArray()) args=array();
     args.push_back(argInfo);
     return get(name,def);
@@ -2039,22 +2440,32 @@ T& Svar::arg(const std::string& name, T def, const std::string& help) {
 
 inline std::string Svar::helpInfo()
 {
+    Svar args=(*this)["__builtin__"]["args"];
+    if(get("complete_function_request",false))
+    {
+        std::string str;
+        for (int i=0;i<(int)args.length();i++) {
+          str+=" -"+args[i][0].castAs<std::string>();
+        }
+        str+=" -help -conf";
+        return str;
+    }
     std::stringstream sst;
-    int width = GetInt("COLUMNS", 80);
+    int width = get("help_colums", 80, true);
     int namePartWidth = width / 5 - 1;
     int statusPartWidth = width * 2 / 5 - 1;
     int introPartWidth = width * 2 / 5;
-    std::string usage = GetString("Usage", "");
+    std::string usage = get<std::string>("__usage__", "");
     if (usage.empty()) {
-      usage = "Usage:\n" + GetString("ProgramName", "exe") +
+      usage = "Usage:\n" + get<std::string>("__name__", "exe") +
               " [--help] [-conf configure_file]"
               " [-arg_name arg_value]...\n";
     }
     sst << usage << std::endl;
 
     std::string desc;
-    if (!GetString("Version").empty())
-      desc += "Version: " + GetString("Version") + ", ";
+    if (exist("__version__"))
+      desc += "Version: " + get<std::string>("__version__","1.0") + ", ";
     desc +=
         "Using Svar supported argument parsing. The following table listed "
         "several argument introductions.\n";
@@ -2063,7 +2474,6 @@ inline std::string Svar::helpInfo()
     arg<std::string>("conf", "Default.cfg",
                      "The default configure file going to parse.");
     arg<bool>("help", false, "Show the help information.");
-    Svar args=Get("__builtin__.args");
     if(!args.isArray()) return "";
 
     sst << printTable({{namePartWidth, "Argument"},
@@ -2275,8 +2685,6 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     return ost;
 }
 
-
-
 template <typename T>
 class caster<std::vector<T> >{
 public:
@@ -2385,7 +2793,7 @@ public:
 
 inline std::istream& operator >>(std::istream& ist,Svar& self)
 {
-    Svar json=svar["__builtin__.Json"];
+    Svar json=svar["__builtin__"]["Json"];
     self=json.call("load",std::string( (std::istreambuf_iterator<char>(ist)) , std::istreambuf_iterator<char>() ));
     return ist;
 }
@@ -2956,7 +3364,7 @@ public:
                 .def_static("dump",&Json::dump);
 
         Svar::instance()["__builtin__"]["Json"]=SvarClass::instance<Json>();
-        Svar::instance()["__builtin__"]["version"]=GSLAM_VERSION;
+        Svar::instance()["__builtin__"]["version"]=SVAR_VERSION;
     }
 
     static Svar int_create(Svar rh){
@@ -3008,6 +3416,7 @@ public:
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;
+#endif
 #endif
 
 }

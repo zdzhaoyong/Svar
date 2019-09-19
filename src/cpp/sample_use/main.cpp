@@ -14,7 +14,16 @@ struct MyClass{
 };
 
 int main(int argc,char** argv){
+    svar.parseMain(argc,argv);
 
+    int argInt=svar.arg<int>("i",0,"This is a demo int parameter");
+    svar.arg<bool>("b",false,"Here is the bool description");
+
+    if(svar.get<bool>("help",false)){
+        svar.help();
+        return 0;
+    }
+    return 0;
     Svar i=1;
     Svar d=2.;
     Svar s="hello world";
