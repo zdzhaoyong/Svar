@@ -889,6 +889,8 @@ public:
 
 class SvarFunction: public SvarValue{
 public:
+    SvarFunction(){}
+
     /// Construct a cpp_function from a vanilla function pointer
     template <typename Return, typename... Args, typename... Extra>
     SvarFunction(Return (*f)(Args...), const Extra&... extra) {
@@ -937,7 +939,7 @@ public:
         const SvarFunction* overload=this;
         std::vector<SvarExeption> catches;
         for(;true;overload=&overload->next.as<SvarFunction>()){
-            if(overload->arg_types.size()!=argv.size())
+            if(do_argcheck&&overload->arg_types.size()!=argv.size())
             {
                 if(!overload->next.isFunction()) {
                     overload=nullptr;break;
@@ -995,7 +997,7 @@ public:
     detail::enable_if_t<!std::is_void<Return>::value, Svar>
     call_impl(Func&& f,Return (*)(Args...),std::vector<Svar>& args,detail::index_sequence<Is...>){
         std::tuple<Args...> castedArgs(args[Is].castAs<Args>()...);
-        return Svar::create(f(std::get<Is>(castedArgs)...));
+        return Svar(f(std::get<Is>(castedArgs)...));
     }
 
     friend std::ostream& operator<<(std::ostream& sst,const SvarFunction& self){
@@ -1019,7 +1021,16 @@ public:
     Svar          next;
 
     std::function<Svar(std::vector<Svar>&)> _func;
-    bool          is_method,is_constructor;
+    bool          is_method,is_constructor,do_argcheck=true;
+};
+
+class SvarProperty{
+public:
+  SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
+    :_fget(fget),_fset(fset),_name(name),_doc(doc){}
+
+  Svar _fget,_fset;
+  std::string _name,_doc;
 };
 
 class SvarClass: public SvarValue{
@@ -1078,6 +1089,29 @@ public:
         return def(name,Svar::lambda(f),false);
     }
 
+    SvarClass& def_property(const std::string& name,
+                            const Svar& fget,const Svar& fset=Svar(),
+                            const std::string& doc=""){
+        _methods[name]=SvarProperty(fget,fset,name,doc);
+        return *this;
+    }
+
+    template <typename C, typename D>
+    SvarClass& def_readwrite(const std::string& name, D C::*pm, const std::string& doc="") {
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
+        fget.as<SvarFunction>().is_method=true;
+        fset.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, fset, doc);
+    }
+
+    template <typename C, typename D>
+    SvarClass& def_readonly(const std::string& name, D C::*pm, const std::string& doc="") {
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        fget.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, Svar(), doc);
+    }
+
     template <typename Base,typename ChildType>
     SvarClass& inherit(){
         Svar base={SvarClass::instance<Base>(),
@@ -1092,8 +1126,6 @@ public:
         _parents=parents;
         return *this;
     }
-
-//    SvarClass& def_property(const std::string& name,);
 
     Svar& operator [](const std::string& name){
         Svar& c=_methods[name];
@@ -1192,6 +1224,7 @@ public:
     Class(const std::string& name)
         :_cls(SvarClass::Class<C>()){
         _cls.setName(name);
+        svar[name]=SvarClass::instance<C>();
     }
 
     Class& def(const std::string& name,const Svar& function,bool isMethod=true)
@@ -1227,6 +1260,32 @@ public:
         return def("__init__",[](Args... args){
             return C(args...);
         });
+    }
+
+    Class& def_property(const std::string& name,
+                        const Svar& fget,const Svar& fset=Svar(),
+                        const std::string& doc=""){
+      _cls.def_property(name,fget,fset,doc);
+      return *this;
+    }
+
+    template <typename E, typename D>
+    Class& def_readwrite(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readwrite() requires a class member (or base class member)");
+
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
+        fget.as<SvarFunction>().is_method=true;
+        fset.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, fset, doc);
+    }
+
+    template <typename E, typename D>
+    Class& def_readonly(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readonly() requires a class member (or base class member)");
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        fget.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, Svar(), doc);
     }
 
     SvarClass& _cls;
@@ -1750,7 +1809,6 @@ public:
     size_t _size;
     Svar   _holder;
 };
-
 
 inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<void>();}
 
@@ -2425,6 +2483,7 @@ inline bool Svar::parseFile(const std::string& file_path)
 {
     Svar var=loadFile(file_path);
     if(var.isUndefined()) return false;
+    if(isUndefined()) {*this=var;return true;}
     call("update",var);
     return true;
 }
@@ -2760,6 +2819,7 @@ class caster<std::shared_ptr<T> >{
 public:
     static Svar from(const Svar& var){
         if(var.is<H>()) return var;
+        if(var.isNull()) return Svar::create(H());
 
         auto h=dynamic_cast<SvarPtrHolder<T,H>*>(var.value().get());
         if(!h) return  Svar::Undefined();
@@ -2767,6 +2827,7 @@ public:
     }
 
     static Svar to(const std::shared_ptr<T>& var){
+        if(!var) return Svar::Null();
         return Svar((SvarValue*)new SvarPtrHolder<T,std::shared_ptr<T>>(var));
     }
 };

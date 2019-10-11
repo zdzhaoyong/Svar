@@ -2,7 +2,6 @@
 #define SVAR_SVARPY_H
 
 #include "Svar.h"
-#include "SharedLibrary.h"
 #include "Glog.h"
 #include <Python.h>
 #include <cstring>
@@ -202,16 +201,16 @@ struct SvarPy: public PyObject{
             };
         else if(src.is<SvarArray>())
             convert=[](Svar src){
-            PyObject* obj=PyList_New(src.length());
+
+            PyObject* obj=PyTuple_New(src.length());
             size_t index = 0;
             for (Svar& value : src.as<SvarArray>()._var) {
                 PyObject* value_ =SvarPy::getPy(value);
                 if (!value_)
                 {
-                    delete value_;
                     return incref(Py_None);
                 }
-                PyList_SET_ITEM(obj, (ssize_t) index++, value_); // steals a reference
+                PyTuple_SetItem(obj, (ssize_t) index++, value_); // steals a reference
             }
             return obj;
         };
@@ -231,6 +230,9 @@ struct SvarPy: public PyObject{
             convert=[](Svar src){return (PyObject*)SvarPy::getPyFunction(src);};
         else if(src.is<SvarClass>())
             convert=[](Svar src){ return (PyObject*)SvarPy::getPyClass(src);};
+        else if(src.is<SvarProperty>()){
+            convert=[](Svar src){return (PyObject*)SvarPy::getPyProperty(src);};
+        }
         else convert=[](Svar src){
             PyTypeObject* py_class=getPyClass(src.classObject());
             SvarPy* obj=(SvarPy*)py_class->tp_new(py_class,nullptr,nullptr);
@@ -241,6 +243,21 @@ struct SvarPy: public PyObject{
         cls->def("getPy",convert);
 
         return convert(src);
+    }
+
+    static PyObject* getPyProperty(Svar src){
+      SvarProperty& property=src.as<SvarProperty>();
+      PyObject *result = PyObject_Call((PyObject*)&PyProperty_Type,
+                                       getPy({property._fget,property._fset,property._doc}),nullptr);
+      if (!result){
+        struct error_scope {
+          PyObject *type, *value, *trace;
+          error_scope() { PyErr_Fetch(&type, &value, &trace); }
+          ~error_scope() { PyErr_Restore(type, value, trace); }
+        }error;
+        throw SvarExeption(fromPy(error.value));
+      }
+      return result;
     }
 
     static PyObject* getPyFunction(Svar src){
@@ -259,7 +276,7 @@ struct SvarPy: public PyObject{
 
             try{
                 Svar svar_args=SvarPy::fromPy(args);
-                if(svarFunc.is_constructor)
+                if(svarFunc.is_constructor)// FIXME: constructor is different since first argument is self?
                 {
                     return SvarPy::getPy(svarFunc.Call({svar_args}));
                 }
@@ -287,7 +304,7 @@ struct SvarPy: public PyObject{
         return m_ptr;
     }
 
-    static PyTypeObject* getPyClass(Svar var){
+    static PyTypeObject* getPyClass(Svar var){// FIXME: segment fault when python cleaning
         SvarClass& cls=var.as<SvarClass>();
         if(cls._attr.exist("PyTypeObject"))
             return cls._attr["PyTypeObject"].castAs<PyTypeObject*>();
@@ -390,8 +407,7 @@ struct SvarPy: public PyObject{
 
         PyObject_SetAttrString((PyObject*)type,"svar_class",capsule);
 
-
-        return (PyTypeObject*)type;
+        return type_incref((PyTypeObject*)type);
     }
 
     static Svar fromPy(PyObject* obj)// this never fails
@@ -453,7 +469,15 @@ struct SvarPy: public PyObject{
             return dict;
         }
 
-
+        if(PyFunction_Check(obj)){
+          SvarFunction func;
+          Svar holder=PyObjectHolder(obj);
+          func._func=[holder](std::vector<Svar>& args)->Svar{
+            return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, SvarPy::getPy(args),nullptr));
+          };
+          func.do_argcheck=false;
+          return func;
+        }
 
         return Svar(PyObjectHolder(obj));
     }

@@ -1,4 +1,3 @@
-#define __SVAR_BUILDIN__
 #include <Svar/SvarPy.h>
 #include <Svar/Registry.h>
 
