@@ -22,7 +22,7 @@ Svar brings the following features:
 
 ## 1.1. Svar vs pybind11
 
-Here is a small [benchmark](./src/python/benchmark/test.py) between Svar and pybind11 to demonstrate some differences.
+Here is a small [benchmark](./src/python/benchmark/) between Svar and pybind11 to demonstrate some differences.
 
 ![benchmark](./doc/images/svar_vs_pybind11.png)
 
