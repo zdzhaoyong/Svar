@@ -112,11 +112,13 @@ TEST(Svar,Function)
     EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
 
     // FIXME: Why the below line won't pass and add returned "b"?
-    // EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
+    EXPECT_EQ(Svar(add)(Svar("a"),std::string("b")).as<std::string>(),"ab");
 
     // static method function binding
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
+    EXPECT_TRUE(Svar::lambda([](const int& a){return a;})(std::make_shared<int>(1))==1);
+    EXPECT_TRUE(Svar::lambda([](std::shared_ptr<int> a){return *a;})(std::make_shared<int>(1))==1);
 }
 
 TEST(Svar,CBOR){

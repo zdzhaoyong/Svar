@@ -566,7 +566,7 @@ public:
 
     /// Construct from SvarValue pointer
     Svar(SvarValue* v)
-        : _obj(std::shared_ptr<SvarValue>(v)){}
+        : _obj(v){}
 
     /// Wrap any thing with template caster for user customize
     template <typename T>
@@ -661,7 +661,7 @@ public:
     template <typename T>
     Svar cast()const;
 
-    Svar cast(const std::string& typeStr)const;
+    Svar cast(const Svar& cls)const;
 
     /// No cast is performed, directly return the c++ pointer, throw SvarException when failed
     template <typename T>
@@ -857,18 +857,15 @@ public:
     std::shared_ptr<SvarValue> _obj;
 };
 
-
 #ifndef DOXYGEN_IGNORE_INTERNAL
 class SvarValue{
 public:
     SvarValue(){}
     virtual ~SvarValue(){}
     typedef std::type_index TypeID;
-    virtual TypeID          cpptype()const{return typeid(void);}
-    virtual const void*     ptr() const{return nullptr;}
+    virtual const void*     as(const TypeID& tp)const{if(tp==typeid(void)) return this;else return nullptr;}
     virtual const Svar&     classObject()const;
     virtual size_t          length() const {return 0;}
-    virtual std::mutex*     accessMutex()const{return nullptr;}
     virtual Svar            clone(int depth=0)const{return Svar();}
 };
 
@@ -918,8 +915,10 @@ public:
                    (Return (*)(const Class *, Arg ...)) nullptr, extra...);
     }
 
-    virtual TypeID          cpptype()const{return typeid(SvarFunction);}
-    virtual const void*     ptr() const{return this;}
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(SvarFunction)) return this;
+        else return nullptr;
+    }
     virtual const Svar&     classObject()const;
 
     class ScopedStack{
@@ -1024,25 +1023,29 @@ public:
     bool          is_method,is_constructor,do_argcheck=true;
 };
 
-class SvarProperty{
-public:
-  SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
-    :_fget(fget),_fset(fset),_name(name),_doc(doc){}
-
-  Svar _fget,_fset;
-  std::string _name,_doc;
-};
-
 class SvarClass: public SvarValue{
 public:
+
+    class SvarProperty{
+    public:
+      SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
+        :_fget(fget),_fset(fset),_name(name),_doc(doc){}
+
+      Svar _fget,_fset;
+      std::string _name,_doc;
+    };
+
     SvarClass(const std::string& name,std::type_index cpp_type,
               std::vector<Svar> parents={})
         : __name__(name),_cpptype(cpp_type),
           _methods(Svar::object()),_attr(Svar::object()),
           _parents(parents){}
 
-    virtual TypeID          cpptype()const{return typeid(SvarClass);}
-    virtual const void*     ptr() const{return this;}
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(SvarClass)) return this;
+        else return nullptr;
+    }
+
     virtual const Svar&     classObject()const{return instance<SvarClass>();}
 
     std::string name()const{return __name__;}
@@ -1194,7 +1197,21 @@ public:
         }
 
     template <typename T>
-    static Svar& instance();
+    static Svar& instance()
+    {
+        static Svar cl;
+        if(cl.isClass()) return cl;
+    #ifdef __GNUC__
+        int status;
+        char* realname = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
+        std::string result(realname);
+        free(realname);
+    #else
+        std::string result(typeid(T).name());
+    #endif
+        cl=(SvarValue*)new SvarClass(result,typeid(T));
+        return cl;
+    }
 
     template <typename T>
     static SvarClass& Class(){
@@ -1213,110 +1230,13 @@ public:
     std::vector<Svar> _parents;
 };
 
-template <typename C>
-class Class
-{
-public:
-    Class(SvarClass& cls):_cls(cls){}
-
-    Class():_cls(SvarClass::Class<C>()){}
-
-    Class(const std::string& name)
-        :_cls(SvarClass::Class<C>()){
-        _cls.setName(name);
-        svar[name]=SvarClass::instance<C>();
-    }
-
-    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
-    {
-        _cls.def(name,function,isMethod);
-        return *this;
-    }
-
-    Class& def_static(const std::string& name,const Svar& function)
-    {
-        return def(name,function,false);
-    }
-
-    template <typename Func>
-    Class& def(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),true);
-    }
-
-    /// Construct a cpp_function from a lambda function (possibly with internal state)
-    template <typename Func>
-    Class& def_static(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),false);
-    }
-
-    template <typename ChildType>
-    Class& inherit(){
-        _cls.inherit<C,ChildType>();
-        return *this;
-    }
-
-    template <typename... Args>
-    Class& construct(){
-        return def("__init__",[](Args... args){
-            return C(args...);
-        });
-    }
-
-    Class& def_property(const std::string& name,
-                        const Svar& fget,const Svar& fset=Svar(),
-                        const std::string& doc=""){
-      _cls.def_property(name,fget,fset,doc);
-      return *this;
-    }
-
-    template <typename E, typename D>
-    Class& def_readwrite(const std::string& name, D E::*pm, const std::string& doc="") {
-        static_assert(std::is_base_of<E, C>::value, "def_readwrite() requires a class member (or base class member)");
-
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
-        fget.as<SvarFunction>().is_method=true;
-        fset.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, fset, doc);
-    }
-
-    template <typename E, typename D>
-    Class& def_readonly(const std::string& name, D E::*pm, const std::string& doc="") {
-        static_assert(std::is_base_of<E, C>::value, "def_readonly() requires a class member (or base class member)");
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        fget.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, Svar(), doc);
-    }
-
-    SvarClass& _cls;
-};
-
-
-template <typename T>
-Svar& SvarClass::instance()
-{
-    static Svar cl;
-    if(cl.isClass()) return cl;
-#ifdef __GNUC__
-    int status;
-    char* realname = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
-    std::string result(realname);
-    free(realname);
-#else
-    std::string result(typeid(T).name());
-#endif
-    cl=(SvarValue*)new SvarClass(result,typeid(T));
-    return cl;
-}
-
 template <typename T>
 class SvarValue_: public SvarValue{
 public:
     explicit SvarValue_(const T& v):_var(v){}
     explicit SvarValue_(T&& v):_var(std::move(v)){}
 
-    virtual TypeID          cpptype()const{return typeid(T);}
-    virtual const void*     ptr() const{return &_var;}
+    virtual const void*     as(const TypeID& tp)const{if(tp==typeid(T)) return &_var;else return nullptr;}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
     virtual Svar            clone(int depth=0)const{return _var;}
 //protected:// FIXME: this should not accessed by outside
@@ -1329,31 +1249,36 @@ private:
     SvarValue_(const Svar& v){}
 };
 
-template <typename T,typename H=std::shared_ptr<T> >
-class SvarPtrHolder: public SvarValue{
+template <typename T>
+class SvarValue_<std::shared_ptr<T>>: public SvarValue{
 public:
-    explicit SvarPtrHolder(const H& v):_var(v){
-    }
+    explicit SvarValue_(const std::shared_ptr<T>& v):_var(v){}
+    explicit SvarValue_(std::shared_ptr<T>&& v):_var(std::move(v)){}
 
     virtual TypeID          cpptype()const{return typeid(T);}
-    virtual const void*     ptr() const{return _var.get();}
     virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
     virtual Svar            clone(int depth=0)const{return _var;}
-//protected:// FIXME: this should not accessed by outside
-    H _var;
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(T)) return _var.get();
+        else if(tp==typeid(std::shared_ptr<T>)) return &_var;
+        else return nullptr;
+    }
+
+    std::shared_ptr<T> _var;
 };
 
 template <typename T>
-class SvarPtrHolder<T,std::unique_ptr<T>>: public SvarValue{
+class SvarValue_<std::unique_ptr<T>>: public SvarValue{
 public:
-    explicit SvarPtrHolder(std::unique_ptr<T>&& v):_var(std::move(v)){
+    explicit SvarValue_(std::unique_ptr<T>&& v):_var(std::move(v)){}
+
+    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(T)) return _var.get();
+        else if(tp==typeid(std::unique_ptr<T>)) return &_var;
+        else return nullptr;
     }
 
-    virtual TypeID          cpptype()const{return typeid(T);}
-    virtual const void*     ptr() const{return _var.get();}
-    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
-
-//protected:// FIXME: this should not accessed by outside
     std::unique_ptr<T> _var;
 };
 
@@ -1361,10 +1286,14 @@ class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
         : SvarValue_<std::map<std::string,Svar>>(m){}
-    virtual TypeID          cpptype()const{return typeid(SvarObject);}
-    virtual const void*     ptr() const{return this;}
+
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(SvarObject)) return this;
+        else if(tp==typeid(std::map<std::string,Svar>)) return &_var;
+        else return nullptr;
+    }
+
     virtual size_t          length() const {return _var.size();}
-    virtual std::mutex*     accessMutex()const{return &_mutex;}
     virtual const Svar&     classObject()const{
         if(_class.isClass()) return _class;
         return SvarClass::instance<SvarObject>();
@@ -1465,11 +1394,16 @@ class SvarArray : public SvarValue_<std::vector<Svar> >{
 public:
     SvarArray(const std::vector<Svar>& v)
         :SvarValue_<std::vector<Svar>>(v){}
-    virtual TypeID          cpptype()const{return typeid(SvarArray);}
-    virtual const void*     ptr() const{return this;}
+
     virtual const Svar&     classObject()const{return SvarClass::instance<SvarArray>();}
     virtual size_t          length() const {return _var.size();}
-    virtual std::mutex*     accessMutex()const{return &_mutex;}
+
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(SvarArray)) return this;
+        else if(tp==typeid(std::vector<Svar>)) return &_var;
+        else return nullptr;
+    }
+
     virtual const Svar& operator[](size_t i) {
         std::unique_lock<std::mutex> lock(_mutex);
         if(i<_var.size()) return _var[i];
@@ -1533,8 +1467,16 @@ public:
         :SvarValue_<std::map<Svar,Svar> >(dict){
 
     }
+
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(SvarDict)) return this;
+        else if(tp==typeid(std::map<Svar,Svar>)) return &_var;
+        else return nullptr;
+    }
+
+    virtual const Svar&     classObject()const{return SvarClass::instance<SvarDict>();}
+
     virtual size_t          length() const {return _var.size();}
-    virtual std::mutex*     accessMutex()const{return &_mutex;}
     virtual Svar operator[](const Svar& i) {
         std::unique_lock<std::mutex> lock(_mutex);
         auto it=_var.find(i);
@@ -1963,7 +1905,7 @@ inline Svar::Svar(const std::map<Svar,Svar>& m)
 
 template <typename T>
 Svar::Svar(std::unique_ptr<T>&& v)
-    : _obj(std::make_shared<SvarPtrHolder<T,std::unique_ptr<T>>>(std::move(v))){}
+    : _obj(new SvarValue_<std::unique_ptr<T>>(std::move(v))){}
 
 template <>
 inline Svar::Svar(const std::shared_ptr<SvarValue>& v)
@@ -1974,9 +1916,9 @@ inline Svar operator"" _svar(const char* str,size_t sz){
 }
 
 template <typename T>
-inline bool Svar::is()const{return _obj->cpptype()==typeid(T);}
-inline bool Svar::is(const std::type_index& typeId)const{return _obj->cpptype()==typeId;}
-inline bool Svar::is(const std::string& typeStr)const{return _obj->cpptype().name()==typeStr;}
+inline bool Svar::is()const{return _obj->as(typeid(T))!=nullptr;}
+inline bool Svar::is(const std::type_index& typeId)const{return _obj->as(typeId)!=nullptr;}
+inline bool Svar::is(const std::string& typeStr)const{return classPtr()->name()==typeStr;}
 
 template <>
 inline bool Svar::is<Svar>()const{return !isUndefined();}
@@ -1999,8 +1941,7 @@ inline bool Svar::isDict()const{
 
 template <typename T>
 inline const T& Svar::as()const{
-    assert(is<T>());
-    return *(T*)_obj->ptr();
+    return *(T*)_obj->as(typeid(T));
 }
 
 template <>
@@ -2010,7 +1951,7 @@ inline const Svar& Svar::as<Svar>()const{
 
 template <typename T>
 T& Svar::as(){
-    return *(T*)_obj->ptr();
+    return *(T*)_obj->as(typeid(T));
 }
 
 template <>
@@ -2052,17 +1993,18 @@ template <typename T>
 Svar::Svar(const T& var):Svar(caster<T>::to(var))
 {}
 
-inline Svar Svar::cast(const std::string& typeStr)const
+inline Svar Svar::cast(const Svar& cls)const
 {
-    if(is(typeStr)) return (*this);
+    std::type_index tp=cls.as<SvarClass>()._cpptype;
+    if(is(tp)) return (*this);
 
     Svar cl=_obj->classObject();
     if(cl.isClass()){
         SvarClass& srcClass=cl.as<SvarClass>();
-        Svar cvt=srcClass._methods["__"+typeStr+"__"];
+        Svar cvt=srcClass._methods["__"+std::string(tp.name())+"__"];
         if(cvt.isFunction()){
             Svar ret=cvt(*this);
-            if(ret.is(typeStr)) return ret;
+            if(ret.is(tp)) return ret;
         }
     }
     return Undefined();
@@ -2070,10 +2012,7 @@ inline Svar Svar::cast(const std::string& typeStr)const
 
 template <typename T>
 Svar Svar::cast()const{
-    Svar ret=caster<T>::from(*this);
-    if(ret.is<T>()) return ret;
-
-    return Undefined();
+    return caster<T>::from(*this);
 }
 
 template <typename T>
@@ -2129,7 +2068,7 @@ inline std::string Svar::typeName()const{
 }
 
 inline SvarValue::TypeID Svar::cpptype()const{
-    return _obj->cpptype();
+    return classPtr()->_cpptype;
 }
 
 inline const Svar&       Svar::classObject()const{
@@ -2622,9 +2561,8 @@ DEF_SVAR_OPERATOR_IMPL(__and__)
 
 inline bool Svar::operator ==(const Svar& rh)const{
     Svar clsobj=classObject();
-    if(!clsobj.isClass()) return _obj->ptr()==rh.value()->ptr();
     Svar eq_func=clsobj.as<SvarClass>()["__eq__"];
-    if(!eq_func.isFunction()) return _obj->ptr()==rh.value()->ptr();
+    if(!eq_func.isFunction()) return _obj==rh.value();
     Svar ret=eq_func(*this,rh);
     assert(ret.is<bool>());
     return ret.as<bool>();
@@ -2632,9 +2570,8 @@ inline bool Svar::operator ==(const Svar& rh)const{
 
 inline bool Svar::operator <(const Svar& rh)const{
     Svar clsobj=classObject();
-    if(!clsobj.isClass()) return _obj->ptr()<rh.value()->ptr();
     Svar lt_func=clsobj.as<SvarClass>()["__lt__"];
-    if(!lt_func.isFunction()) return _obj->ptr()<rh.value()->ptr();
+    if(!lt_func.isFunction()) return _obj==rh.value();
     Svar ret=lt_func(*this,rh);
     assert(ret.is<bool>());
     return ret.as<bool>();
@@ -2656,7 +2593,7 @@ inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
         ost<<a.as<std::string>();
         return ost;
     }
-    ost<<"<"<<self.typeName()<<" at "<<self.value()->ptr()<<">";
+    ost<<"<"<<self.typeName()<<" at "<<self.value().get()<<">";
     return ost;
 }
 
@@ -2767,6 +2704,29 @@ public:
     }
 };
 
+template <typename T>
+class caster<std::list<T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::list<T>>()) return var;
+
+        if(!var.isArray()) return Svar::Undefined();
+
+        std::list<T> ret;
+        for(const Svar& v:var.as<SvarArray>()._var)
+        {
+            ret.push_back(v.castAs<T>());
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::list<T>& var){
+        SvarArray* obj=new SvarArray({});
+        obj->_var.insert(obj->_var.end(),var.begin(),var.end());
+        return Svar((SvarValue*)obj);
+    }
+};
 
 template <typename T>
 class caster<std::map<std::string,T> >{
@@ -2821,14 +2781,12 @@ public:
         if(var.is<H>()) return var;
         if(var.isNull()) return Svar::create(H());
 
-        auto h=dynamic_cast<SvarPtrHolder<T,H>*>(var.value().get());
-        if(!h) return  Svar::Undefined();
-        return Svar::create(h->_var);
+        return  Svar::Undefined();
     }
 
     static Svar to(const std::shared_ptr<T>& var){
         if(!var) return Svar::Null();
-        return Svar((SvarValue*)new SvarPtrHolder<T,std::shared_ptr<T>>(var));
+        return Svar::create(var);
     }
 };
 
@@ -3270,6 +3228,84 @@ private:
 
         return fail("expected value, got " + esc(ch));
     }
+};
+
+template <typename C>
+class Class
+{
+public:
+    Class(SvarClass& cls):_cls(cls){}
+
+    Class():_cls(SvarClass::Class<C>()){}
+
+    Class(const std::string& name)
+        :_cls(SvarClass::Class<C>()){
+        _cls.setName(name);
+        svar[name]=SvarClass::instance<C>();
+    }
+
+    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
+    {
+        _cls.def(name,function,isMethod);
+        return *this;
+    }
+
+    Class& def_static(const std::string& name,const Svar& function)
+    {
+        return def(name,function,false);
+    }
+
+    template <typename Func>
+    Class& def(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),true);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func>
+    Class& def_static(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),false);
+    }
+
+    template <typename ChildType>
+    Class& inherit(){
+        _cls.inherit<C,ChildType>();
+        return *this;
+    }
+
+    template <typename... Args>
+    Class& construct(){
+        return def("__init__",[](Args... args){
+            return C(args...);
+        });
+    }
+
+    Class& def_property(const std::string& name,
+                        const Svar& fget,const Svar& fset=Svar(),
+                        const std::string& doc=""){
+      _cls.def_property(name,fget,fset,doc);
+      return *this;
+    }
+
+    template <typename E, typename D>
+    Class& def_readwrite(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readwrite() requires a class member (or base class member)");
+
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
+        fget.as<SvarFunction>().is_method=true;
+        fset.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, fset, doc);
+    }
+
+    template <typename E, typename D>
+    Class& def_readonly(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readonly() requires a class member (or base class member)");
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        fget.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, Svar(), doc);
+    }
+
+    SvarClass& _cls;
 };
 
 class SvarBuiltin{
