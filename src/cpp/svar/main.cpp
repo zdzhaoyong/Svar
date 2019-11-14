@@ -270,7 +270,7 @@ TEST(Svar,Class){
 
 TEST(Svar,GetSet){
     Svar var;
-    int& testInt=var.GetInt("testInt",20);
+    Svar testInt=var.get<Svar>("testInt",20);
     EXPECT_EQ(testInt,20);
     testInt=30;
     EXPECT_EQ(var.GetInt("testInt"),30);
@@ -321,21 +321,6 @@ TEST(Svar,Dump){
     std::cout<<Svar::lambda([](std::string sig){})<<std::endl;
     std::cout<<SvarClass::Class<int>();
     std::cout<<Svar::instance();
-}
-
-TEST(Svar,Iterator){
-    auto vec=Svar::array({1,2,3});
-    Svar arrayiter=vec.call("__iter__");
-    Svar next=arrayiter.classObject()["next"];
-    int i=0;
-    for(Svar it=next(arrayiter);!it.isUndefined();it=next(arrayiter)){
-        EXPECT_EQ(vec[i++],it);
-    }
-    i=0;
-    for(Svar it=arrayiter.call("next");!it.isUndefined();it=arrayiter.call("next"))
-    {
-        EXPECT_EQ(vec[i++],it);
-    }
 }
 
 TEST(Svar,Json){

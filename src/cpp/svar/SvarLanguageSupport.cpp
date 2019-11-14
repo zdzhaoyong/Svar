@@ -154,8 +154,8 @@ class SvarMapHolder{
 
   virtual std::string getStatsAsText(const size_t column_width = 80) {
       std::ostringstream ost;
-      std::string key_name=Svar::type_id<KeyType>();
-      std::string type_name=Svar::type_id<VarType>();
+      std::string key_name=SvarClass::Class<KeyType>().name();
+      std::string type_name=SvarClass::Class<VarType>().name();
       type_name="map<"+key_name+","+type_name+">";
       int gap=std::max<int>((column_width-type_name.size())/2-1,0);
       for(int i=0;i<gap;i++) ost<<'-';ost<<type_name;
@@ -291,8 +291,8 @@ class SvarConfigLanguage {
     svar_.Set("Svar.ParsingName", getBaseName(parsingFile));
     svar_.Set("Svar.ParsingFile", parsingFile);
     string buffer;
-    int& shouldParse = svar_.GetInt("Svar.NoReturn", 1);
-    while (getline(is, buffer) && shouldParse) {
+    Svar shouldParse = svar_.get<Svar>("Svar.NoReturn", 1);
+    while (getline(is, buffer) && shouldParse.as<int>()) {
       // Lines ending with '\' are taken as continuing on the next line.
       while (!buffer.empty() && buffer[buffer.length() - 1] == '\\') {
         string buffer2;
@@ -334,7 +334,7 @@ class SvarConfigLanguage {
     }
 
     std::string  current_tid=svar_.toString(std::this_thread::get_id());
-    std::string& parsing_tid=svar_.GetString("Svar.ParsingThreadId");
+    std::string  parsing_tid=svar_.GetString("Svar.ParsingThreadId");
     assert(current_tid==parsing_tid||parsing_tid.empty());
 
     fileQueue.push_back(sFileName);
@@ -355,7 +355,7 @@ class SvarConfigLanguage {
       svar_.erase("Svar.ParsingPath");
       svar_.erase("Svar.ParsingFile");
       parsingFile.clear();
-      parsing_tid.clear();
+      svar_.set("Svar.ParsingThreadId",std::string(""));
     }
     return ret;
   }

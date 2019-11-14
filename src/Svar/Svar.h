@@ -708,9 +708,7 @@ public:
     /// Force to return the children as type T, cast is performed,
     /// otherwise the old value will be droped and set to the value "def"
     template <typename T>
-    T& get(const std::string& name,T def,bool parse_dot=false);
-
-    Svar get(const std::string& name,Svar def,bool parse_dot=false);
+    T get(const std::string& name,T def,bool parse_dot=false);
 
     /// Set the child "name" to "create<T>(def)"
     template <typename T>
@@ -813,9 +811,6 @@ public:
     static Svar        loadFile(const std::string& file_path);
 
     template <typename T>
-    static std::string type_id();
-
-    template <typename T>
     static std::string toString(const T& v);
 
     /// Return the raw holder
@@ -825,18 +820,18 @@ public:
     Svar& getOrCreate(const std::string& name,bool parse_dot=false);// FIXME: Not thread safe
 
     template <typename T>
-    T& Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
+    T Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
 
     std::vector<std::string> ParseMain(int argc, char** argv){return parseMain(argc,argv);}
     bool ParseFile(const std::string& file_path){return parseFile(file_path);}
 
     template <typename T>
-    T& Get(const std::string& name,T def=T()){return get<T>(name,def);}
+    T Get(const std::string& name,T def=T()){return get<T>(name,def);}
     Svar Get(const std::string& name,Svar def=Svar()){return get(name,def);}
-    int& GetInt(const std::string& name,int def=0){return get<int>(name,def);}
-    double& GetDouble(const std::string& name,double def=0){return get<double>(name,def);}
-    std::string& GetString(const std::string& name,std::string def=""){return get<std::string>(name,def);}
-    void*& GetPointer(const std::string& name,void* def=nullptr){return get<void*>(name,def);}
+    int GetInt(const std::string& name,int def=0){return get<int>(name,def);}
+    double GetDouble(const std::string& name,double def=0){return get<double>(name,def);}
+    std::string GetString(const std::string& name,std::string def=""){return get<std::string>(name,def);}
+    void* GetPointer(const std::string& name,void* def=nullptr){return get<void*>(name,def);}
     template <typename T>
     void Set(const std::string& name,const T& def){return set<T>(name,def);}
     template <typename T>
@@ -1763,7 +1758,7 @@ void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... ext
     for(size_t i=0;i<types.size();i++)
         signature<<types[i].as<SvarClass>().name()<<(i+1==types.size()?"":",");
     signature<<")->";
-    signature<<Svar::type_id<Return>();
+    signature<<SvarClass::Class<Return>().name();
     this->signature=signature.str();
     this->arg_types=types;
     _func=[this,f](std::vector<Svar>& args)->Svar{
@@ -1797,13 +1792,6 @@ template <>
 inline std::string Svar::toString(const bool& def) {
   return def ? "true" : "false";
 }
-
-template <typename T>
-std::string Svar::type_id(){
-    return SvarClass::Class<T>().name();
-//    return typeName(typeid(T).name());
-}
-
 
 inline Svar::Svar(const std::initializer_list<Svar>& init)
     :Svar()
@@ -1968,7 +1956,7 @@ public:
         Svar cl=var.classObject();
         if(cl.isClass()){
             SvarClass& srcClass=cl.as<SvarClass>();
-            Svar cvt=srcClass._methods["__"+Svar::type_id<T>()+"__"];
+            Svar cvt=srcClass._methods["__"+SvarClass::Class<T>().name()+"__"];
             if(cvt.isFunction()){
                 Svar ret=cvt(var);
                 if(ret.is<T>()) return ret;
@@ -2021,7 +2009,7 @@ Svar::castAs()const
 {
     auto ret=cast<T>();
     if(!ret.template is<T>())
-        throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
+        throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
     return ret.template as<T>();// let compiler happy
 }
 
@@ -2029,7 +2017,7 @@ template <typename T>
 detail::enable_if_t<std::is_reference<T>::value,T&>
 Svar::castAs(){
     if(!is<typename std::remove_reference<T>::type>())
-        throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
+        throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
 
     return as<typename std::remove_reference<T>::type>();
 }
@@ -2052,7 +2040,7 @@ Svar::castAs(){
 
     auto ret=cast<T>();
     if(!ret.template is<T>())
-        throw SvarExeption("Unable cast "+typeName()+" to "+type_id<T>());
+        throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
     return ret.template as<T>();// let compiler happy
 }
 
@@ -2113,51 +2101,24 @@ inline Svar& Svar::operator[](const Svar& name){
     return *this;
 }
 
-inline Svar Svar::get(const std::string& name,Svar def,bool parse_dot)
-{
-    if(parse_dot){
-        auto idx = name.find_first_of(".");
-        if (idx != std::string::npos) {
-            return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def,parse_dot);
-        }
-    }
-
-    Svar var;
-
-    if(isUndefined())
-        *this=object();// force to be an object
-    else if(isObject())
-    {
-        var=as<SvarObject>()[name];
-    }
-    else throw SvarExeption("Can not get an item from "+typeName());
-
-    if(var.isUndefined()){
-        set(name,def);// value type changed
-        return def;
-    }
-    else return var;
-}
-
 template <typename T>
-T& Svar::get(const std::string& name,T def,bool parse_dot){
+T Svar::get(const std::string& name,T def,bool parse_dot){
     if(parse_dot){
         auto idx = name.find_first_of(".");
         if (idx != std::string::npos) {
             return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def,parse_dot);
         }
     }
-    Svar var;
 
-    if(isUndefined())
-        *this=object();// force to be an object
-    else if(isObject())
+    Svar var;
+    if(isObject())
     {
         var=as<SvarObject>()[name];
+        if(var.is<T>()) return var.as<T>();
     }
+    else if(isUndefined())
+        *this=object();// force to be an object
     else throw SvarExeption("Can not get an item from "+typeName());
-
-    if(var.is<T>()) return var.as<T>();
 
     if(!var.isUndefined()){
         Svar casted=var.cast<T>();
@@ -2310,9 +2271,9 @@ inline Svar& Svar::def(const std::string& name,Svar funcOrClass)
 inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   using namespace std;
   // save main cmd things
-  GetInt("argc") = argc;
+  set("argc",argc);
   set("argv",argv);
-  set("ProgramName",getFileName(argv[0]));
+  set("__name__",getFileName(argv[0]));
   auto setvar=[this](std::string s)->bool{
       // Execution failed. Maybe its an assignment.
       std::string::size_type n = s.find("=");
@@ -2406,7 +2367,7 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
       return f.good();
   };
   if(exist("conf")){
-      parseFile(Get<std::string>("conf"));
+      parseFile(get<std::string>("conf",""));
   }
   else
   for(auto& it:tries)
@@ -3412,26 +3373,6 @@ public:
         })
                 .def("__delitem__",&SvarArray::erase)
                 .def("__str__",[](Svar self){return Svar::toString(self.as<SvarArray>());})
-                .def("__iter__",[](Svar self)->Svar{
-            static Svar arrayinteratorClass;
-            if(!arrayinteratorClass.isClass()){
-                SvarClass* cls=new SvarClass("arrayiterator",typeid(SvarObject));
-                arrayinteratorClass=(SvarValue*)cls;
-                cls->def("next",[](Svar iter){
-                    Svar arrObj=iter["array"];
-                    SvarArray& array=arrObj.as<SvarArray>();
-                    int& index=iter.get<int>("index",0);
-                    if(index<(int)array.length()){
-                        return array[index++];
-                    }
-                    return Svar();
-                });
-            }
-            Svar iter=Svar::object({{"array",self},
-                                   {"index",0}});
-            iter.as<SvarObject>()._class=arrayinteratorClass;
-            return iter;
-        })
                 .def("__add__",[](Svar self,Svar other){
             return self.as<SvarArray>()+other;
         })
