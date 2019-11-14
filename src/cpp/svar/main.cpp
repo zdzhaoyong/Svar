@@ -241,7 +241,7 @@ TEST(Svar,Class){
             .def_static("create",&BaseClass::create)
             .def_static("create1",&BaseClass::create1)
             .def("intro",&BaseClass::intro);
-    Svar a=Svar::create(BaseClass(10));
+    Svar a=BaseClass(10);
     Svar baseClass=a.classObject();
     a=baseClass["__init__"](10);
     a=baseClass();//
@@ -258,7 +258,7 @@ TEST(Svar,Class){
             .def("__init__",[](int age,std::string name){return InheritClass(age,name);})
             .def("name",&InheritClass::name)
             .def("intro",&InheritClass::intro);
-    Svar b=Svar::create(InheritClass(10,"xm"));
+    Svar b=InheritClass(10,"xm");
     EXPECT_EQ(b.call("getAge").as<int>(),10);
     EXPECT_EQ(b.call("name").as<std::string>(),"xm");
     EXPECT_EQ(b.call("intro").as<std::string>(),InheritClass(10,"xm").intro());
@@ -317,7 +317,7 @@ TEST(Svar,Dump){
     Svar obj(std::map<std::string,int>({{"1",1}}));
     std::cout<<obj<<std::endl;
     std::cout<<Svar::array({1,2,3})<<std::endl;
-    std::cout<<Svar::create((std::type_index)typeid(1))<<std::endl;
+    std::cout<<Svar((std::type_index)typeid(1))<<std::endl;
     std::cout<<Svar::lambda([](std::string sig){})<<std::endl;
     std::cout<<SvarClass::Class<int>();
     std::cout<<Svar::instance();

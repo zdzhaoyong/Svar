@@ -617,13 +617,8 @@ public:
     Svar(Return (Class::*f)(arg...) const, const Extra&... extra);
 
     /// Create any other c++ type instance, T need to be a copyable type
-#if (__GNUC__>=5)||defined(__clang__)
-    template <class T>
-    static Svar create(T & t);
-#else
     template <class T>
     static Svar create(const T & t);
-#endif
 
     template <class T>
     static Svar create(T && t);
@@ -1343,27 +1338,6 @@ public:
         _var.erase(id);
     }
 
-    Svar iter(){
-        static Svar objectinteratorClass;
-        if(!objectinteratorClass.isClass()){
-            SvarClass* cls=new SvarClass("objectiterator",typeid(SvarObject));
-            objectinteratorClass=(SvarValue*)cls;
-            cls->def("next",[](Svar iter){
-                SvarObject* obj=iter.as<SvarObject>()["object"].as<SvarObject*>();
-                typedef std::map<std::string,Svar>::iterator Iter;
-                Iter it=iter.as<SvarObject>()["iter"].as<Iter>();
-                if(it!=obj->_var.end()){
-                    auto kv=*(it++);
-                    return Svar::array({kv.first,kv.second});
-                }
-                return Svar();
-            });
-        }
-        Svar iter=Svar::object({{"object",this},{"iter",Svar::create(_var.begin())}});
-        iter.as<SvarObject>()._class=objectinteratorClass;
-        return iter;
-    }
-
     friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
         if(rh._var.empty()) {
@@ -1833,50 +1807,19 @@ template <typename Return, typename Class, typename... Args, typename... Extra>
 Svar::Svar(Return (Class::*f)(Args...) const, const Extra&... extra)
     :_obj(std::make_shared<SvarFunction>(f,extra...)){}
 
-#if (__GNUC__>=5)||defined(__clang__)
-template <class T>
-inline Svar Svar::create(T & t)
-{
-    return (SvarValue*)new SvarValue_<typename std::remove_const<T>::type >(const_cast<T&>(t));
-}
 
-template <>
-inline Svar Svar::create<const Svar>(const Svar & t)
-{
-    return t;
-}
-
-template <>
-inline Svar Svar::create<Svar>(Svar & t)
-{
-    return t;
-}
-
-#else
 template <class T>
 inline Svar Svar::create(const T & t)
 {
-    return (SvarValue*)new SvarValue_<T>(t);
+    static_assert(!std::is_same<T,Svar>::value,"This should not happen.");
+    return (SvarValue*)new SvarValue_<T >(t);
 }
-
-template <>
-inline Svar Svar::create(const Svar & t)
-{
-    return t;
-}
-#endif
-
 
 template <class T>
 inline Svar Svar::create(T && t)
 {
+    static_assert(!std::is_same<T,Svar>::value,"This should not happen.");
     return (SvarValue*)new SvarValue_<typename std::remove_reference<T>::type>(std::move(t));
-}
-
-template <>
-inline Svar Svar::create<Svar>( Svar && t)
-{
-    return std::move(t);
 }
 
 inline Svar::Svar(const std::string& m)
@@ -2127,7 +2070,7 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
         }
     }
     else
-        var=Svar::create(def);
+        var=def;
     set(name,var);// value type changed
 
     return var.as<T>();
@@ -2169,7 +2112,7 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
         }
     }
     if(isUndefined()){
-        *this=object({{name,Svar::create(def)}});
+        *this=object({{name,def}});
         return;
     }
     assert(isObject());
@@ -2177,7 +2120,7 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
     if(var.is<T>())
         var.as<T>()=def;
     else
-        as<SvarObject>().set(name,Svar::create(def));
+        as<SvarObject>().set(name,def);
 }
 
 inline bool Svar::exist(const Svar& id)const
@@ -2390,7 +2333,7 @@ inline bool Svar::parseFile(const std::string& file_path)
 
 template <typename T>
 T Svar::arg(const std::string& name, T def, const std::string& help) {
-    Svar argInfo=array({name,Svar::create(def),help});
+    Svar argInfo=array({name,def,help});
     Svar& args=(*this)["__builtin__"]["args"];
     if(!args.isArray()) args=array();
     args.push_back(argInfo);
@@ -3387,7 +3330,6 @@ public:
                 .def("__getitem__",&SvarObject::operator [])
                 .def("__delitem__",&SvarObject::erase)
                 .def("__str__",[](Svar self){return Svar::toString(self.as<SvarObject>());})
-                .def("__iter__",&SvarObject::iter)
                 .def("update",&SvarObject::update);
 
         SvarClass::Class<SvarFunction>()
