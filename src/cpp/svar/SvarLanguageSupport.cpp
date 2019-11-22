@@ -305,6 +305,15 @@ class SvarConfigLanguage {
     return true;
   }
 
+  static std::string  getFileName(const std::string& path){
+      auto idx = std::string::npos;
+      if ((idx = path.find_last_of('/')) == std::string::npos)
+          idx = path.find_last_of('\\');
+      if (idx != std::string::npos)
+          return path.substr(idx + 1);
+      else
+          return path;
+  }
 
   static std::string getFolderPath(const std::string& path) {
     auto idx = std::string::npos;
@@ -317,7 +326,7 @@ class SvarConfigLanguage {
   }
 
   static std::string getBaseName(const std::string& path) {
-    std::string filename = Svar::getFileName(path);
+    std::string filename = getFileName(path);
     auto idx = filename.find_last_of('.');
     if (idx == std::string::npos)
       return filename;
@@ -348,7 +357,7 @@ class SvarConfigLanguage {
     if (fileQueue.size()) {
       parsingFile = fileQueue.back();
       svar_.Set("Svar.ParsingPath", getFolderPath(parsingFile));
-      svar_.Set("Svar.ParsingName", Svar::getFileName(parsingFile));
+      svar_.Set("Svar.ParsingName", getFileName(parsingFile));
       svar_.Set("Svar.ParsingFile", parsingFile);
     } else {
       svar_.erase("Svar.ParsingName");

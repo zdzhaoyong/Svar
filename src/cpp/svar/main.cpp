@@ -71,8 +71,12 @@ TEST(Svar,Function)
     int intV=0,srcV=0;
     Svar intSvar(0);
     // Svar argument is recommended
-    SvarFunction isBool([](Svar config){return config.is<bool>();});
+    SvarFunction isBool([](const Svar& config){return config.is<bool>();});
     EXPECT_TRUE(isBool.call(false).as<bool>());
+
+    SvarFunction refArg([](Svar& v){return v.is<int>();});
+    EXPECT_TRUE(refArg.call(1).as<bool>());
+
     // pointer
     Svar::lambda([](int* ref){*ref=10;})(&intV);
     Svar::lambda([](int* ref){*ref=10;})(intSvar);

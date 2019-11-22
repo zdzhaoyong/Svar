@@ -652,12 +652,6 @@ public:
     template <typename T>
     T& as();
 
-    /// Success: return a Svar holding T instance, Failed: return Undefined
-    template <typename T>
-    Svar cast()const;
-
-    Svar cast(const Svar& cls)const;
-
     /// No cast is performed, directly return the c++ pointer, throw SvarException when failed
     template <typename T>
     detail::enable_if_t<std::is_pointer<T>::value,T>
@@ -835,15 +829,6 @@ public:
         return set<T>(name,def);
     }
 
-    static std::string getFileName(const std::string& path) {
-      auto idx = std::string::npos;
-      if ((idx = path.find_last_of('/')) == std::string::npos)
-        idx = path.find_last_of('\\');
-      if (idx != std::string::npos)
-        return path.substr(idx + 1);
-      else
-        return path;
-    }
     std::shared_ptr<SvarValue> _obj;
 };
 
@@ -1054,7 +1039,6 @@ public:
         *dest=function;
         dest->as<SvarFunction>().is_method=isMethod;
         dest->as<SvarFunction>().name=__name__+"."+name;
-
 
         if(__init__.is<void>()&&name=="__init__") {
             __init__=function;
@@ -1924,64 +1908,50 @@ template <typename T>
 Svar::Svar(const T& var):Svar(caster<T>::to(var))
 {}
 
-inline Svar Svar::cast(const Svar& cls)const
-{
-    std::type_index tp=cls.as<SvarClass>()._cpptype;
-    if(is(tp)) return (*this);
-
-    Svar cl=_obj->classObject();
-    if(cl.isClass()){
-        SvarClass& srcClass=cl.as<SvarClass>();
-        Svar cvt=srcClass._methods["__"+std::string(tp.name())+"__"];
-        if(cvt.isFunction()){
-            Svar ret=cvt(*this);
-            if(ret.is(tp)) return ret;
-        }
-    }
-    return Undefined();
-}
-
-template <typename T>
-Svar Svar::cast()const{
-    return caster<T>::from(*this);
-}
-
 template <typename T>
 detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,T>
 Svar::castAs()const
 {
-    auto ret=cast<T>();
+    T* ptr=(T*)_obj->as(typeid(T));
+    if(ptr) return *ptr;
+    Svar ret=caster<T>::from(*this);
     if(!ret.template is<T>())
         throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
-    return ret.template as<T>();// let compiler happy
+    return ret.as<T>();
 }
 
 template <typename T>
 detail::enable_if_t<std::is_reference<T>::value,T&>
 Svar::castAs(){
-    if(!is<typename std::remove_reference<T>::type>())
+    typedef typename std::remove_const<typename std::remove_reference<T>::type>::type VarType;
+    if(!is<VarType>())
         throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
 
-    return as<typename std::remove_reference<T>::type>();
+    return as<VarType>();
 }
 
 template <typename T>
 detail::enable_if_t<std::is_pointer<T>::value,T>
 Svar::castAs(){
-    // nullptr
-    if(isNull()) return (T)nullptr;
-    // T* -> T*
-    if(is<T>()) return as<T>();
+    typedef typename std::remove_const<typename std::remove_pointer<T>::type>::type* rcptr;
+    typedef typename std::remove_pointer<T>::type rpt;
 
-    // T* -> T const*
-    if(is<typename std::remove_const<typename std::remove_pointer<T>::type>::type*>())
-        return as<typename std::remove_const<typename std::remove_pointer<T>::type>::type*>();
+    // T* -> T*
+    const void* ptr=_obj->as(typeid(T));
+    if(ptr) return *(T*)ptr;
 
     // T -> T*
-    if(is<typename std::remove_pointer<T>::type>())
-        return &as<typename std::remove_pointer<T>::type>();
+    ptr=_obj->as(typeid(rpt));
+    if(ptr) return (rpt*)ptr;
 
-    auto ret=cast<T>();
+    // T* -> T const*
+    ptr=_obj->as(typeid(rcptr));
+    if(ptr) return *(rcptr*)ptr;
+
+    // nullptr
+    if(isNull()) return (T)nullptr;
+
+    auto ret=caster<T>::from(*this);
     if(!ret.template is<T>())
         throw SvarExeption("Unable cast "+typeName()+" to "+SvarClass::Class<T>().name());
     return ret.template as<T>();// let compiler happy
@@ -2064,7 +2034,7 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     else throw SvarExeption("Can not get an item from "+typeName());
 
     if(!var.isUndefined()){
-        Svar casted=var.cast<T>();
+        Svar casted=caster<T>::from(var);
         if(casted.is<T>()){
             var=casted;
         }
@@ -2213,6 +2183,15 @@ inline Svar& Svar::def(const std::string& name,Svar funcOrClass)
 
 inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   using namespace std;
+    auto getFileName=[](const std::string& path) ->std::string {
+        auto idx = std::string::npos;
+        if ((idx = path.find_last_of('/')) == std::string::npos)
+            idx = path.find_last_of('\\');
+        if (idx != std::string::npos)
+            return path.substr(idx + 1);
+        else
+            return path;
+    };
   // save main cmd things
   set("argc",argc);
   set("argv",argv);
