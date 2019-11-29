@@ -340,6 +340,14 @@ TEST(Svar,Json){
     EXPECT_EQ(str,Json::dump(varCopy));
 }
 
+TEST(Svar,Iterator){
+    Svar var={1,2,3,4};
+    int i=0;
+    for(auto a:var) EXPECT_EQ(a,var[i++]);
+    Svar obj={{"1",1},{"2",2}};
+    for(std::pair<std::string,Svar> it:obj) EXPECT_EQ(obj[it.second],it.first);
+}
+
 TEST(Svar,Alias){
     Svar i=1;
     Svar alias=i;

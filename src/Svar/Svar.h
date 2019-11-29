@@ -808,6 +808,73 @@ public:
     /// This is dangerous since the returned Svar may be free by other threads, TAKE CARE!
     Svar& getOrCreate(const std::string& name,bool parse_dot=false);// FIXME: Not thread safe
 
+    struct svar_interator{
+        typedef std::vector<Svar>::iterator array_iter;
+        typedef std::map<std::string,Svar>::iterator    object_iter;
+        enum IterType{Object,Array,Others};
+
+        svar_interator(const array_iter& it)
+            : _it(new Svar(it)),_type(Array){ }
+        svar_interator(const object_iter& it)
+            : _it(new Svar(it)),_type(Object){}
+        svar_interator(const Svar& obj)
+            : _it(new Svar(obj)),_type(Others){}
+        ~svar_interator(){delete _it;}
+
+        Svar*  _it;
+        IterType  _type;
+
+        Svar operator *(){
+            switch (_type) {
+            case Object: return *_it->as<object_iter>();break;
+            case Array: return *_it->as<array_iter>();break;
+            default:  return *_it;
+            }
+        }
+
+        svar_interator& operator++()
+        {
+            switch (_type)
+            {
+            case Object: _it->as<object_iter>()++;break;
+            case Array: _it->as<array_iter>()++;break;
+            default: break;
+            }
+            return *this;
+        }
+
+        svar_interator& operator--(int)
+        {
+            switch (_type)
+            {
+            case Object: _it->as<object_iter>()--;break;
+            case Array: _it->as<array_iter>()--;break;
+            default: break;
+            }
+            return *this;
+        }
+
+        bool operator==(const svar_interator& other) const
+        {
+            switch (_type)
+            {
+            case Object: return _it->as<object_iter>()==other._it->as<object_iter>();
+            case Array: return _it->as<array_iter>()==other._it->as<array_iter>();
+            default: return _it==other._it;break;
+            }
+        }
+
+        bool operator!=(const svar_interator& other) const
+        {
+            return not operator==(other);
+        }
+    };
+
+    svar_interator begin();
+    svar_interator end();
+
+    operator std::pair<std::string,Svar>()const{return castAs<std::pair<const std::string,Svar>>();}
+
     template <typename T>
     T Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
 
@@ -2544,6 +2611,20 @@ inline Svar  Svar::loadFile(const std::string& file_path)
     return Svar::Undefined();
 }
 
+inline Svar::svar_interator Svar::begin()
+{
+    if(isObject()) return as<SvarObject>()._var.begin();
+    else if(isArray()) return as<SvarArray>()._var.begin();
+    return *this;
+}
+
+inline Svar::svar_interator Svar::end()
+{
+    if(isObject()) return as<SvarObject>()._var.end();
+    else if(isArray()) return as<SvarArray>()._var.end();
+    return *this;
+}
+
 inline const Svar&  SvarFunction::classObject()const{return SvarClass::instance<SvarFunction>();}
 
 inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
@@ -3377,6 +3458,8 @@ public:
 static SvarBuiltin SvarBuiltinInitializerinstance;
 #endif
 #endif
+
+
 
 }
 #endif
