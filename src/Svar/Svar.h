@@ -1856,7 +1856,10 @@ inline bool Svar::isDict()const{
 
 template <typename T>
 inline const T& Svar::as()const{
-    return *(T*)_obj->as(typeid(T));
+    T* ptr=(T*)_obj->as(typeid(T));
+    if(!ptr)
+        throw SvarExeption("Can not treat "+typeName()+" as "+SvarClass::Class<T>().name());
+    return *ptr;
 }
 
 template <>
@@ -1866,7 +1869,10 @@ inline const Svar& Svar::as<Svar>()const{
 
 template <typename T>
 T& Svar::as(){
-    return *(T*)_obj->as(typeid(T));
+    T* ptr=(T*)_obj->as(typeid(T));
+    if(!ptr)
+        throw SvarExeption("Can not treat "+typeName()+" as "+SvarClass::Class<T>().name());
+    return *ptr;
 }
 
 template <>

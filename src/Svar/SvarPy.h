@@ -230,12 +230,15 @@ struct SvarPy: public PyObject{
             convert=[](Svar src){return (PyObject*)SvarPy::getPyFunction(src);};
         else if(src.is<SvarClass>())
             convert=[](Svar src){ return (PyObject*)SvarPy::getPyClass(src);};
-        else if(src.is<SvarProperty>()){
+        else if(src.is<SvarClass::SvarProperty>()){
             convert=[](Svar src){return (PyObject*)SvarPy::getPyProperty(src);};
         }
         else convert=[](Svar src){
             PyTypeObject* py_class=getPyClass(src.classObject());
-            SvarPy* obj=(SvarPy*)py_class->tp_new(py_class,nullptr,nullptr);
+            PyObject *self = py_class->tp_alloc(py_class, 0);
+            SvarPy* obj = reinterpret_cast<SvarPy*>(self);
+
+//            SvarPy* obj=(SvarPy*)py_class->tp_new(py_class,nullptr,nullptr);
             obj->var=new Svar(src);
             return (PyObject*)obj;
         };
@@ -246,7 +249,7 @@ struct SvarPy: public PyObject{
     }
 
     static PyObject* getPyProperty(Svar src){
-      SvarProperty& property=src.as<SvarProperty>();
+      SvarClass::SvarProperty& property=src.as<SvarClass::SvarProperty>();
       PyObject *result = PyObject_Call((PyObject*)&PyProperty_Type,
                                        getPy({property._fget,property._fset,property._doc}),nullptr);
       if (!result){
@@ -356,6 +359,10 @@ struct SvarPy: public PyObject{
             return -1;
         };
 
+        auto init=[](PyObject *self, PyObject *, PyObject *)->int{
+            return 0;
+        };
+
         type->tp_repr = [](PyObject* obj){
             std::stringstream sst;
             sst<<"<"<<obj->ob_type->tp_name<<" object at "<<obj<<">";
@@ -385,7 +392,7 @@ struct SvarPy: public PyObject{
         {
             if(f.first=="__init__"){
                 Svar func_init=Svar::lambda([f](std::vector<Svar> args){
-                        SvarPy* self=args[0].as<SvarPy*>();
+                        SvarPy* self=(SvarPy*)args[0].as<PyObjectHolder>().obj;
                         std::vector<Svar> used_args(args.begin()+1,args.end());
                         Svar ret=f.second.as<SvarFunction>().Call(used_args);
                         self->var=new Svar(ret);
@@ -398,7 +405,8 @@ struct SvarPy: public PyObject{
                 PyObject_SetAttrString((PyObject*)type,"__init__",getPy(func_init));
                 continue;
             }
-            PyObject_SetAttrString((PyObject*)type,f.first.c_str(),getPy(f.second));
+            else
+                PyObject_SetAttrString((PyObject*)type,f.first.c_str(),getPy(f.second));
         }
 
         PyObject* capsule=PyCapsule_New(new Svar(var),nullptr,[](PyObject *o) {
