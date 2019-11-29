@@ -672,6 +672,7 @@ public:
     bool isFunction() const{return is<SvarFunction>();}
     bool isClass() const{return is<SvarClass>();}
     bool isException() const{return is<SvarExeption>();}
+    bool isProperty() const;
     bool isObject() const;
     bool isArray()const;
     bool isDict()const;
@@ -1362,21 +1363,11 @@ public:
 
     void set(const std::string &key,const Svar& value){
         std::unique_lock<std::mutex> lock(_mutex);
-        _var[key]=value;
-    }
-
-    void update(Svar rh){
-        if(!rh.isObject()) return;
-        std::unique_lock<std::mutex> lock(_mutex);
-        auto cp=rh.as<SvarObject>()._var;
-        for(auto it:cp){
-            auto old=_var.find(it.first);
-            if(old==_var.end())
-                _var[it.first]=it.second;
-            else if(old->second.isObject()&&it.second.isObject())
-                old->second.as<SvarObject>().update(it.second);
-            else old->second=it.second;
+        auto it=_var.find(key);
+        if(it==_var.end()){
+            _var.insert(std::make_pair(key,value));
         }
+        else it->second=value;
     }
 
     bool exist(const std::string& id)const{
@@ -1454,28 +1445,6 @@ public:
         while(std::getline(context,line)) ost<<"  "<<line<<std::endl;
         ost<<"]";
         return ost;
-    }
-
-    Svar operator+(Svar other){
-        std::unique_lock<std::mutex> lock(_mutex);
-        std::vector<Svar> ret=_var;
-        if(other.isArray()){
-            SvarArray& rh=other.as<SvarArray>();
-            std::unique_lock<std::mutex> lock(rh._mutex);
-            ret.insert(ret.end(),rh._var.begin(),rh._var.end());
-        }
-        else ret.push_back(other);
-        return Svar::array(ret);
-    }
-
-    void append(Svar other){
-        std::unique_lock<std::mutex> lock(_mutex);
-        _var.push_back(other);
-    }
-
-    void erase(int idx){
-        std::unique_lock<std::mutex> lock(_mutex);
-        _var.erase(_var.begin()+idx);
     }
 
     mutable std::mutex _mutex;
@@ -1909,6 +1878,10 @@ inline bool Svar::isNull()const{
     return Null()==(*this);
 }
 
+inline bool Svar::isProperty() const{
+    return is<SvarClass::SvarProperty>();
+}
+
 inline bool Svar::isObject() const{
     return std::dynamic_pointer_cast<SvarObject>(_obj)!=nullptr;
 }
@@ -2067,6 +2040,11 @@ inline Svar Svar::operator[](const Svar& i) const{
     if(cl.__getitem__.isFunction()){
         return cl.__getitem__((*this),i);
     }
+    if(!i.is<std::string>()) return Undefined();
+    Svar property=cl._methods[i.as<std::string>()];
+    if(property.isProperty()){
+        return property.as<SvarClass::SvarProperty>()._fget(*this);
+    }
     return Undefined();
 }
 
@@ -2202,8 +2180,9 @@ inline void Svar::erase(const Svar& id)
 
 inline void Svar::push_back(const Svar& rh)
 {
-    assert(isArray());
-    as<SvarArray>().append(rh);
+    SvarArray& self=as<SvarArray>();
+    std::unique_lock<std::mutex> lock(self._mutex);
+    self._var.push_back(rh);
 }
 
 template <typename... Args>
@@ -2379,7 +2358,7 @@ inline bool Svar::parseFile(const std::string& file_path)
     Svar var=loadFile(file_path);
     if(var.isUndefined()) return false;
     if(isUndefined()) {*this=var;return true;}
-    call("update",var);
+    *this=var+(*this);
     return true;
 }
 
@@ -3299,76 +3278,75 @@ public:
         SvarClass::Class<Svar>().setName("svar");
 
         SvarClass::Class<void>()
-                .def("__str__",[](Svar){return "Undefined";})
+                .def("__str__",[](const Svar&){return "Undefined";})
         .setName("void");
 
         SvarClass::Class<int>()
                 .def("__init__",&SvarBuiltin::int_create)
-                .def("__double__",[](int i){return (double)i;})
-                .def("__bool__",[](int i){return (bool)i;})
-                .def("__str__",[](int i){return Svar::toString(i);})
-                .def("__eq__",[](int self,int rh){return self==rh;})
-                .def("__lt__",[](int self,int rh){return self<rh;})
-                .def("__add__",[](int self,Svar rh)->Svar{
+                .def("__double__",[](int& i){return (double)i;})
+                .def("__bool__",[](int& i){return (bool)i;})
+                .def("__str__",[](int& i){return Svar::toString(i);})
+                .def("__eq__",[](int& self,int rh){return self==rh;})
+                .def("__lt__",[](int& self,int rh){return self<rh;})
+                .def("__add__",[](int& self,Svar& rh)->Svar{
             if(rh.is<int>()) return Svar(self+rh.as<int>());
             if(rh.is<double>()) return Svar(self+rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__sub__",[](int self,Svar rh)->Svar{
+                .def("__sub__",[](int self,Svar& rh)->Svar{
             if(rh.is<int>()) return Svar(self-rh.as<int>());
             if(rh.is<double>()) return Svar(self-rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__mul__",[](int self,Svar rh)->Svar{
+                .def("__mul__",[](int& self,Svar rh)->Svar{
             if(rh.is<int>()) return Svar(self*rh.as<int>());
             if(rh.is<double>()) return Svar(self*rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__div__",[](int self,Svar rh){
+                .def("__div__",[](int& self,Svar rh){
             if(rh.is<int>()) return Svar(self/rh.as<int>());
             if(rh.is<double>()) return Svar(self/rh.as<double>());
             return Svar::Undefined();
         })
-                .def("__mod__",[](int self,int rh){
+                .def("__mod__",[](int& self,int& rh){
             return self%rh;
         })
-                .def("__neg__",[](int self){return -self;})
-                .def("__xor__",[](int self,int rh){return self^rh;})
-                .def("__or__",[](int self,int rh){return self|rh;})
-                .def("__and__",[](int self,int rh){return self&rh;});
+                .def("__neg__",[](int& self){return -self;})
+                .def("__xor__",[](int& self,int& rh){return self^rh;})
+                .def("__or__",[](int& self,int& rh){return self|rh;})
+                .def("__and__",[](int& self,int& rh){return self&rh;});
 
         SvarClass::Class<bool>()
-                .def("__int__",[](bool b){return (int)b;})
-                .def("__double__",[](bool b){return (double)b;})
-                .def("__str__",[](bool b){return Svar::toString(b);})
-                .def("__eq__",[](bool self,bool rh){return self==rh;});
+                .def("__int__",[](bool& b){return (int)b;})
+                .def("__double__",[](bool& b){return (double)b;})
+                .def("__str__",[](bool& b){return Svar::toString(b);})
+                .def("__eq__",[](bool& self,bool& rh){return self==rh;});
 
         SvarClass::Class<double>()
-                .def("__int__",[](double d){return (int)d;})
-                .def("__bool__",[](double d){return (bool)d;})
-                .def("__str__",[](double d){return Svar::toString(d);})
-                .def("__eq__",[](double self,double rh){return self==rh;})
-                .def("__lt__",[](double self,double rh){return self<rh;})
-                .def("__neg__",[](double self){return -self;})
-                .def("__add__",[](double self,double rh){return self+rh;})
-                .def("__sub__",[](double self,double rh){return self-rh;})
-                .def("__mul__",[](double self,double rh){return self*rh;})
-                .def("__div__",[](double self,double rh){return self/rh;})
-                .def("__invert__",[](double self){return 1./self;});
+                .def("__int__",[](double& d){return (int)d;})
+                .def("__bool__",[](double& d){return (bool)d;})
+                .def("__str__",[](double& d){return Svar::toString(d);})
+                .def("__eq__",[](double& self,double rh){return self==rh;})
+                .def("__lt__",[](double& self,double rh){return self<rh;})
+                .def("__neg__",[](double& self){return -self;})
+                .def("__add__",[](double& self,double rh){return self+rh;})
+                .def("__sub__",[](double& self,double rh){return self-rh;})
+                .def("__mul__",[](double& self,double rh){return self*rh;})
+                .def("__div__",[](double& self,double rh){return self/rh;})
+                .def("__invert__",[](double& self){return 1./self;});
 
         SvarClass::Class<std::string>()
-                .def("__len__",[](const Svar& self){return self.as<std::string>().size();})
-                .def("__str__",[](Svar self){
+                .def("__len__",[](const std::string& self){return self.size();})
+                .def("__str__",[](const std::string& self){
             std::string out;
-            dump(self.as<std::string>(),out);
+            dump(self,out);
             return out;
         })
-                .def("__add__",[](const std::string& self,std::string rh){
-            std::cerr<<"added "<<self<<rh;
+                .def("__add__",[](const std::string& self,const std::string& rh){
             return self+rh;
         })
-                .def("__eq__",[](const std::string& self,std::string rh){return self==rh;})
-                .def("__lt__",[](const std::string& self,std::string rh){return self<rh;});
+                .def("__eq__",[](const std::string& self,std::string& rh){return self==rh;})
+                .def("__lt__",[](const std::string& self,std::string& rh){return self<rh;});
 
         SvarClass::Class<char const*>()
                 .def("__str__",[](char const* str){
@@ -3376,16 +3354,27 @@ public:
         });
 
         SvarClass::Class<SvarArray>()
-                .def("__getitem__",[](Svar self,int i){
-            SvarArray& array=self.as<SvarArray>();
-            return array[i];
+                .def("__getitem__",[](SvarArray& self,int& i){
+            return self[i];
         })
-                .def("__delitem__",&SvarArray::erase)
-                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarArray>());})
-                .def("__add__",[](Svar self,Svar other){
-            return self.as<SvarArray>()+other;
+                .def("__delitem__",[](SvarArray& self,const int& idx){
+            std::unique_lock<std::mutex> lock(self._mutex);
+            self._var.erase(self._var.begin()+idx);
         })
-                .def("append",&SvarArray::append);
+        .def("__str__",[](SvarArray& self){return Svar::toString(self);})
+        .def("__add__",[](const SvarArray& self,const SvarArray& other){
+            std::unique_lock<std::mutex> lock1(self._mutex);
+            std::unique_lock<std::mutex> lock2(other._mutex);
+            std::vector<Svar> ret(self._var);
+            ret.insert(ret.end(),other._var.begin(),other._var.end());
+            return ret;
+        })
+            .def("__mul__",[](const SvarArray& self,const int& num){
+            std::vector<Svar> ret;
+            for(int i=0;i<num;++i)
+                ret.insert(ret.end(),self._var.begin(),self._var.end());
+            return ret;
+        });
 
         SvarClass::Class<SvarDict>()
                 .def("__getitem__",&SvarDict::operator [])
@@ -3395,11 +3384,18 @@ public:
         SvarClass::Class<SvarObject>()
                 .def("__getitem__",&SvarObject::operator [])
                 .def("__delitem__",&SvarObject::erase)
-                .def("__str__",[](Svar self){return Svar::toString(self.as<SvarObject>());})
-                .def("update",&SvarObject::update);
+                .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
+                .def("__add__",[](const SvarObject& self,const SvarObject& rh){
+            std::unique_lock<std::mutex> lock1(self._mutex);
+            std::unique_lock<std::mutex> lock2(rh._mutex);
+            auto ret=self._var;
+            for(auto it:rh._var){
+                if(ret.find(it.first)==ret.end())
+                    ret.insert(it);
+            }});
 
         SvarClass::Class<SvarFunction>()
-                .def("__doc__",[](Svar self){return Svar::toString(self.as<SvarFunction>());});
+                .def("__doc__",[](SvarFunction& self){return Svar::toString(self);});
 
         SvarClass::Class<SvarClass>()
                 .def("__getitem__",[](SvarClass& self,const std::string& i)->Svar{return self[i];})
@@ -3413,7 +3409,7 @@ public:
         Svar::instance()["__builtin__"]["version"]=SVAR_VERSION;
     }
 
-    static Svar int_create(Svar rh){
+    static Svar int_create(const Svar& rh){
         if(rh.is<int>()) return rh;
         if(rh.is<std::string>()) return (Svar)std::atoi(rh.as<std::string>().c_str());
         if(rh.is<double>()) return (Svar)(int)rh.as<double>();
