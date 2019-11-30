@@ -2144,7 +2144,7 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
     if(parse_dot){
         auto idx = name.find(".");
         if (idx != std::string::npos) {
-            return (*this)[name.substr(0, idx)].set(name.substr(idx + 1), def);
+            return (*this)[name.substr(0, idx)].set(name.substr(idx + 1), def, parse_dot);
         }
     }
     if(isUndefined()){
@@ -2215,7 +2215,12 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   set("argc",argc);
   set("argv",argv);
   set("__name__",getFileName(argv[0]));
-  auto setvar=[this](std::string s)->bool{
+  auto setjson=[this](std::string name,std::string json){
+    Svar v=parse_json(json);
+    if(v.isUndefined()) set(name,json,true);
+    else set(name,v,true);
+  };
+  auto setvar=[this,setjson](std::string s)->bool{
       // Execution failed. Maybe its an assignment.
       std::string::size_type n = s.find("=");
       bool shouldOverwrite = true;
@@ -2250,7 +2255,7 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
           } else
             val = "";
 
-          set(var, val);
+          setjson(var, val);
           return true;
         }
       }
@@ -2278,17 +2283,17 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
     }
 
     if (i + 1 >= argc) {
-      set(str, true);
+      set(str, true,true);
       continue;
     }
     string str2 = argv[i + 1];
     if (str2.front() == '-') {
-      set(str, true);
+      set(str, true,true);
       continue;
     }
 
     i++;
-    set<std::string>(str, argv[i]);
+    setjson(str, argv[i]);
     continue;
   }
 
@@ -2335,7 +2340,7 @@ T Svar::arg(const std::string& name, T def, const std::string& help) {
     Svar& args=(*this)["__builtin__"]["args"];
     if(!args.isArray()) args=array();
     args.push_back(argInfo);
-    return get(name,def);
+    return get(name,def,true);
 }
 
 inline std::string Svar::helpInfo()
@@ -2387,7 +2392,7 @@ inline std::string Svar::helpInfo()
       std::stringstream defset;
       Svar def    = info[1];
       std::string name=info[0].castAs<std::string>();
-      Svar setted = get(name,Svar::Undefined());
+      Svar setted = get(name,Svar::Undefined(),true);
       if(setted.isUndefined()||def==setted) defset<<def;
       else defset<<def<<"->"<<setted;
       std::string status = def.typeName() + "(" + defset.str() + ")";
@@ -2842,7 +2847,13 @@ public:
 
 private:
     Json(const std::string& str_input, JsonParse parse_strategy=STANDARD)
-        :str(str_input),i(0),failed(false),strategy(parse_strategy){}
+        :str(str_input),i(0),failed(false),strategy(parse_strategy){
+        for(int i=0;i<128;i++) {invalidmask[i]=0;namemask[i]=0;}
+        for(char c='0';c<='9';c++) namemask[c]=1;
+        for(char c='A';c<='Z';c++) namemask[c]=2;
+        for(char c='a';c<'z';c++) namemask[c]=2;
+        namemask['_']=2;
+    }
 
     std::string str;
     size_t i;
@@ -2850,6 +2861,7 @@ private:
     bool failed;
     const JsonParse strategy;
     const int max_depth = 200;
+    int   invalidmask[128],namemask[128];
 
     /// fail(msg, err_ret = Json())
     Svar fail(std::string &&msg) {
@@ -3114,6 +3126,13 @@ private:
         return std::strtod(str.c_str() + start_pos, nullptr);
     }
 
+    std::string parse_name(){
+        size_t start_i=i-1;
+        while(i<str.size()&&namemask[str[i]]>=1)++i;
+        std::string ret=str.substr(start_i,i-start_i);
+        return ret;
+    }
+
     /// Expect that 'str' starts at the character that was just read. If it does, advance
     /// the input and return res. If not, flag an error.
     Svar expect(const std::string &expected, Svar res) {
@@ -3122,7 +3141,10 @@ private:
         if (str.compare(i, expected.length(), expected) == 0) {
             i += expected.length();
             return res;
-        } else {
+        } else if (namemask[str[i++]]>=2){
+            return parse_name();
+        }
+        else{
             return fail("parse error: expected " + expected + ", got " + str.substr(i, expected.length()));
         }
     }
@@ -3161,10 +3183,15 @@ private:
                 return data;
 
             while (1) {
-                if (ch != '"')
+                std::string key;
+                if (ch == '"')
+                    key = parse_string();
+                else if (namemask[ch]>=2){
+                    key = parse_name();
+                }
+                else
                     return fail("expected '\"' in object, got " + esc(ch));
 
-                std::string key = parse_string();
                 if (failed)
                     return Svar();
 
@@ -3218,6 +3245,10 @@ private:
                     break;
             }
             return Svar();
+        }
+
+        if (namemask[ch]>=2){
+            return parse_name();
         }
 
         return fail("expected value, got " + esc(ch));

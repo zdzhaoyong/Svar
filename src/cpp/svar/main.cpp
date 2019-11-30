@@ -343,9 +343,12 @@ TEST(Svar,Json){
     var.set("b",false);
     var.set("l",Svar::array({1,2,3}));
     var.set("m",Svar::object({{"a",1},{"b",false}}));
-    std::string str=Json::dump(var);
-    Svar varCopy=Json::load(str);
-//    EXPECT_EQ(str,Json::dump(varCopy));
+    std::string str=var.dump_json();
+    Svar varCopy=Svar::parse_json(str);
+
+    Svar v1=Svar::parse_json("{a:1,b:true}");
+    EXPECT_EQ(v1["a"],1);
+    EXPECT_EQ(v1["b"],true);
 }
 
 TEST(Svar,Iterator){
@@ -453,6 +456,8 @@ int main(int argc,char** argv){
     var.arg<std::string>("key","","The name in the module wanna to show");
     bool tests=var.arg("tests",false,"Perform google tests.");
     bool dumpVar=var.arg("dumpVar",false,"DumpVar");
+    var.arg("tree.arg",256,"tryout tree like argument");
+    Svar obj=var.arg("object",Svar(),"object parameter");
 
     if(var.get("help",false)||argc<2){
         return var.help();
