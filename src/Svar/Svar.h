@@ -1109,14 +1109,14 @@ public:
         return *this;
     }
 
-    Svar& operator [](const std::string& name){
+    Svar operator [](const std::string& name){
         Svar& c=_attr[name];
-//        if(!c.isUndefined())  return c;
-//        for(Svar& p:_parents)
-//        {
-//            c=p.as<SvarClass>()[name];
-//            if(!c.isUndefined()) return c;
-//        }
+        if(!c.isUndefined())  return c;
+        for(Svar& p:_parents)
+        {
+            c=p.as<SvarClass>()[name];
+            if(!c.isUndefined()) return c;
+        }
         return c;
     }
 
@@ -2103,8 +2103,6 @@ inline Svar& Svar::operator[](const Svar& name){
         return as<SvarArray>()._var[name.castAs<int>()];
     else if(isDict())
         return as<SvarDict>()._var[name];
-    else if(isClass())
-        return as<SvarClass>()[name.castAs<std::string>()];
     throw SvarExeption(typeName()+": Operator [] can't be used as a lvalue.");
     return *this;
 }
@@ -2789,6 +2787,20 @@ class caster<char[sz]>{
 public:
     static Svar to(const char* v){
         return Svar(std::string(v));
+    }
+};
+
+template <>
+class caster<const char*>{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::string>())
+            return Svar::create(var.as<std::string>().c_str());
+        return Svar();
+    }
+
+    static Svar to(const char* v){
+        return std::string(v);
     }
 };
 

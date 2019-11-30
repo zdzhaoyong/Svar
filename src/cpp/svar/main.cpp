@@ -247,7 +247,6 @@ TEST(Svar,Class){
             .def("intro",&BaseClass::intro);
     Svar a=BaseClass(10);
     Svar baseClass=a.classObject();
-    a=baseClass["__init__"](10);
     a=baseClass();//
     a=baseClass(10);//
     EXPECT_EQ(a.call("getAge").as<int>(),10);
