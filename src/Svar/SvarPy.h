@@ -271,7 +271,7 @@ struct SvarPy: public PyObject{
         func->ml_flags = METH_VARARGS| METH_KEYWORDS ;
         if(svar_func.is_constructor)
             func->ml_flags|=METH_CLASS;
-        func->ml_doc=svar_func.signature.c_str();
+        func->ml_doc=svar_func.signature().c_str();
 
         func->ml_meth = [](PyObject *capsule, PyObject *args)->PyObject*{
             Svar* func=(Svar*)PyCapsule_GetPointer(capsule,nullptr);
@@ -401,7 +401,7 @@ struct SvarPy: public PyObject{
             });
                 func_init.as<SvarFunction>().is_constructor=true;
                 func_init.as<SvarFunction>().is_method=true;
-                func_init.as<SvarFunction>().signature=f.second.as<SvarFunction>().signature;
+                func_init.as<SvarFunction>().arg_types=f.second.as<SvarFunction>().arg_types;
                 PyObject_SetAttrString((PyObject*)type,"__init__",getPy(func_init));
                 continue;
             }

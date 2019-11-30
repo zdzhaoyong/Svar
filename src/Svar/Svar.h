@@ -925,7 +925,7 @@ public:
         const SvarFunction* overload=this;
         std::vector<SvarExeption> catches;
         for(;true;overload=&overload->next.as<SvarFunction>()){
-            if(do_argcheck&&overload->arg_types.size()!=argv.size())
+            if(do_argcheck&&overload->arg_types.size()!=argv.size()+1)
             {
                 if(!overload->next.isFunction()) {
                     overload=nullptr;break;
@@ -986,11 +986,13 @@ public:
         return Svar(f(std::get<Is>(castedArgs)...));
     }
 
+    std::string signature()const;
+
     friend std::ostream& operator<<(std::ostream& sst,const SvarFunction& self){
         sst<<self.getName()<<"(...)\n";
         const SvarFunction* overload=&self;
         while(overload){
-            sst<<"    "<<overload->getName()<<overload->signature<<std::endl;
+            sst<<"    "<<overload->getName()<<overload->signature()<<std::endl;
             if(!overload->next.isFunction()) {
                 return sst;
             }
@@ -1002,7 +1004,7 @@ public:
     std::string getName()const{return name.empty()?"function":name;}
     void        initName(const std::string& nm){if(name.empty()) name=nm;}
 
-    std::string   name,signature;
+    std::string   name;
     std::vector<Svar> arg_types;
     Svar          next;
 
@@ -1037,7 +1039,7 @@ public:
         Svar* dest=&_methods[name];
         while(dest->isFunction())
         {
-            if(dest->as<SvarFunction>().signature==function.as<SvarFunction>().signature)
+            if(dest->as<SvarFunction>().signature()==function.as<SvarFunction>().signature())
                 return *this;
             dest=&dest->as<SvarFunction>().next;
         }
@@ -1207,6 +1209,84 @@ public:
     std::type_index _cpptype;
     Svar _methods,_attr;
     std::vector<Svar> _parents;
+};
+
+template <typename C>
+class Class
+{
+public:
+    Class(SvarClass& cls):_cls(cls){}
+
+    Class():_cls(SvarClass::Class<C>()){}
+
+    Class(const std::string& name)
+        :_cls(SvarClass::Class<C>()){
+        _cls.setName(name);
+        svar[name]=SvarClass::instance<C>();
+    }
+
+    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
+    {
+        _cls.def(name,function,isMethod);
+        return *this;
+    }
+
+    Class& def_static(const std::string& name,const Svar& function)
+    {
+        return def(name,function,false);
+    }
+
+    template <typename Func>
+    Class& def(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),true);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func>
+    Class& def_static(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),false);
+    }
+
+    template <typename ChildType>
+    Class& inherit(){
+        _cls.inherit<C,ChildType>();
+        return *this;
+    }
+
+    template <typename... Args>
+    Class& construct(){
+        return def("__init__",[](Args... args){
+            return C(args...);
+        });
+    }
+
+    Class& def_property(const std::string& name,
+                        const Svar& fget,const Svar& fset=Svar(),
+                        const std::string& doc=""){
+      _cls.def_property(name,fget,fset,doc);
+      return *this;
+    }
+
+    template <typename E, typename D>
+    Class& def_readwrite(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readwrite() requires a class member (or base class member)");
+
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
+        fget.as<SvarFunction>().is_method=true;
+        fset.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, fset, doc);
+    }
+
+    template <typename E, typename D>
+    Class& def_readonly(const std::string& name, D E::*pm, const std::string& doc="") {
+        static_assert(std::is_base_of<E, C>::value, "def_readonly() requires a class member (or base class member)");
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        fget.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, Svar(), doc);
+    }
+
+    SvarClass& _cls;
 };
 
 class SvarBuffer
@@ -1709,19 +1789,22 @@ inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<
 template <typename Func, typename Return, typename... Args, typename... Extra>
 void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... extra)
 {
-    std::vector<Svar> types={SvarClass::instance<Args>()...};
-    std::stringstream signature;signature<<"(";
-    for(size_t i=0;i<types.size();i++)
-        signature<<types[i].as<SvarClass>().name()<<(i+1==types.size()?"":",");
-    signature<<")->";
-    signature<<SvarClass::Class<Return>().name();
-    this->signature=signature.str();
-    this->arg_types=types;
+    this->arg_types={SvarClass::instance<Return>(),SvarClass::instance<Args>()...};
     _func=[this,f](std::vector<Svar>& args)->Svar{
         using indices = detail::make_index_sequence<sizeof...(Args)>;
         return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
     };
     is_constructor=false;
+}
+
+inline std::string SvarFunction::signature()const{
+    std::stringstream sst;
+    sst<<"(";
+    for(size_t i=1;i<arg_types.size();i++)
+        sst<<arg_types[i].as<SvarClass>().name()<<(i+1==arg_types.size()?"":",");
+    sst<<")->";
+    sst<<arg_types[0].as<SvarClass>().name();
+    return sst.str();
 }
 
 template <typename T>
@@ -3128,84 +3211,6 @@ private:
 
         return fail("expected value, got " + esc(ch));
     }
-};
-
-template <typename C>
-class Class
-{
-public:
-    Class(SvarClass& cls):_cls(cls){}
-
-    Class():_cls(SvarClass::Class<C>()){}
-
-    Class(const std::string& name)
-        :_cls(SvarClass::Class<C>()){
-        _cls.setName(name);
-        svar[name]=SvarClass::instance<C>();
-    }
-
-    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
-    {
-        _cls.def(name,function,isMethod);
-        return *this;
-    }
-
-    Class& def_static(const std::string& name,const Svar& function)
-    {
-        return def(name,function,false);
-    }
-
-    template <typename Func>
-    Class& def(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),true);
-    }
-
-    /// Construct a cpp_function from a lambda function (possibly with internal state)
-    template <typename Func>
-    Class& def_static(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),false);
-    }
-
-    template <typename ChildType>
-    Class& inherit(){
-        _cls.inherit<C,ChildType>();
-        return *this;
-    }
-
-    template <typename... Args>
-    Class& construct(){
-        return def("__init__",[](Args... args){
-            return C(args...);
-        });
-    }
-
-    Class& def_property(const std::string& name,
-                        const Svar& fget,const Svar& fset=Svar(),
-                        const std::string& doc=""){
-      _cls.def_property(name,fget,fset,doc);
-      return *this;
-    }
-
-    template <typename E, typename D>
-    Class& def_readwrite(const std::string& name, D E::*pm, const std::string& doc="") {
-        static_assert(std::is_base_of<E, C>::value, "def_readwrite() requires a class member (or base class member)");
-
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
-        fget.as<SvarFunction>().is_method=true;
-        fset.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, fset, doc);
-    }
-
-    template <typename E, typename D>
-    Class& def_readonly(const std::string& name, D E::*pm, const std::string& doc="") {
-        static_assert(std::is_base_of<E, C>::value, "def_readonly() requires a class member (or base class member)");
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        fget.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, Svar(), doc);
-    }
-
-    SvarClass& _cls;
 };
 
 class SvarBuiltin{
