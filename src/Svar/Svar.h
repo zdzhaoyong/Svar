@@ -1010,6 +1010,205 @@ public:
     bool          is_method,is_constructor,do_argcheck=true;
 };
 
+class SvarClass{
+public:
+
+    class SvarProperty{
+    public:
+      SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
+        :_fget(fget),_fset(fset),_name(name),_doc(doc){}
+
+      Svar _fget,_fset;
+      std::string _name,_doc;
+    };
+
+    SvarClass(const std::string& name,std::type_index cpp_type,
+              std::vector<Svar> parents={})
+        : __name__(name),_cpptype(cpp_type),
+          _methods(Svar::object()),_attr(Svar::object()),
+          _parents(parents){}
+
+    std::string name()const{return __name__;}
+    void     setName(const std::string& nm){__name__=nm;}
+
+    SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
+    {
+        assert(function.isFunction());
+        Svar* dest=&_methods[name];
+        while(dest->isFunction())
+        {
+            if(dest->as<SvarFunction>().signature==function.as<SvarFunction>().signature)
+                return *this;
+            dest=&dest->as<SvarFunction>().next;
+        }
+        *dest=function;
+        dest->as<SvarFunction>().is_method=isMethod;
+        dest->as<SvarFunction>().name=__name__+"."+name;
+
+        if(__init__.is<void>()&&name=="__init__") {
+            __init__=function;
+            dest->as<SvarFunction>().is_constructor=true;
+        }
+        if(__str__.is<void>()&&name=="__str__") __str__=function;
+        if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
+        if(__setitem__.is<void>()&&name=="__setitem__") __setitem__=function;
+        return *this;
+    }
+
+    SvarClass& def_static(const std::string& name,const Svar& function)
+    {
+        return def(name,function,false);
+    }
+
+    template <typename Func>
+    SvarClass& def(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),true);
+    }
+
+    /// Construct a cpp_function from a lambda function (possibly with internal state)
+    template <typename Func>
+    SvarClass& def_static(const std::string& name,Func &&f){
+        return def(name,Svar::lambda(f),false);
+    }
+
+    SvarClass& def_property(const std::string& name,
+                            const Svar& fget,const Svar& fset=Svar(),
+                            const std::string& doc=""){
+        _methods[name]=SvarProperty(fget,fset,name,doc);
+        return *this;
+    }
+
+    template <typename C, typename D>
+    SvarClass& def_readwrite(const std::string& name, D C::*pm, const std::string& doc="") {
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
+        fget.as<SvarFunction>().is_method=true;
+        fset.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, fset, doc);
+    }
+
+    template <typename C, typename D>
+    SvarClass& def_readonly(const std::string& name, D C::*pm, const std::string& doc="") {
+        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
+        fget.as<SvarFunction>().is_method=true;
+        return def_property(name, fget, Svar(), doc);
+    }
+
+    template <typename Base,typename ChildType>
+    SvarClass& inherit(){
+        Svar base={SvarClass::instance<Base>(),
+                   Svar::lambda([](ChildType* v){
+                       return dynamic_cast<Base*>(v);
+                   })};
+        _parents.push_back(base);
+        return *this;
+    }
+
+    SvarClass& inherit(std::vector<Svar> parents={}){
+        _parents=parents;
+        return *this;
+    }
+
+    Svar& operator [](const std::string& name){
+        Svar& c=_methods[name];
+//        if(!c.isUndefined())  return c;
+//        for(Svar& p:_parents)
+//        {
+//            c=p.as<SvarClass>()[name];
+//            if(!c.isUndefined()) return c;
+//        }
+        return c;
+    }
+
+    template <typename... Args>
+    Svar call(const Svar& inst,const std::string function, Args... args)const
+    {
+        Svar f=_methods[function];
+        if(f.isFunction())
+        {
+            SvarFunction& func=f.as<SvarFunction>();
+            if(func.is_method)
+                return func.call(inst,args...);
+            else return func.call(args...);
+        }
+
+        for(const Svar& p:_parents){
+            try{
+                if(p.isClass()){
+                    return p.as<SvarClass>().call(inst,function,args...);
+                }
+                return p[0].as<SvarClass>().call(p[1](inst),function,args...);
+            }
+            catch(SvarExeption e){
+                continue;
+            }
+        }
+        throw SvarExeption("Class "+__name__+" has no function "+function);
+        return Svar::Undefined();
+    }
+
+        Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
+        {
+            Svar f=_methods[function];
+            if(f.isFunction())
+            {
+                SvarFunction& func=f.as<SvarFunction>();
+                if(func.is_method){
+                    args.insert(args.begin(),inst);
+                    return func.Call(args);
+                }
+                else return func.Call(args);
+            }
+
+            for(const Svar& p:_parents){
+                try{
+                    if(p.isClass()){
+                        return p.as<SvarClass>().Call(inst,function,args);
+                    }
+                    return p[0].as<SvarClass>().Call(p[1](inst),function,args);
+                }
+                catch(SvarExeption e){
+                    continue;
+                }
+            }
+            throw SvarExeption("Class "+__name__+" has no function "+function);
+            return Svar::Undefined();
+        }
+
+    template <typename T>
+    static Svar& instance()
+    {
+        static Svar cl;
+        if(cl.isClass()) return cl;
+    #ifdef __GNUC__
+        int status;
+        char* realname = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
+        std::string result(realname);
+        free(realname);
+    #else
+        std::string result(typeid(T).name());
+    #endif
+        cl=SvarClass(result,typeid(T));
+        return cl;
+    }
+
+    template <typename T>
+    static SvarClass& Class(){
+        Svar& inst=instance<T>();
+        return inst.as<SvarClass>();
+    }
+
+    friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
+
+    /// buildin functions
+    Svar __init__,__str__,__getitem__,__setitem__;
+
+    std::string  __name__,__doc__;
+    std::type_index _cpptype;
+    Svar _methods,_attr;
+    std::vector<Svar> _parents;
+};
+
 class SvarBuffer
 {
 public:
@@ -1280,212 +1479,6 @@ public:
     virtual const Svar&     classObject()const;
     virtual size_t          length() const {return 0;}
     virtual Svar            clone(int depth=0)const{return Svar();}
-};
-
-class SvarClass: public SvarValue{
-public:
-
-    class SvarProperty{
-    public:
-      SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
-        :_fget(fget),_fset(fset),_name(name),_doc(doc){}
-
-      Svar _fget,_fset;
-      std::string _name,_doc;
-    };
-
-    SvarClass(const std::string& name,std::type_index cpp_type,
-              std::vector<Svar> parents={})
-        : __name__(name),_cpptype(cpp_type),
-          _methods(Svar::object()),_attr(Svar::object()),
-          _parents(parents){}
-
-    virtual const void*     as(const TypeID& tp)const{
-        if(tp==typeid(SvarClass)) return this;
-        else return nullptr;
-    }
-
-    virtual const Svar&     classObject()const{return instance<SvarClass>();}
-
-    std::string name()const{return __name__;}
-    void     setName(const std::string& nm){__name__=nm;}
-
-    SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
-    {
-        assert(function.isFunction());
-        Svar* dest=&_methods[name];
-        while(dest->isFunction())
-        {
-            if(dest->as<SvarFunction>().signature==function.as<SvarFunction>().signature)
-                return *this;
-            dest=&dest->as<SvarFunction>().next;
-        }
-        *dest=function;
-        dest->as<SvarFunction>().is_method=isMethod;
-        dest->as<SvarFunction>().name=__name__+"."+name;
-
-        if(__init__.is<void>()&&name=="__init__") {
-            __init__=function;
-            dest->as<SvarFunction>().is_constructor=true;
-        }
-        if(__str__.is<void>()&&name=="__str__") __str__=function;
-        if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
-        if(__setitem__.is<void>()&&name=="__setitem__") __setitem__=function;
-        return *this;
-    }
-
-    SvarClass& def_static(const std::string& name,const Svar& function)
-    {
-        return def(name,function,false);
-    }
-
-    template <typename Func>
-    SvarClass& def(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),true);
-    }
-
-    /// Construct a cpp_function from a lambda function (possibly with internal state)
-    template <typename Func>
-    SvarClass& def_static(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),false);
-    }
-
-    SvarClass& def_property(const std::string& name,
-                            const Svar& fget,const Svar& fset=Svar(),
-                            const std::string& doc=""){
-        _methods[name]=SvarProperty(fget,fset,name,doc);
-        return *this;
-    }
-
-    template <typename C, typename D>
-    SvarClass& def_readwrite(const std::string& name, D C::*pm, const std::string& doc="") {
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        Svar fset=SvarFunction([pm](C &c, const D &value) { c.*pm = value;});
-        fget.as<SvarFunction>().is_method=true;
-        fset.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, fset, doc);
-    }
-
-    template <typename C, typename D>
-    SvarClass& def_readonly(const std::string& name, D C::*pm, const std::string& doc="") {
-        Svar fget=SvarFunction([pm](const C &c) -> const D &{ return c.*pm; });
-        fget.as<SvarFunction>().is_method=true;
-        return def_property(name, fget, Svar(), doc);
-    }
-
-    template <typename Base,typename ChildType>
-    SvarClass& inherit(){
-        Svar base={SvarClass::instance<Base>(),
-                   Svar::lambda([](ChildType* v){
-                       return dynamic_cast<Base*>(v);
-                   })};
-        _parents.push_back(base);
-        return *this;
-    }
-
-    SvarClass& inherit(std::vector<Svar> parents={}){
-        _parents=parents;
-        return *this;
-    }
-
-    Svar& operator [](const std::string& name){
-        Svar& c=_methods[name];
-//        if(!c.isUndefined())  return c;
-//        for(Svar& p:_parents)
-//        {
-//            c=p.as<SvarClass>()[name];
-//            if(!c.isUndefined()) return c;
-//        }
-        return c;
-    }
-
-    template <typename... Args>
-    Svar call(const Svar& inst,const std::string function, Args... args)const
-    {
-        Svar f=_methods[function];
-        if(f.isFunction())
-        {
-            SvarFunction& func=f.as<SvarFunction>();
-            if(func.is_method)
-                return func.call(inst,args...);
-            else return func.call(args...);
-        }
-
-        for(const Svar& p:_parents){
-            try{
-                if(p.isClass()){
-                    return p.as<SvarClass>().call(inst,function,args...);
-                }
-                return p[0].as<SvarClass>().call(p[1](inst),function,args...);
-            }
-            catch(SvarExeption e){
-                continue;
-            }
-        }
-        throw SvarExeption("Class "+__name__+" has no function "+function);
-        return Svar::Undefined();
-    }
-
-        Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
-        {
-            Svar f=_methods[function];
-            if(f.isFunction())
-            {
-                SvarFunction& func=f.as<SvarFunction>();
-                if(func.is_method){
-                    args.insert(args.begin(),inst);
-                    return func.Call(args);
-                }
-                else return func.Call(args);
-            }
-
-            for(const Svar& p:_parents){
-                try{
-                    if(p.isClass()){
-                        return p.as<SvarClass>().Call(inst,function,args);
-                    }
-                    return p[0].as<SvarClass>().Call(p[1](inst),function,args);
-                }
-                catch(SvarExeption e){
-                    continue;
-                }
-            }
-            throw SvarExeption("Class "+__name__+" has no function "+function);
-            return Svar::Undefined();
-        }
-
-    template <typename T>
-    static Svar& instance()
-    {
-        static Svar cl;
-        if(cl.isClass()) return cl;
-    #ifdef __GNUC__
-        int status;
-        char* realname = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
-        std::string result(realname);
-        free(realname);
-    #else
-        std::string result(typeid(T).name());
-    #endif
-        cl=(SvarValue*)new SvarClass(result,typeid(T));
-        return cl;
-    }
-
-    template <typename T>
-    static SvarClass& Class(){
-        Svar& inst=instance<T>();
-        return inst.as<SvarClass>();
-    }
-
-    friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
-
-    /// buildin functions
-    Svar __init__,__str__,__getitem__,__setitem__;
-
-    std::string  __name__,__doc__;
-    std::type_index _cpptype;
-    Svar _methods,_attr;
-    std::vector<Svar> _parents;
 };
 
 template <typename T>
@@ -2478,9 +2471,6 @@ inline Svar  Svar::loadFile(const std::string& file_path)
 inline Svar::svar_interator::svar_interator(Svar it,Svar::svar_interator::IterType tp)
     :_it(new Svar(it)),_type(tp)
 {}
-
-//inline Svar::svar_interator::svar_interator(const std::unordered_map<std::string,Svar>::iterator& it)
-//    : _it(new Svar(it)),_type(Object){}
 
 inline Svar Svar::svar_interator::operator*(){
     typedef std::vector<Svar>::iterator array_iter;
