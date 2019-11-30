@@ -54,6 +54,7 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <unordered_map>
 #include <algorithm>
 #include <memory>
 #include <mutex>
@@ -579,23 +580,14 @@ public:
     /// Wrap bool to static instances
     Svar(bool b):Svar(b?True():False()){}
 
-    /// Wrap a int
+    /// Wrap a int, uint_8, int_8, short .ext
     Svar(int  i):Svar(create(i)){}
 
-    /// Wrap a double
+    /// Wrap a double or float
     Svar(double  d):Svar(create(d)){}
 
-    /// Wrap a string
+    /// Wrap a string or const char*
     Svar(const std::string& str);
-
-    /// Construct an Array
-    Svar(const std::vector<Svar>& vec);//Array
-
-    /// Construct an Object
-    Svar(const std::map<std::string,Svar>& m);//Object
-
-    /// Construct a Dict
-    Svar(const std::map<Svar,Svar>& m);//Dict
 
     /// Construct from initializer
     Svar(const std::initializer_list<Svar>& init);
@@ -635,6 +627,12 @@ public:
     /// Create from Json String
     static Svar json(const std::string& str){
         return svar["__builtin__"]["Json"].call("load",str);
+    }
+
+    std::string dump()const{
+        std::stringstream sst;
+        sst<<*this;
+        return sst.str();
     }
 
     /// Is holding a type T value?
@@ -783,8 +781,6 @@ public:
         return *this;
     }
 
-    operator std::string(){return castAs<std::string>();}
-
     /// Dump this as Json style outputs
     friend std::ostream& operator <<(std::ostream& ost,const Svar& self);
     friend std::istream& operator >>(std::istream& ist,Svar& self);
@@ -810,60 +806,19 @@ public:
     Svar& getOrCreate(const std::string& name,bool parse_dot=false);// FIXME: Not thread safe
 
     struct svar_interator{
-        typedef std::vector<Svar>::iterator array_iter;
-        typedef std::map<std::string,Svar>::iterator    object_iter;
         enum IterType{Object,Array,Others};
 
-        svar_interator(const array_iter& it)
-            : _it(new Svar(it)),_type(Array){ }
-        svar_interator(const object_iter& it)
-            : _it(new Svar(it)),_type(Object){}
-        svar_interator(const Svar& obj)
-            : _it(new Svar(obj)),_type(Others){}
+        svar_interator(Svar it,IterType tp);
         ~svar_interator(){delete _it;}
 
         Svar*  _it;
         IterType  _type;
 
-        Svar operator *(){
-            switch (_type) {
-            case Object: return *_it->as<object_iter>();break;
-            case Array: return *_it->as<array_iter>();break;
-            default:  return *_it;
-            }
-        }
+        Svar operator *();
 
-        svar_interator& operator++()
-        {
-            switch (_type)
-            {
-            case Object: _it->as<object_iter>()++;break;
-            case Array: _it->as<array_iter>()++;break;
-            default: break;
-            }
-            return *this;
-        }
+        svar_interator& operator++();
 
-        svar_interator& operator--(int)
-        {
-            switch (_type)
-            {
-            case Object: _it->as<object_iter>()--;break;
-            case Array: _it->as<array_iter>()--;break;
-            default: break;
-            }
-            return *this;
-        }
-
-        bool operator==(const svar_interator& other) const
-        {
-            switch (_type)
-            {
-            case Object: return _it->as<object_iter>()==other._it->as<object_iter>();
-            case Array: return _it->as<array_iter>()==other._it->as<array_iter>();
-            default: return _it==other._it;break;
-            }
-        }
+        bool operator==(const svar_interator& other) const;
 
         bool operator!=(const svar_interator& other) const
         {
@@ -873,6 +828,7 @@ public:
 
     svar_interator begin();
     svar_interator end();
+    svar_interator find(const Svar& idx);
 
     operator std::pair<std::string,Svar>()const{return castAs<std::pair<const std::string,Svar>>();}
 
@@ -1324,14 +1280,24 @@ public:
     std::unique_ptr<T> _var;
 };
 
-class SvarObject : public SvarValue_<std::map<std::string,Svar> >{
+class SvarObject : public SvarValue_<std::unordered_map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
-        : SvarValue_<std::map<std::string,Svar>>(m){}
+        : SvarValue_<std::unordered_map<std::string,Svar>>({}){
+        _var.insert(m.begin(),m.end());
+    }
+
+    SvarObject(std::unordered_map<std::string,Svar>&& m)
+        : SvarValue_<std::unordered_map<std::string,Svar>>(m){
+    }
+
+    SvarObject(const std::unordered_map<std::string,Svar>& m)
+        : SvarValue_<std::unordered_map<std::string,Svar>>(m){
+    }
 
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(SvarObject)) return this;
-        else if(tp==typeid(std::map<std::string,Svar>)) return &_var;
+        else if(tp==typeid(std::unordered_map<std::string,Svar>)) return &_var;
         else return nullptr;
     }
 
@@ -1345,7 +1311,7 @@ public:
         std::unique_lock<std::mutex> lock(_mutex);
         if(!depth)
             return _var;
-        std::map<std::string,Svar> var=_var;
+        auto var=_var;
         for(auto it=var.begin();it!=var.end();it++){
             it->second=it->second.clone(depth-1);
         }
@@ -1845,15 +1811,6 @@ inline Svar Svar::create(T && t)
 inline Svar::Svar(const std::string& m)
     :_obj(std::make_shared<SvarValue_<std::string>>(m)){}
 
-inline Svar::Svar(const std::vector<Svar>& vec)
-    :_obj(std::make_shared<SvarArray>(vec)){}
-
-inline Svar::Svar(const std::map<std::string,Svar>& m)
-    :_obj(std::make_shared<SvarObject>(m)){}
-
-inline Svar::Svar(const std::map<Svar,Svar>& m)
-    :_obj(std::make_shared<SvarDict>(m)){}
-
 template <typename T>
 Svar::Svar(std::unique_ptr<T>&& v)
     : _obj(new SvarValue_<std::unique_ptr<T>>(std::move(v))){}
@@ -2044,6 +2001,9 @@ inline Svar Svar::operator[](const Svar& i) const{
     Svar property=cl._methods[i.as<std::string>()];
     if(property.isProperty()){
         return property.as<SvarClass::SvarProperty>()._fget(*this);
+    }
+    else{
+        throw SvarExeption("Operator [] called without property "+i.as<std::string>());
     }
     return Undefined();
 }
@@ -2596,18 +2556,66 @@ inline Svar  Svar::loadFile(const std::string& file_path)
     return Svar::Undefined();
 }
 
+inline Svar::svar_interator::svar_interator(Svar it,Svar::svar_interator::IterType tp)
+    :_it(new Svar(it)),_type(tp)
+{}
+
+//inline Svar::svar_interator::svar_interator(const std::unordered_map<std::string,Svar>::iterator& it)
+//    : _it(new Svar(it)),_type(Object){}
+
+inline Svar Svar::svar_interator::operator*(){
+    typedef std::vector<Svar>::iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    switch (_type) {
+    case Object: return *_it->as<object_iter>();break;
+    case Array: return *_it->as<array_iter>();break;
+    default:  return *_it;
+    }
+}
+
+inline Svar::svar_interator& Svar::svar_interator::operator++()
+{
+    typedef std::vector<Svar>::iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    switch (_type)
+    {
+    case Object: _it->as<object_iter>()++;break;
+    case Array: _it->as<array_iter>()++;break;
+    default: break;
+    }
+    return *this;
+}
+
+inline bool Svar::svar_interator::operator==(const svar_interator& other) const
+{
+    typedef std::vector<Svar>::iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    switch (_type)
+    {
+    case Object: return _it->as<object_iter>()==other._it->as<object_iter>();
+    case Array: return _it->as<array_iter>()==other._it->as<array_iter>();
+    default: return _it==other._it;break;
+    }
+}
+
 inline Svar::svar_interator Svar::begin()
 {
-    if(isObject()) return as<SvarObject>()._var.begin();
-    else if(isArray()) return as<SvarArray>()._var.begin();
-    return *this;
+    if(isObject()) return svar_interator(as<SvarObject>()._var.begin(),svar_interator::Object);
+    else if(isArray()) return svar_interator(as<SvarArray>()._var.begin(),svar_interator::Array);
+    return svar_interator(*this,svar_interator::Others);
 }
 
 inline Svar::svar_interator Svar::end()
 {
-    if(isObject()) return as<SvarObject>()._var.end();
-    else if(isArray()) return as<SvarArray>()._var.end();
-    return *this;
+    if(isObject()) return svar_interator(as<SvarObject>()._var.end(),svar_interator::Object);
+    else if(isArray()) return svar_interator(as<SvarArray>()._var.end(),svar_interator::Array);
+    return svar_interator(*this,svar_interator::Others);
+}
+
+inline Svar::svar_interator Svar::find(const Svar& idx)
+{
+    if(isObject()) return svar_interator(as<SvarObject>()._var.find(idx.castAs<std::string>()),svar_interator::Object);
+    return end();
 }
 
 inline const Svar&  SvarFunction::classObject()const{return SvarClass::instance<SvarFunction>();}
@@ -2649,7 +2657,7 @@ public:
     }
 
     static Svar to(const std::vector<T>& var){
-        return Svar::create(var);
+        return (SvarValue*)new SvarArray(std::vector<Svar>(var.begin(),var.end()));
     }
 };
 
@@ -2695,7 +2703,29 @@ public:
     }
 
     static Svar to(const std::map<std::string,T>& var){
-        return Svar::object(std::map<std::string,Svar>(var.begin(),var.end()));
+        return (SvarValue*)new SvarObject(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
+    }
+};
+
+template <typename T>
+class caster<std::unordered_map<std::string,T> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::unordered_map<std::string,T> >()) return var;
+
+        if(!var.isObject()) return  Svar::Undefined();
+
+        std::unordered_map<std::string,T> ret;
+        for(const std::pair<std::string,Svar>& v:var.as<SvarObject>()._var)
+        {
+            ret.insert(std::make_pair(v.first,v.second.castAs<T>()));
+        }
+
+        return Svar::create(ret);
+    }
+
+    static Svar to(const std::unordered_map<std::string,T>& var){
+        return (SvarValue*)new SvarObject(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
     }
 };
 
@@ -2717,7 +2747,7 @@ public:
     }
 
     static Svar to(const std::map<K,T>& var){
-        return Svar::dict(std::map<Svar,Svar>(var.begin(),var.end()));
+        return (SvarValue*)new SvarDict(std::map<Svar,Svar>(var.begin(),var.end()));
     }
 };
 
