@@ -624,22 +624,53 @@ public:
     /// Create a Dict instance
     static Svar dict(const std::map<Svar,Svar>& m={}){return Svar(m);}
 
-    /// Create from Json String
-    static Svar json(const std::string& str){
-        return svar["__builtin__"]["Json"].call("load",str);
-    }
+    /// Undefined is the default value when Svar is not assigned a valid value
+    /// It corrosponding to the c++ void and means no return
+    static const Svar& Undefined();
 
-    std::string dump()const{
-        std::stringstream sst;
-        sst<<*this;
-        return sst.str();
-    }
+    /// Null is corrosponding to the c++ nullptr
+    static const Svar& Null();
+    static const Svar& True();
+    static const Svar& False();
+    static Svar&       instance();
+
+    /// Return the raw holder
+    const std::shared_ptr<SvarValue>& value()const{return _obj;}
+
+    /// Deep copy a object, non-copyable things will become Undefined
+    Svar                    clone(int depth=0)const;
+
+    /// Return the value typename
+    std::string             typeName()const;
+
+    /// Return the value typeid
+    std::type_index         cpptype()const;
+
+    /// Return the class singleton, return Undefined when failed.
+    const Svar&             classObject()const;
+
+    /// Return the class singleton pointer, return nullptr when failed.
+    SvarClass*              classPtr()const;
+
+    /// Return the item numbers when it is an array, object or dict.
+    size_t                  length() const;
+    size_t                  size()const{return length();}
 
     /// Is holding a type T value?
     template <typename T>
     bool is()const;
     bool is(const std::type_index& typeId)const;
     bool is(const std::string& typeStr)const;
+
+    bool isUndefined()const{return is<void>();}
+    bool isNull()const;
+    bool isFunction() const{return is<SvarFunction>();}
+    bool isClass() const{return is<SvarClass>();}
+    bool isException() const{return is<SvarExeption>();}
+    bool isProperty() const;
+    bool isObject() const;
+    bool isArray()const;
+    bool isDict()const;
 
     /// Should always check type with "is<T>()" first
     template <typename T>
@@ -665,33 +696,9 @@ public:
     detail::enable_if_t<!std::is_reference<T>::value&&!std::is_pointer<T>::value,T>
     castAs()const;
 
-    bool isUndefined()const{return is<void>();}
-    bool isNull()const;
-    bool isFunction() const{return is<SvarFunction>();}
-    bool isClass() const{return is<SvarClass>();}
-    bool isException() const{return is<SvarExeption>();}
-    bool isProperty() const;
-    bool isObject() const;
-    bool isArray()const;
-    bool isDict()const;
-
-    Svar                    clone(int depth=0)const;
-
-    /// Return the value typename
-    std::string             typeName()const;
-
-    /// Return the value typeid
-    std::type_index         cpptype()const;
-
-    /// Return the class singleton, return Undefined when failed.
-    const Svar&             classObject()const;
-
-    /// Return the class singleton pointer, return nullptr when failed.
-    SvarClass*              classPtr()const;
-
-    /// Return the item numbers when it is an array, object or dict.
-    size_t                  length() const;
-    size_t                  size()const{return length();}
+    /// This is the same to castAs<T>()
+    template <typename T>
+    T get(){return castAs<T>();}
 
     /// Force to return the children as type T, cast is performed,
     /// otherwise the old value will be droped and set to the value "def"
@@ -702,16 +709,51 @@ public:
     template <typename T>
     void set(const std::string& name,const T& def,bool parse_dot=false);
 
-    /// For Object: dot compute and find the member
-    /// For Array, Dict and Class, check if the item is not Undefined without dot compute
+    /// Check if the item is not Undefined without dot compute
     bool exist(const Svar& id)const;
 
-    /// For Object: dot compute and call __delitem__
-    /// Others    : directly call __delitem__
+    /// Directly call __delitem__
     void erase(const Svar& id);
 
     /// Append item when this is an array
     void push_back(const Svar& rh);
+
+    /// The svar iterator now just support array and object.
+    /// @code
+    /// for(auto v:Svar({1,2,3})) std::cout<<v<<std::endl;
+    /// @endcode
+    struct svar_interator{
+        enum IterType{Object,Array,Others};
+
+        svar_interator(Svar it,IterType tp);
+        ~svar_interator(){delete _it;}
+
+        Svar*  _it;
+        IterType  _type;
+
+        Svar operator *();
+
+        svar_interator& operator++();
+
+        bool operator==(const svar_interator& other) const;
+
+        bool operator!=(const svar_interator& other) const
+        {
+            return not operator==(other);
+        }
+    };
+
+    svar_interator begin();
+    svar_interator end();
+    svar_interator find(const Svar& idx);
+
+    /// Used to iter an object
+    /// @code
+    /// Svar obj={{"a":1,"b":false}};
+    /// for(std::pair<std::string,Svar> it:obj)
+    ///   std::cout<<it.first<<":"<<it.second<<std::endl;
+    /// @endcode
+    operator std::pair<std::string,Svar>()const{return castAs<std::pair<const std::string,Svar>>();}
 
     /// Call function or class with name and arguments
     template <typename... Args>
@@ -720,34 +762,6 @@ public:
     /// Call this as function or class
     template <typename... Args>
     Svar operator()(Args... args)const;
-
-    /// Define a class or function with name
-    Svar& def(const std::string& name,Svar funcOrClass);
-
-    /// Define a lambda function with name
-    template <typename Func>
-    Svar& def(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f));
-    }
-
-    /// Parse the "main(int argc,char** argv)" arguments
-    std::vector<std::string> parseMain(int argc, char** argv);
-
-    bool parseFile(const std::string& file_path);
-
-    /// Register default required arguments
-    template <typename T>
-    T arg(const std::string& name, T def, const std::string& help);
-
-    /// Format print version, usages and arguments as string
-    std::string helpInfo();
-
-    /// Format print version, usages and arguments
-    int help(){std::cout<<helpInfo();return 0;}
-
-    /// Format print strings as table
-    static std::string printTable(
-            std::vector<std::pair<int, std::string>> line);
 
     Svar operator -()const;              //__neg__
     Svar operator +(const Svar& rh)const;//__add__
@@ -785,52 +799,43 @@ public:
     friend std::ostream& operator <<(std::ostream& ost,const Svar& self);
     friend std::istream& operator >>(std::istream& ist,Svar& self);
 
-    /// Undefined is the default value when Svar is not assigned a valid value
-    /// It corrosponding to the c++ void and means no return
-    static const Svar& Undefined();
+    /// Create from Json String
+    static Svar parse_json(const std::string& str){
+        return svar["__builtin__"]["Json"].call("load",str);
+    }
 
-    /// Null is corrosponding to the c++ nullptr
-    static const Svar& Null();
-    static const Svar& True();
-    static const Svar& False();
-    static Svar&       instance();
+    /// Dump Json String
+    std::string dump_json()const{
+        std::stringstream sst;
+        sst<<*this;
+        return sst.str();
+    }
+
+    /// Parse the "main(int argc,char** argv)" arguments
+    std::vector<std::string> parseMain(int argc, char** argv);
+
+    /// Parse a file, builtin support json
     static Svar        loadFile(const std::string& file_path);
+
+    /// Parse a file to update this, existed value will be overlaped
+    bool parseFile(const std::string& file_path);
+
+    /// Register default required arguments
+    template <typename T>
+    T arg(const std::string& name, T def, const std::string& help);
+
+    /// Format print version, usages and arguments as string
+    std::string helpInfo();
+
+    /// Format print version, usages and arguments
+    int help(){std::cout<<helpInfo();return 0;}
+
+    /// Format print strings as table
+    static std::string printTable(
+            std::vector<std::pair<int, std::string>> line);
 
     template <typename T>
     static std::string toString(const T& v);
-
-    /// Return the raw holder
-    const std::shared_ptr<SvarValue>& value()const{return _obj;}
-
-    /// This is dangerous since the returned Svar may be free by other threads, TAKE CARE!
-    Svar& getOrCreate(const std::string& name,bool parse_dot=false);// FIXME: Not thread safe
-
-    struct svar_interator{
-        enum IterType{Object,Array,Others};
-
-        svar_interator(Svar it,IterType tp);
-        ~svar_interator(){delete _it;}
-
-        Svar*  _it;
-        IterType  _type;
-
-        Svar operator *();
-
-        svar_interator& operator++();
-
-        bool operator==(const svar_interator& other) const;
-
-        bool operator!=(const svar_interator& other) const
-        {
-            return not operator==(other);
-        }
-    };
-
-    svar_interator begin();
-    svar_interator end();
-    svar_interator find(const Svar& idx);
-
-    operator std::pair<std::string,Svar>()const{return castAs<std::pair<const std::string,Svar>>();}
 
     template <typename T>
     T Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
@@ -1336,16 +1341,6 @@ public:
         else it->second=value;
     }
 
-    bool exist(const std::string& id)const{
-        std::unique_lock<std::mutex> lock(_mutex);
-        return _var.count(id);
-    }
-
-    void erase(const std::string& id){
-        std::unique_lock<std::mutex> lock(_mutex);
-        _var.erase(id);
-    }
-
     friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
         std::unique_lock<std::mutex> lock(rh._mutex);
         if(rh._var.empty()) {
@@ -1829,7 +1824,7 @@ inline bool Svar::is(const std::type_index& typeId)const{return _obj->as(typeId)
 inline bool Svar::is(const std::string& typeStr)const{return classPtr()->name()==typeStr;}
 
 template <>
-inline bool Svar::is<Svar>()const{return !isUndefined();}
+inline bool Svar::is<Svar>()const{return true;}
 
 inline bool Svar::isNull()const{
     return Null()==(*this);
@@ -1991,8 +1986,6 @@ inline size_t            Svar::length() const{
 }
 
 inline Svar Svar::operator[](const Svar& i) const{
-    if(isObject()) return as<SvarObject>()[i.castAs<std::string>()];
-    if(classObject().is<void>()) return Undefined();
     const SvarClass& cl=classObject().as<SvarClass>();
     if(cl.__getitem__.isFunction()){
         return cl.__getitem__((*this),i);
@@ -2003,7 +1996,7 @@ inline Svar Svar::operator[](const Svar& i) const{
         return property.as<SvarClass::SvarProperty>()._fget(*this);
     }
     else{
-        throw SvarExeption("Operator [] called without property "+i.as<std::string>());
+        throw SvarExeption(typeName()+": Operator [] called without property "+i.as<std::string>());
     }
     return Undefined();
 }
@@ -2013,8 +2006,16 @@ inline Svar& Svar::operator[](const Svar& name){
         *this=object();
     }
 
-    if(isObject())
-        return getOrCreate(name.castAs<std::string>());
+    if(isObject()){
+        SvarObject& obj=as<SvarObject>();
+        std::string nameStr=name.as<std::string>();
+        std::unique_lock<std::mutex> lock(obj._mutex);
+        auto it=obj._var.find(nameStr);
+        if(it!=obj._var.end())
+            return it->second;
+        auto ret=obj._var.insert(std::make_pair(nameStr,Svar()));
+        return ret.first->second;
+    }
     else if(isArray())
         return as<SvarArray>()._var[name.castAs<int>()];
     else if(isDict())
@@ -2030,7 +2031,7 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     if(parse_dot){
         auto idx = name.find_first_of(".");
         if (idx != std::string::npos) {
-            return getOrCreate(name.substr(0, idx)).get(name.substr(idx + 1), def,parse_dot);
+            return (*this)[name.substr(0, idx)].get(name.substr(idx + 1), def,parse_dot);
         }
     }
 
@@ -2057,48 +2058,20 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     return var.as<T>();
 }
 
-
-inline Svar& Svar::getOrCreate(const std::string& name,bool parse_dot)
-{
-    if(parse_dot){
-        auto idx = name.find_last_of('.');
-        if (idx != std::string::npos) {
-            return getOrCreate(name.substr(0, idx),parse_dot).getOrCreate(name.substr(idx + 1));
-        }
-    }
-    if(isUndefined()) {
-        *this=object();
-    }
-    if(!isObject())
-        throw SvarExeption("Svar::Get can only be called with an object, got "+ typeName());
-    SvarObject& obj=as<SvarObject>();
-
-    {
-        std::unique_lock<std::mutex> lock(obj._mutex);
-        auto it=obj._var.find(name);
-        if(it!=obj._var.end())
-            return it->second;
-        auto ret=obj._var.insert(std::make_pair(name,Svar()));
-        return ret.first->second;
-    }
-//    return Undefined();
-}
-
 template <typename T>
 inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
     if(parse_dot){
         auto idx = name.find(".");
         if (idx != std::string::npos) {
-            return getOrCreate(name.substr(0, idx)).set(name.substr(idx + 1), def);
+            return (*this)[name.substr(0, idx)].set(name.substr(idx + 1), def);
         }
     }
     if(isUndefined()){
         *this=object({{name,def}});
         return;
     }
-    assert(isObject());
     Svar var=as<SvarObject>()[name];
-    if(var.is<T>())
+    if(!std::is_same<T,Svar>::value&&var.is<T>())
         var.as<T>()=def;
     else
         as<SvarObject>().set(name,def);
@@ -2106,35 +2079,11 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
 
 inline bool Svar::exist(const Svar& id)const
 {
-    if(isObject())
-    {
-        std::string name=id.castAs<std::string>();
-#ifdef SVAR_PARSE_DOT
-        auto idx = name.find('.');
-        if (idx != std::string::npos) {
-            Svar child=as<SvarObject>()[name.substr(0, idx)];
-            return child.exist(name.substr(idx + 1));
-        }
-#endif
-        return as<SvarObject>().exist(name);
-    }
     return !(*this)[id].isUndefined();
 }
 
 inline void Svar::erase(const Svar& id)
 {
-    if(isObject())
-    {
-        std::string name=id.castAs<std::string>();
-#ifdef SVAR_PARSE_DOT
-        auto idx = name.find('.');
-        if (idx != std::string::npos) {
-            Svar child=as<SvarObject>()[name.substr(0, idx)];
-            return child.erase(name.substr(idx + 1));
-        }
-#endif
-        return as<SvarObject>().erase(name);
-    }
     call("__delitem__",id);
 }
 
@@ -2150,9 +2099,6 @@ Svar Svar::call(const std::string function, Args... args)const
 {
     // call as static methods without check
     if(isClass()) return as<SvarClass>().call(Svar(),function,args...);
-    // call when func member available
-//    Svar func=(*this)[function];
-//    if(func.isFunction()) return func(args...);
     // call as member methods with check
     auto clsPtr=classPtr();
     if(!clsPtr) throw SvarExeption("Unable to call "+typeName()+"."+function);
@@ -2171,26 +2117,6 @@ Svar Svar::operator()(Args... args)const{
     }
     throw SvarExeption(typeName()+" can't be called as a function or constructor.");
     return Undefined();
-}
-
-inline Svar& Svar::def(const std::string& name,Svar funcOrClass)
-{
-    if(funcOrClass.isFunction()){
-        funcOrClass.as<SvarFunction>().initName(name);
-        Svar old=(*this)[name];
-        if(!old.isFunction()){
-            set(name,funcOrClass);
-        }else{
-            SvarFunction& oldF=old.as<SvarFunction>();
-            if(oldF.signature!=funcOrClass.as<SvarFunction>().signature)
-                oldF.next=funcOrClass;
-        }
-    }
-    else if(funcOrClass.isClass()){
-        set(name,funcOrClass);
-    }
-    else throw SvarExeption("Svar::def can only define a function or class.");
-    return *this;
 }
 
 inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
@@ -2475,11 +2401,11 @@ inline bool Svar::operator <(const Svar& rh)const{
 inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
 {
     if(self.isUndefined()) {
-        ost<<"Undefined";
+        ost<<"undefined";
         return ost;
     }
     if(self.isNull()){
-        ost<<"Null";
+        ost<<"null";
         return ost;
     }
     auto cls=self.classPtr();
@@ -2750,7 +2676,6 @@ public:
         return (SvarValue*)new SvarDict(std::map<Svar,Svar>(var.begin(),var.end()));
     }
 };
-
 
 template <typename T>
 class caster<std::shared_ptr<T> >{
@@ -3134,7 +3059,7 @@ private:
             return expect("false", false);
 
         if (ch == 'n')
-            return expect("null", Svar());
+            return expect("null", Svar::Null());
 
         if (ch == '"')
             return parse_string();
@@ -3413,7 +3338,10 @@ public:
 
         SvarClass::Class<SvarObject>()
                 .def("__getitem__",&SvarObject::operator [])
-                .def("__delitem__",&SvarObject::erase)
+                .def("__delitem__",[](SvarObject& self,const std::string& id){
+                         std::unique_lock<std::mutex> lock(self._mutex);
+                         self._var.erase(id);
+                     })
                 .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
                 .def("__add__",[](const SvarObject& self,const SvarObject& rh){
             std::unique_lock<std::mutex> lock1(self._mutex);

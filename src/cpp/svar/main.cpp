@@ -350,7 +350,7 @@ TEST(Svar,Iterator){
     int i=0;
     for(auto a:var) EXPECT_EQ(a,var[i++]);
     Svar obj={{"1",1},{"2",2}};
-    for(std::pair<std::string,Svar> it:obj) EXPECT_EQ(obj[it.second].castAs<std::string>(),it.first);
+    for(std::pair<std::string,Svar> it:obj) EXPECT_EQ(obj[it.first],it.second);
 }
 
 TEST(Svar,Alias){
