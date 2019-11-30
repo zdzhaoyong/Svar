@@ -275,6 +275,10 @@ TEST(Svar,Class){
     EXPECT_EQ(b.call("getAge").as<int>(),20);
     EXPECT_EQ(b.call("getScore").as<double>(),100.);
     EXPECT_EQ(b.call("isBBase").as<bool>(),false);
+    InheritClass& inst=b.as<InheritClass>();
+    EXPECT_EQ(Svar(&inst).call("getAge").as<int>(),20);
+    InheritClass instCopy=Svar(&inst).as<InheritClass>();
+    EXPECT_EQ(instCopy.name(),inst.name());
 }
 
 TEST(Svar,GetSet){

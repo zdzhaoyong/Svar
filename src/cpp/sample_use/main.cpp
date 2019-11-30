@@ -23,7 +23,6 @@ int main(int argc,char** argv){
         svar.help();
         return 0;
     }
-    return 0;
     Svar i=1;
     Svar d=2.;
     Svar s="hello world";

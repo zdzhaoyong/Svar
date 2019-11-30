@@ -1533,6 +1533,21 @@ public:
     std::unique_ptr<T> _var;
 };
 
+template <typename T>
+class SvarValue_<T*>: public SvarValue{
+public:
+    explicit SvarValue_(T* v):_var(v){}
+
+    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual const void*     as(const TypeID& tp)const{
+        if(tp==typeid(T)) return _var;
+        else if(tp==typeid(T*)) return &_var;
+        else return nullptr;
+    }
+
+    T* _var;
+};
+
 class SvarObject : public SvarValue_<std::unordered_map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
