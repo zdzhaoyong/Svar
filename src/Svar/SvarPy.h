@@ -388,7 +388,7 @@ struct SvarPy: public PyObject{
 
         PyObject_SetAttrString((PyObject *) type, "__module__", SVAR_FROM_STRING("svar_builtins"));
         cls._attr.set("PyTypeObject",type);
-        for(std::pair<std::string,Svar> f:cls._methods.as<SvarObject>()._var)
+        for(std::pair<std::string,Svar> f:cls._attr.as<SvarObject>()._var)
         {
             if(f.first=="__init__"){
                 Svar func_init=Svar::lambda([f](std::vector<Svar> args){

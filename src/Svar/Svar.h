@@ -982,8 +982,7 @@ public:
     template <typename Func, typename Return, typename... Args,size_t... Is>
     detail::enable_if_t<!std::is_void<Return>::value, Svar>
     call_impl(Func&& f,Return (*)(Args...),std::vector<Svar>& args,detail::index_sequence<Is...>){
-        std::tuple<Args...> castedArgs(args[Is].castAs<Args>()...);
-        return Svar(f(std::get<Is>(castedArgs)...));
+        return Svar(f(args[Is].castAs<Args>()...));
     }
 
     std::string signature()const;
@@ -1009,7 +1008,7 @@ public:
     Svar          next;
 
     std::function<Svar(std::vector<Svar>&)> _func;
-    bool          is_method,is_constructor,do_argcheck=true;
+    bool          is_method,is_constructor=false,do_argcheck=true;
 };
 
 class SvarClass{
@@ -1027,8 +1026,7 @@ public:
     SvarClass(const std::string& name,std::type_index cpp_type,
               std::vector<Svar> parents={})
         : __name__(name),_cpptype(cpp_type),
-          _methods(Svar::object()),_attr(Svar::object()),
-          _parents(parents){}
+          _attr(Svar::object()),_parents(parents){}
 
     std::string name()const{return __name__;}
     void     setName(const std::string& nm){__name__=nm;}
@@ -1036,7 +1034,7 @@ public:
     SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
     {
         assert(function.isFunction());
-        Svar* dest=&_methods[name];
+        Svar* dest=&_attr[name];
         while(dest->isFunction())
         {
             if(dest->as<SvarFunction>().signature()==function.as<SvarFunction>().signature())
@@ -1076,7 +1074,7 @@ public:
     SvarClass& def_property(const std::string& name,
                             const Svar& fget,const Svar& fset=Svar(),
                             const std::string& doc=""){
-        _methods[name]=SvarProperty(fget,fset,name,doc);
+        _attr[name]=SvarProperty(fget,fset,name,doc);
         return *this;
     }
 
@@ -1112,7 +1110,7 @@ public:
     }
 
     Svar& operator [](const std::string& name){
-        Svar& c=_methods[name];
+        Svar& c=_attr[name];
 //        if(!c.isUndefined())  return c;
 //        for(Svar& p:_parents)
 //        {
@@ -1125,7 +1123,7 @@ public:
     template <typename... Args>
     Svar call(const Svar& inst,const std::string function, Args... args)const
     {
-        Svar f=_methods[function];
+        Svar f=_attr[function];
         if(f.isFunction())
         {
             SvarFunction& func=f.as<SvarFunction>();
@@ -1151,7 +1149,7 @@ public:
 
         Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
         {
-            Svar f=_methods[function];
+            Svar f=_attr[function];
             if(f.isFunction())
             {
                 SvarFunction& func=f.as<SvarFunction>();
@@ -1177,20 +1175,24 @@ public:
             return Svar::Undefined();
         }
 
+    static std::string decodeName(const char* __mangled_name){
+#ifdef __GNUC__
+    int status;
+    char* realname = abi::__cxa_demangle(__mangled_name, 0, 0, &status);
+    std::string result(realname);
+    free(realname);
+#else
+    std::string result(__mangled_name);
+#endif
+    return result;
+    }
+
     template <typename T>
     static Svar& instance()
     {
         static Svar cl;
         if(cl.isClass()) return cl;
-    #ifdef __GNUC__
-        int status;
-        char* realname = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
-        std::string result(realname);
-        free(realname);
-    #else
-        std::string result(typeid(T).name());
-    #endif
-        cl=SvarClass(result,typeid(T));
+        cl=SvarClass(decodeName(typeid(T).name()),typeid(T));
         return cl;
     }
 
@@ -1202,12 +1204,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
 
-    /// buildin functions
-    Svar __init__,__str__,__getitem__,__setitem__;
-
     std::string  __name__,__doc__;
     std::type_index _cpptype;
-    Svar _methods,_attr;
+    Svar _attr,__init__,__str__,__getitem__,__setitem__;
     std::vector<Svar> _parents;
 };
 
@@ -1789,12 +1788,12 @@ inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<
 template <typename Func, typename Return, typename... Args, typename... Extra>
 void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... extra)
 {
-    this->arg_types={SvarClass::instance<Return>(),SvarClass::instance<Args>()...};
-    _func=[this,f](std::vector<Svar>& args)->Svar{
+    // FIXME: this template used over 50% percent of binary size and slow down compile speed
+    this->arg_types={SvarClass::instance<Return>(),SvarClass::instance<Args>()...};// about 15%
+    _func=[this,f](std::vector<Svar>& args)->Svar{ // about 19%
         using indices = detail::make_index_sequence<sizeof...(Args)>;
-        return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});
+        return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});// about 19%
     };
-    is_constructor=false;
 }
 
 inline std::string SvarFunction::signature()const{
@@ -1965,7 +1964,7 @@ public:
         Svar cl=var.classObject();
         if(cl.isClass()){
             SvarClass& srcClass=cl.as<SvarClass>();
-            Svar cvt=srcClass._methods["__"+SvarClass::Class<T>().name()+"__"];
+            Svar cvt=srcClass._attr["__"+SvarClass::Class<T>().name()+"__"];
             if(cvt.isFunction()){
                 Svar ret=cvt(var);
                 if(ret.is<T>()) return ret;
@@ -2075,7 +2074,7 @@ inline Svar Svar::operator[](const Svar& i) const{
         return cl.__getitem__((*this),i);
     }
     if(!i.is<std::string>()) return Undefined();
-    Svar property=cl._methods[i.as<std::string>()];
+    Svar property=cl._attr[i.as<std::string>()];
     if(property.isProperty()){
         return property.as<SvarClass::SvarProperty>()._fget(*this);
     }
@@ -2630,9 +2629,9 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     std::stringstream  content;
     if(rh.__init__.isFunction()) content<<rh.__init__.as<SvarFunction>()<<std::endl<<std::endl;
     if(!rh.__doc__.empty()) content<<rh.__doc__<<std::endl;
-    if(rh._methods.isObject()&&rh._methods.length()){
+    if(rh._attr.isObject()&&rh._attr.length()){
         content<<"Methods defined here:\n";
-        const SvarObject& methods=rh._methods.as<SvarObject>();
+        const SvarObject& methods=rh._attr.as<SvarObject>();
         auto varCopy=methods._var;
         for(std::pair<std::string,Svar> it:varCopy){
             content<<it.second.as<SvarFunction>()<<std::endl<<std::endl;
