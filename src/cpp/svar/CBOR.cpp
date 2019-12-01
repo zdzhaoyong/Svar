@@ -375,7 +375,7 @@ REGISTER_SVAR_MODULE(CBOR){
                 .def_static("load",&CBOR::load)
                 .def_static("dump",&CBOR::dump);
 
-        Svar::instance().set("__builtin__.CBOR",SvarClass::instance<CBOR>());
+        Svar::instance().set("__builtin__.CBOR",SvarClass::instance<CBOR>(),true);
 }
 
 }

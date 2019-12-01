@@ -126,7 +126,7 @@ TEST(Svar,Function)
 }
 
 TEST(Svar,CBOR){
-    Svar cbor=svar["__builtin__.CBOR"];
+    Svar cbor=svar["__builtin__"]["CBOR"];
     Svar var={{"i",1},
               {"bool",false},
               {"double",434.},
@@ -135,9 +135,11 @@ TEST(Svar,CBOR){
               {"map",{{"name","value"}}}
              };
 
-    std::string file=svar.GetString("test.cbor","");
-    if(!file.empty())
+    std::string file=svar.get("test.cbor",std::string(""),true);
+    if(!file.empty()){
+        ScopedTimer tm("parse_json");
         var=var.loadFile(file);
+    }
 
     int bufSize=svar.GetInt("test.cborBufSize",1e6);
     if(bufSize){
