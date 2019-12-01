@@ -2216,9 +2216,14 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   set("argv",argv);
   set("__name__",getFileName(argv[0]));
   auto setjson=[this](std::string name,std::string json){
-    Svar v=parse_json(json);
-    if(v.isUndefined()) set(name,json,true);
-    else set(name,v,true);
+      try{
+          Svar v=parse_json(json);
+          if(!v.isUndefined()) set(name,v,true);
+          else set(name,json,true);
+      }
+      catch (SvarExeption& e){
+          set(name,json,true);
+      }
   };
   auto setvar=[this,setjson](std::string s)->bool{
       // Execution failed. Maybe its an assignment.
@@ -2345,6 +2350,9 @@ T Svar::arg(const std::string& name, T def, const std::string& help) {
 
 inline std::string Svar::helpInfo()
 {
+    arg<std::string>("conf", "Default.cfg",
+                     "The default configure file going to parse.");
+    arg<bool>("help", false, "Show the help information.");
     Svar args=(*this)["__builtin__"]["args"];
     if(get("complete_function_request",false))
     {
@@ -2352,7 +2360,6 @@ inline std::string Svar::helpInfo()
         for (int i=0;i<(int)args.length();i++) {
           str+=" -"+args[i][0].castAs<std::string>();
         }
-        str+=" -help -conf";
         return str;
     }
     std::stringstream sst;
@@ -2375,10 +2382,6 @@ inline std::string Svar::helpInfo()
         "Using Svar supported argument parsing. The following table listed "
         "several argument introductions.\n";
     sst << printTable({{width, desc}});
-
-    arg<std::string>("conf", "Default.cfg",
-                     "The default configure file going to parse.");
-    arg<bool>("help", false, "Show the help information.");
     if(!args.isArray()) return "";
 
     sst << printTable({{namePartWidth, "Argument"},
@@ -2665,6 +2668,19 @@ public:
 
     static Svar to(const std::vector<T>& var){
         return (SvarValue*)new SvarArray(std::vector<Svar>(var.begin(),var.end()));
+    }
+};
+
+template <>
+class caster<std::vector<Svar> >{
+public:
+    static Svar from(const Svar& var){
+        if(var.is<std::vector<Svar>>()) return var;
+        return Svar();
+    }
+
+    static Svar to(const std::vector<Svar>& var){
+        return (SvarValue*)new SvarArray(var);
     }
 };
 
@@ -3177,7 +3193,7 @@ private:
             return parse_string();
 
         if (ch == '{') {
-            std::map<std::string, Svar> data;
+            std::unordered_map<std::string, Svar> data;
             ch = get_next_token();
             if (ch == '}')
                 return data;
@@ -3199,7 +3215,7 @@ private:
                 if (ch != ':')
                     return fail("expected ':' in object, got " + esc(ch));
 
-                data[std::move(key)] = parse_json(depth + 1);
+                data.insert(std::make_pair(std::move(key),parse_json(depth + 1)));
                 if (failed)
                     return Svar();
 

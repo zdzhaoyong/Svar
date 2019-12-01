@@ -1,6 +1,5 @@
 #include "Svar.h"
 #include "gtest.h"
-#include "Registry.h"
 #include "Timer.h"
 
 using namespace GSLAM;
@@ -125,70 +124,6 @@ TEST(Svar,Function)
     EXPECT_TRUE(Svar::lambda([](std::shared_ptr<int> a){return *a;})(std::make_shared<int>(1))==1);
 }
 
-TEST(Svar,CBOR){
-    Svar cbor=svar["__builtin__"]["CBOR"];
-    Svar var={{"i",1},
-              {"bool",false},
-              {"double",434.},
-              {"str","sfd"},
-              {"vec",{1,2,3}},
-              {"map",{{"name","value"}}}
-             };
-
-    std::string file=svar.get("test.cbor",std::string(""),true);
-    if(!file.empty()){
-        ScopedTimer tm("parse_json");
-        var=var.loadFile(file);
-    }
-
-    int bufSize=svar.GetInt("test.cborBufSize",1e6);
-    if(bufSize){
-        std::string *buf=new std::string();
-        buf->resize(bufSize);
-        // should tell svarBuffer to release the buffer
-        SvarBuffer svarBuf(buf->data(),buf->size(),
-                           std::unique_ptr<std::string>(buf));
-        var.set("binary_buf",svarBuf);
-
-        timer.enter("dump_cbor");
-        SvarBuffer bin=cbor.call("dump",var).as<SvarBuffer>();
-        timer.leave("dump_cbor");
-
-        timer.enter("load_cbor");
-        Svar ret=cbor.call("load",bin);
-        timer.leave("load_cbor");
-
-        EXPECT_TRUE(ret["binary_buf"].is<SvarBuffer>());
-
-    }
-}
-
-TEST(Svar,HexAndBase64){
-    SvarBuffer buf=SvarBuffer::load(svar.GetString("md5",svar["argv"].as<char**>()[0]));
-
-    EXPECT_EQ(buf.hex(),SvarBuffer::fromHex(buf.hex()).hex());
-    EXPECT_EQ(buf.base64(),SvarBuffer::fromBase64(buf.base64()).base64());
-    LOG(INFO)<<buf.length();
-    std::cout<<buf.md5()<<std::endl;
-
-    std::string str;
-    {
-        ScopedTimer tm("HexEncode");
-        str=buf.hex();
-    }
-    {
-        ScopedTimer tm("HexDecode");
-        buf=SvarBuffer::fromHex(str);
-    }
-    {
-        ScopedTimer tm("Base64Encode");
-        str=buf.base64();
-    }
-    {
-        ScopedTimer tm("Base64Decode");
-        buf=SvarBuffer::fromBase64(str);
-    }
-}
 
 class BBase{
 public:
@@ -436,53 +371,11 @@ TEST(Svar,Thread){
     for(auto& it:threads) it.join();
 }
 
-void showPlugin(){
-    std::string pluginPath=svar.GetString("plugin");
-    std::string key=svar.GetString("key");
-
-    Svar inst=Registry::load(pluginPath);
-    GSLAM::Svar var=key.empty()?(inst):inst.get(key,Svar());
-
-    if(var.isFunction())
-        std::cout<<var.as<SvarFunction>()<<std::endl;
-    else if(var.isClass())
-        std::cout<<var.as<SvarClass>()<<std::endl;
-    else std::cout<<var;
+int tests(Svar config){
+    testing::InitGoogleTest(&config["argc"].as<int>(),config["argv"].as<char**>());
+    return RUN_ALL_TESTS();
 }
 
-int main(int argc,char** argv){
-    Svar var=svar;
-    Svar unParsed=var.parseMain(argc,argv);
-
-    std::string plugin=var.arg<std::string>("plugin","","The svar module plugin wanna to show.");
-    var.arg<std::string>("key","","The name in the module wanna to show");
-    bool tests=var.arg("tests",false,"Perform google tests.");
-    bool dumpVar=var.arg("dumpVar",false,"DumpVar");
-    var.arg("tree.arg",256,"tryout tree like argument");
-    Svar obj=var.arg("object",Svar(),"object parameter");
-
-    if(var.get("help",false)||argc<2){
-        return var.help();
-    }
-
-    if(unParsed.length()){
-        std::cerr<<"Unparsed arguments:"<<unParsed<<std::endl;
-        return -1;
-    }
-
-    if(plugin.size()){
-        showPlugin();
-        return 0;
-    }
-
-    if(tests){
-        testing::InitGoogleTest(&argc,argv);
-        return RUN_ALL_TESTS();
-    }
-
-    if(dumpVar){
-        std::cout<<var;
-    }
-
-    return 0;
+REGISTER_SVAR_MODULE(tests){
+    svar["apps"]["tests"]={tests,"Use 'svar tests' to perform module testing"};
 }
