@@ -4,33 +4,30 @@
 using namespace GSLAM;
 
 int sample_json(Svar config){
-    Svar i=1;
-    Svar d=2.;
-    Svar s="hello world";
+    Svar null=nullptr;
     Svar b=false;
-    Svar v={1,2,"s",false};
-    Svar m={{"i",1},{"d",d},{"n",nullptr}};
+    Svar i=1;
+    Svar d=2.1;
+    Svar s="hello world";
+    Svar v={1,2,3};
+    Svar m={{"b",false},{"s","hello world"},{"n",nullptr},{"u",Svar()}};
 
-    if(i.is<int>()){
-        int it=i.as<int>();
-    }
+    Svar obj;
+    obj["m"]=m;
+    obj["pi"]=3.14159;
 
-    if(d.is<double>()){
-        d=d+3.;
-    }
+    std::cout<<obj<<std::endl;
 
-    if(v.isArray()){
-        for(auto a:v) std::cout<<a<<std::endl;
-    }
+    if(s.is<std::string>()) // use is to check type
+        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl; // use as to cast, never throw
 
-    if(m.isObject()){
-        for(std::pair<std::string,Svar> it:m)
-            std::cout<<it.first<<":"<<it.second<<std::endl;
-    }
+    double db=i.castAs<double>();// use castAs, this may throw SvarException
+
+    for(auto it:v) std::cout<<it<<std::endl;
+
+    for(std::pair<std::string,Svar> it:m) std::cout<<it.first<<":"<<it.second<<std::endl;
 
     std::string json=m.dump_json();
-    std::cout<<json<<std::endl;
-
     m=Svar::parse_json(json);
     return 0;
 }
@@ -60,7 +57,7 @@ int sample_cppclass()
         MyClass(int b=2):a(b){}
         static MyClass create(){return MyClass();}
         void print(){
-            std::cerr<<a;
+            std::cerr<<a<<std::endl;
         }
 
         int a;
@@ -79,9 +76,9 @@ int sample_cppclass()
     Svar inst=DemoClass(3);
     inst.call("print");
 
-    Svar inst2=DemoClass.call("create");
-    int  a=inst2["a"].as<int>();
-    std::cout<<a;
+    const Svar& inst2=DemoClass.call("create");
+    int  a=inst2["a"].as<int>();// const & is essential to correctly get property
+    std::cout<<a<<std::endl;
 
     return 0;
 }
@@ -112,12 +109,22 @@ int sample_svarclass(){// users can also define a class without related c++ clas
 int sample_module(Svar config){
     Svar sampleModule=Registry::load("sample_module");
 
-    Svar ApplicationDemo=sampleModule["ApplicationDemo"];
+    Svar Person=sampleModule["Person"];
+    Svar Student=sampleModule["Student"];
+    std::cout<<Person.as<SvarClass>();
+    std::cout<<Student.as<SvarClass>();
 
-    Svar instance=ApplicationDemo("zhaoyong");
-    std::cout<<instance.call("gslam_version");
+    Svar father=Person(40,"father");
+    Svar mother=Person(39,"mother");
+    Svar sister=Student(15,"sister","high");
+    Svar me    =Student(13,"me","juniar");
 
-    std::cout<<ApplicationDemo.as<SvarClass>();
+    std::cout<<"all:"<<Person.call("all")<<std::endl;
+    std::cout<<father.call("intro").as<std::string>()<<std::endl;
+    std::cout<<sister.call("intro").as<std::string>()<<std::endl;
+    std::cout<<mother.call("age")<<std::endl;
+    std::cout<<me.call("age")<<std::endl;
+
     return 0;
 }
 

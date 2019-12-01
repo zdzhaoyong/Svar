@@ -173,7 +173,7 @@ script:
   - mkdir -p build && cd build
   - cmake .. ${CMAKE_OPTIONS} && cmake --build . --config Release
   - sudo make install
-  - svar -tests
+  - svar tests
   
 # Generate and deploy documentation
 after_success:

@@ -89,18 +89,18 @@ svar --help
 
 Perform tests:
 ```
-svar -tests
+svar tests
 ```
 
 Show the context of the sample plugin module:
 
 ```
 # Show the structure of a plugin
-svar -plugin libsample_module.so
+svar doc -plugin libsample_module.so
 # Show the documentation of a named class
-svar -plugin libsample_module.so -name __builtin__.Json
+svar doc -plugin libsample_module.so -key __builtin__.Json
 # Show the documentation of a named function
-svar -plugin libsample_module.so -name add
+svar doc -plugin libsample_module.so -key add
 ```
 
 Use sample plugin module with c++: [sample_use](./src/cpp/sample_use).

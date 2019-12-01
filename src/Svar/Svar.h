@@ -189,32 +189,33 @@ Svar brings the following features:
 
 Svar natually support JSON and here is some basic usage demo:
 \code
-Svar null=nullptr;
-Svar b=false;
-Svar i=1;
-Svar d=2.1;
-Svar s="hello world";
-Svar v={1,2,3}
-Svar m={"b",false,"s","hello world"}
+    Svar null=nullptr;
+    Svar b=false;
+    Svar i=1;
+    Svar d=2.1;
+    Svar s="hello world";
+    Svar v={1,2,3};
+    Svar m={{"b",false},{"s","hello world"}};
 
-Svar obj;
-obj["m"]=m;
-obj["pi"]=3.14159;
+    Svar obj;
+    obj["m"]=m;
+    obj["pi"]=3.14159;
 
-std::cout<<obj;
+    std::cout<<obj<<std::endl;
 
-std::stringstream sst("[2,3,4]");
-sst>>obj;
-std::cout<<obj;
+    if(s.is<std::string>()) // use is to check type
+        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl; // use as to cast, never throw
 
-// use string literal
-Svar lit="[false,3]"_svar;
+    double db=i.castAs<double>();// use castAs, this may throw SvarException
 
-if(s.is<std::string>()) // use is to check type
-    std::cout<<"raw string is "<<s.as<std::string>(); // use as to force cast, never throw
+    for(auto it:v) std::cout<<it<<std::endl;
 
-double d=i.castAs<double>();// use castAs, this may throw SvarException
+    for(std::pair<std::string,Svar> it:m) std::cout<<it.first<<":"<<it.second<<std::endl;
 
+    std::string json=m.dump_json();
+    std::cout<<json<<std::endl;
+
+    m=Svar::parse_json(json);
 \endcode
 
 \section s_svar_arguments Use Svar for Argument Parsing
@@ -223,19 +224,21 @@ Svar provides argument parsing functional with JSON configuration loading.
 Here is a small demo shows how to use Svar for argument parsing:
 
 @code
-#include <GSLAM/core/Svar.h>
 
 int main(int argc,char** argv)
 {
     svar.parseMain(argc,argv);
 
-    int argInt=svar.arg<int>("i",0,"This is a demo int parameter");
-    svar.arg<bool>("b",false,"Here is the bool description");
+    int  argInt=svar.arg<int>("i",0,"This is a demo int parameter");
+    bool bv=svar.arg("b.dump",false,"Svar supports tree item assign");
+    Svar m =svar.arg("obj",Svar(),"Svar support json parameter");
 
     if(svar.get<bool>("help",false)){
         svar.help();
         return 0;
     }
+    if(svar["b"]["dump"].as<bool>())
+        std::cerr<<svar;
     return 0;
 }
 
@@ -253,7 +256,8 @@ nt introductions.
 Argument        Type(default->setted)           Introduction
 --------------------------------------------------------------------------------
 -i              int(0)                          This is a demo int parameter
--b              bool(false)                     Here is the bool description
+-b.dump         bool(false)                     Svar supports tree item assign
+-obj            svar(undefined)                 Svar support json parameter
 -conf           str("Default.cfg")              The default configure file going
                                                  to parse.
 -help           bool(false->true)               Show the help information.
@@ -266,6 +270,11 @@ Svar supports the following parsing styles:
 - "-arg=value": two "--" such as "--arg=value" is the same
 - "arg=value"
 - "-arg" : this is the same with "arg=true", but the next argument should not be a value
+
+Svar supports to use brief Json instead of strict Json:
+@code
+sample_use -b.dump -obj '{a:1,b:false}'
+@endcode
 
 \section s_svar_cppelements Use Svar to Hold Other C++ Elements
 
@@ -501,7 +510,7 @@ One can use the 'svar' application from https://github.com/zdzhaoyong/Svar,
 or the "gslam" application of https://github.com/zdzhaoyong/GSLAM to access the context.
 
 @code
--> gslam doc -plugin sample
+-> svar doc -plugin sample
 {
   "ApplicationDemo" : <class at 0x15707d0>,
   "__builtin__" : {
@@ -512,7 +521,7 @@ or the "gslam" application of https://github.com/zdzhaoyong/GSLAM to access the 
   "__name__" : "sample_module",
   "add" : <function at 0x15706e0>
 }
--> gslam doc -plugin sample -key ApplicationDemo
+-> svar doc -plugin sample -key ApplicationDemo
 class ApplicationDemo():
 |  ApplicationDemo.__init__(...)
 |      ApplicationDemo.__init__(str)->ApplicationDemo
@@ -743,9 +752,9 @@ public:
         }
     };
 
-    svar_interator begin();
-    svar_interator end();
-    svar_interator find(const Svar& idx);
+    svar_interator begin()const;
+    svar_interator end()const;
+    svar_interator find(const Svar& idx)const;
 
     /// Used to iter an object
     /// @code
@@ -945,7 +954,7 @@ public:
 
         if(!overload){
             std::stringstream stream;
-            stream<<"Failed to call method "<<getName()<<" with imput arguments: [";
+            stream<<(*this)<<"Failed to call method with imput arguments: [";
             for(auto it=argv.begin();it!=argv.end();it++)
             {
                 stream<<(it==argv.begin()?"":",")<<it->typeName();
@@ -988,10 +997,11 @@ public:
     std::string signature()const;
 
     friend std::ostream& operator<<(std::ostream& sst,const SvarFunction& self){
-        sst<<self.getName()<<"(...)\n";
+        if(self.name.size())
+            sst<<self.name<<"(...)\n";
         const SvarFunction* overload=&self;
         while(overload){
-            sst<<"    "<<overload->getName()<<overload->signature()<<std::endl;
+            sst<<"    "<<overload->name<<overload->signature()<<std::endl;
             if(!overload->next.isFunction()) {
                 return sst;
             }
@@ -1000,10 +1010,7 @@ public:
         return sst;
     }
 
-    std::string getName()const{return name.empty()?"function":name;}
-    void        initName(const std::string& nm){if(name.empty()) name=nm;}
-
-    std::string   name;
+    std::string   name,sign;
     std::vector<Svar> arg_types;
     Svar          next;
 
@@ -1018,6 +1025,12 @@ public:
     public:
       SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
         :_fget(fget),_fset(fset),_name(name),_doc(doc){}
+
+      friend std::ostream& operator<<(std::ostream& ost,const SvarProperty& rh)
+      {
+          ost<<rh._name<<"\n  "<<rh._fget.as<SvarFunction>()<<std::endl;;
+          return ost;
+      }
 
       Svar _fget,_fset;
       std::string _name,_doc;
@@ -1123,28 +1136,10 @@ public:
     template <typename... Args>
     Svar call(const Svar& inst,const std::string function, Args... args)const
     {
-        Svar f=_attr[function];
-        if(f.isFunction())
-        {
-            SvarFunction& func=f.as<SvarFunction>();
-            if(func.is_method)
-                return func.call(inst,args...);
-            else return func.call(args...);
-        }
-
-        for(const Svar& p:_parents){
-            try{
-                if(p.isClass()){
-                    return p.as<SvarClass>().call(inst,function,args...);
-                }
-                return p[0].as<SvarClass>().call(p[1](inst),function,args...);
-            }
-            catch(SvarExeption e){
-                continue;
-            }
-        }
-        throw SvarExeption("Class "+__name__+" has no function "+function);
-        return Svar::Undefined();
+        std::vector<Svar> argv = {
+                (Svar(std::move(args)))...
+        };
+        return Call(inst,function,argv);
     }
 
         Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
@@ -1160,6 +1155,7 @@ public:
                 else return func.Call(args);
             }
 
+            std::stringstream sst;
             for(const Svar& p:_parents){
                 try{
                     if(p.isClass()){
@@ -1168,10 +1164,11 @@ public:
                     return p[0].as<SvarClass>().Call(p[1](inst),function,args);
                 }
                 catch(SvarExeption e){
+                    sst<<e.what();
                     continue;
                 }
             }
-            throw SvarExeption("Class "+__name__+" has no function "+function);
+            throw SvarExeption("Class "+__name__+" has no function "+function+sst.str());
             return Svar::Undefined();
         }
 
@@ -1218,9 +1215,10 @@ public:
 
     Class():_cls(SvarClass::Class<C>()){}
 
-    Class(const std::string& name)
+    Class(const std::string& name,const std::string& doc="")
         :_cls(SvarClass::Class<C>()){
         _cls.setName(name);
+        _cls.__doc__=doc;
         svar[name]=SvarClass::instance<C>();
     }
 
@@ -1246,9 +1244,9 @@ public:
         return def(name,Svar::lambda(f),false);
     }
 
-    template <typename ChildType>
+    template <typename BaseType>
     Class& inherit(){
-        _cls.inherit<C,ChildType>();
+        _cls.inherit<BaseType,C>();
         return *this;
     }
 
@@ -2489,14 +2487,6 @@ inline bool Svar::operator <(const Svar& rh)const{
 
 inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
 {
-    if(self.isUndefined()) {
-        ost<<"undefined";
-        return ost;
-    }
-    if(self.isNull()){
-        ost<<"null";
-        return ost;
-    }
     auto cls=self.classPtr();
     if(cls&&cls->__str__.isFunction()){
         Svar a = cls->__str__(self);
@@ -2524,7 +2514,7 @@ inline const Svar& Svar::Undefined(){
 
 inline const Svar& Svar::Null()
 {
-    static Svar v=create<void*>(nullptr);
+    static Svar v=create<std::nullptr_t>(nullptr);
     return v;
 }
 
@@ -2576,8 +2566,8 @@ inline Svar::svar_interator::svar_interator(Svar it,Svar::svar_interator::IterTy
 {}
 
 inline Svar Svar::svar_interator::operator*(){
-    typedef std::vector<Svar>::iterator array_iter;
-    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    typedef std::vector<Svar>::const_iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::const_iterator object_iter;
     switch (_type) {
     case Object: return *_it->as<object_iter>();break;
     case Array: return *_it->as<array_iter>();break;
@@ -2587,8 +2577,8 @@ inline Svar Svar::svar_interator::operator*(){
 
 inline Svar::svar_interator& Svar::svar_interator::operator++()
 {
-    typedef std::vector<Svar>::iterator array_iter;
-    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    typedef std::vector<Svar>::const_iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::const_iterator object_iter;
     switch (_type)
     {
     case Object: _it->as<object_iter>()++;break;
@@ -2600,8 +2590,8 @@ inline Svar::svar_interator& Svar::svar_interator::operator++()
 
 inline bool Svar::svar_interator::operator==(const svar_interator& other) const
 {
-    typedef std::vector<Svar>::iterator array_iter;
-    typedef std::unordered_map<std::string,Svar>::iterator object_iter;
+    typedef std::vector<Svar>::const_iterator array_iter;
+    typedef std::unordered_map<std::string,Svar>::const_iterator object_iter;
     switch (_type)
     {
     case Object: return _it->as<object_iter>()==other._it->as<object_iter>();
@@ -2610,21 +2600,21 @@ inline bool Svar::svar_interator::operator==(const svar_interator& other) const
     }
 }
 
-inline Svar::svar_interator Svar::begin()
+inline Svar::svar_interator Svar::begin()const
 {
     if(isObject()) return svar_interator(as<SvarObject>()._var.begin(),svar_interator::Object);
     else if(isArray()) return svar_interator(as<SvarArray>()._var.begin(),svar_interator::Array);
     return svar_interator(*this,svar_interator::Others);
 }
 
-inline Svar::svar_interator Svar::end()
+inline Svar::svar_interator Svar::end()const
 {
     if(isObject()) return svar_interator(as<SvarObject>()._var.end(),svar_interator::Object);
     else if(isArray()) return svar_interator(as<SvarArray>()._var.end(),svar_interator::Array);
     return svar_interator(*this,svar_interator::Others);
 }
 
-inline Svar::svar_interator Svar::find(const Svar& idx)
+inline Svar::svar_interator Svar::find(const Svar& idx)const
 {
     if(isObject()) return svar_interator(as<SvarObject>()._var.find(idx.castAs<std::string>()),svar_interator::Object);
     return end();
@@ -2633,14 +2623,19 @@ inline Svar::svar_interator Svar::find(const Svar& idx)
 inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
     ost<<"class "<<rh.__name__<<"():\n";
     std::stringstream  content;
-    if(rh.__init__.isFunction()) content<<rh.__init__.as<SvarFunction>()<<std::endl<<std::endl;
     if(!rh.__doc__.empty()) content<<rh.__doc__<<std::endl;
     if(rh._attr.isObject()&&rh._attr.length()){
         content<<"Methods defined here:\n";
-        const SvarObject& methods=rh._attr.as<SvarObject>();
-        auto varCopy=methods._var;
-        for(std::pair<std::string,Svar> it:varCopy){
-            content<<it.second.as<SvarFunction>()<<std::endl<<std::endl;
+        for(std::pair<std::string,Svar> it:rh._attr)
+        {
+            if(!it.second.isFunction()) continue;
+            content<<it.second.as<SvarFunction>()<<std::endl;
+        }
+        content<<"Property defined here:\n\n";
+        for(std::pair<std::string,Svar> it:rh._attr)
+        {
+            if(!it.second.isProperty()) continue;
+            content<<it.second.as<SvarClass::SvarProperty>()<<std::endl;
         }
     }
     std::string line;
@@ -3290,10 +3285,14 @@ public:
         SvarClass::Class<SvarFunction>().setName("function");
         SvarClass::Class<SvarClass>().setName("class");
         SvarClass::Class<Svar>().setName("svar");
+        SvarClass::Class<SvarBuffer>().setName("buffer");
+        SvarClass::Class<SvarClass::SvarProperty>().setName("property");
 
         SvarClass::Class<void>()
-                .def("__str__",[](const Svar&){return "Undefined";})
+                .def("__str__",[](const Svar&){return "undefined";})
         .setName("void");
+        Svar::Null().classPtr()
+                ->def("__str__",[](const Svar&){return "null";});
 
         SvarClass::Class<int>()
                 .def("__init__",&SvarBuiltin::int_create)
