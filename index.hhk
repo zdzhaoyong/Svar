@@ -1,0 +1,411 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML><HEAD></HEAD><BODY>
+<OBJECT type="text/site properties">
+<param name="FrameName" value="right">
+</OBJECT>
+<UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a015ae9ecae065364d47a99adebe0fa60"><param name="Name" value="_cycle"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1ScopedTimer.html#ac6c6568f629811a15a5a9680c6669db4"><param name="Name" value="_func_name"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a571286a3f8d6a4ced7c54bc0c69b16cb"><param name="Name" value="_it"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ada34dbc9e36eb6ed6fa27b7bfabb9615"><param name="Name" value="_libraryFilePath"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a6200d62d9a8e68345d9234968761a699"><param name="Name" value="_obj"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a3b4d0d9af1c1f17224a9ad1726a4e2a0"><param name="Name" value="_registedLibs"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a7e1bf2f8b8b0f1478b18f411b797dc98"><param name="Name" value="_tmBegin"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a7e1bf2f8b8b0f1478b18f411b797dc98"><param name="Name" value="GSLAM::Rate"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#ab6b19968b90edb4cc389d06936590138"><param name="Name" value="GSLAM::TicToc"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a00e0ad96548d4503c504b2888d0d59d6"><param name="Name" value="_type"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af486d437ca83bff3de868962797b7dfa"><param name="Name" value="arg"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a19d147d00faf43034a672c6dd1fc1e13"><param name="Name" value="Arg"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#afb2fc4b5464c01ddd5aba4f9a7605bb9"><param name="Name" value="array"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a08773c77163453a2ce55b7145e3c7ba8"><param name="Name" value="as"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a58e7a201b941b80a71b625ddec1c6c32"><param name="Name" value="begin"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a244e9f10e4f3959a160118e2acf9cd10"><param name="Name" value="call"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a01876ee06f17e72e9e1af2e4e313e2af"><param name="Name" value="castAs"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a7a4afab2161301d0f892acadc20b7014"><param name="Name" value="classObject"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a543343527eebcf1bd1614a5b33ba03d3"><param name="Name" value="classPtr"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af318263cfeaf4bec98b2f6e2ff6ce127"><param name="Name" value="clone"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="compile.html"><param name="Name" value="Compile and Install"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#af112aa2b293a15db4f98486e768d9805"><param name="Name" value="convertStringPathIntoFilePathList"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#adee237b89897e980c44fe0a2ba714a71"><param name="Name" value="cpptype"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="module.html"><param name="Name" value="Create and Use a Svar Module"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aaa19826445f82f8208e81b822d1deb21"><param name="Name" value="create"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a032e4fe8ededac4a872e00bccde08256"><param name="Name" value="decref"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aa2d692eca140375108b2a22d77ff8db4"><param name="Name" value="dict"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a8cfbbe53c1cf6e3054736daea3044c0f"><param name="Name" value="disable"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ad17ac92eab2b866cc205bcf72c85ffcf"><param name="Name" value="dump_json"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#af567799e456dbae81256eb22ff261ac8"><param name="Name" value="dumpAllStats"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a412540c097deebc800432ef0fefc0f15"><param name="Name" value="enable"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a49181655387ca530d0dfc73213f57089"><param name="Name" value="end"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#af04d14073086e82d9da30f99830691b1"><param name="Name" value="enter"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a4e355e31bd4e015f9c8eedbb11371e6a"><param name="Name" value="erase"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a4e355e31bd4e015f9c8eedbb11371e6a"><param name="Name" value="GSLAM::Registry"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af8bb039895b5b3d5251385f44a06e522"><param name="Name" value="GSLAM::Svar"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3cf3c136eb3134117975f13efdb9adec"><param name="Name" value="exist"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac8425d3191cde8479f26c84e0044aef9"><param name="Name" value="False"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aca325038cf8fe309cde4dc12dd2564f3"><param name="Name" value="fileExists"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a7c2f2a4a88d0a1957fc2853a2c6f6197"><param name="Name" value="FilePathList"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a92da9f64ce440bdaee8d213e5d0b2ff3"><param name="Name" value="find"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a15dccd53dccb2f0c55b3a815ff36409e"><param name="Name" value="fromPy"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#abaece383b5b1b5e78cb486ca8a6bf889"><param name="Name" value="get"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#abaece383b5b1b5e78cb486ca8a6bf889"><param name="Name" value="GSLAM::Registry"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a91e586a2f699351839e2fe40c8ec7e42"><param name="Name" value="GSLAM::Svar"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1b42f2b17dd6cdc0f2704152674cbb78"><param name="Name" value="Get"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ab5fa1410c79a6b27b12f9a1a4e358c5f"><param name="Name" value="getBaseName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab4b55ba01421cca6917316135a97d907"><param name="Name" value="GetDouble"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a1c4fc038b21425cdf06f240f3edf4bdd"><param name="Name" value="getFileName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ac4af0f90ba8e2fc7b3137d9cafee2511"><param name="Name" value="getFolderPath"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aeeb564224b1f0e7e8d57ce2cf2e99921"><param name="Name" value="GetInt"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a305912d4a4a1a62eb6c323b76d626087"><param name="Name" value="getMeanTime"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a7a18d3947d3bb422fc329eca1e9f32b4"><param name="Name" value="getModule"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ac2837b5a53ad7882ce136891497e56be"><param name="Name" value="getPath"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a83bb835394998985631c78c134b6ec9a"><param name="Name" value="getPluginName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#afc6d28da41dbcc91e6ae58227ad3cee4"><param name="Name" value="GetPointer"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a2b3760447863def25f3e7048d0427e2c"><param name="Name" value="getPy"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#ac316525bdfdf56d66dacc90c273c9011"><param name="Name" value="getPyClass"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#aba10cde12647d19336fdc4bdac34be5b"><param name="Name" value="getPyFunction"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a4d25524d9c0f55c81a8859bc5d2ae6a0"><param name="Name" value="getPyProperty"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a3dd0aaa14063b9fc0871115e27b46239"><param name="Name" value="getStatsAsText"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a49fb706b251aa5cec67d35ca2d3851a3"><param name="Name" value="GetString"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a96fbcad7bb4f1d92dbca13579dcef0d3"><param name="Name" value="getSymbol"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html"><param name="Name" value="GSLAM::LogFileSink"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a614d2340f61f4ac50f6b50bdd6260c88"><param name="Name" value="LogFileSink"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a0b5e17071c14e75e8c7397e29b036a86"><param name="Name" value="m_baseFileName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#acf48957d5ddf612c374ce47dabc0cb9e"><param name="Name" value="m_logFile"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a3c55222cf58f968dfc88ae00668491f1"><param name="Name" value="m_logFileName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a101eee954e651d1f484eaffaff800b1a"><param name="Name" value="m_severity"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#ae5dac19a1a52b09b77a5de349666e1da"><param name="Name" value="send"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#af279d00e333b15cc6331a43861551e9f"><param name="Name" value="WaitTillSent"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LoggerVoidify.html"><param name="Name" value="GSLAM::LoggerVoidify"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LoggerVoidify.html#a3cdbebbca781311a798be87332089412"><param name="Name" value="operator&"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html"><param name="Name" value="GSLAM::LogSink"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#aadd78ccc12ee5334a84cc5ea9dbecdc3"><param name="Name" value="send"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#a200c80b4950b9e74a852cf23e3cb7522"><param name="Name" value="ToString"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#a387abf843ace923ad63b4fa3942ba43b"><param name="Name" value="WaitTillSent"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1MessageLogger.html"><param name="Name" value="GSLAM::MessageLogger"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1MessageLogger.html#a7c5d47c436f38bc8819a917e2d2b85ec"><param name="Name" value="MessageLogger"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1MessageLogger.html#a019e962817e4ba80f37f1ae05d2c73da"><param name="Name" value="stream"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1PyObjectHolder.html"><param name="Name" value="GSLAM::PyObjectHolder"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1PyObjectHolder.html#aaa12580403a2cc24c96324b4c5715889"><param name="Name" value="obj"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1PyObjectHolder.html#ac8a95ab9e399424caf119c81b86ce579"><param name="Name" value="PyObjectHolder"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html"><param name="Name" value="GSLAM::Rate"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a015ae9ecae065364d47a99adebe0fa60"><param name="Name" value="_cycle"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a7e1bf2f8b8b0f1478b18f411b797dc98"><param name="Name" value="_tmBegin"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#ad4721ba72b8f51da8a63478837e51337"><param name="Name" value="Rate"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a14a11029699a982ceb1e798082d611d6"><param name="Name" value="sleep"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html"><param name="Name" value="GSLAM::Registry"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ada34dbc9e36eb6ed6fa27b7bfabb9615"><param name="Name" value="_libraryFilePath"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a3b4d0d9af1c1f17224a9ad1726a4e2a0"><param name="Name" value="_registedLibs"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#af112aa2b293a15db4f98486e768d9805"><param name="Name" value="convertStringPathIntoFilePathList"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a4e355e31bd4e015f9c8eedbb11371e6a"><param name="Name" value="erase"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aca325038cf8fe309cde4dc12dd2564f3"><param name="Name" value="fileExists"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a7c2f2a4a88d0a1957fc2853a2c6f6197"><param name="Name" value="FilePathList"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#abaece383b5b1b5e78cb486ca8a6bf889"><param name="Name" value="get"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ab5fa1410c79a6b27b12f9a1a4e358c5f"><param name="Name" value="getBaseName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a1c4fc038b21425cdf06f240f3edf4bdd"><param name="Name" value="getFileName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#ac4af0f90ba8e2fc7b3137d9cafee2511"><param name="Name" value="getFolderPath"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#a83bb835394998985631c78c134b6ec9a"><param name="Name" value="getPluginName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aa9d8fca0f9aa453803cfc0aeb399eea0"><param name="Name" value="instance"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#adc2da251c19d39160e66d0e2effb236d"><param name="Name" value="load"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aa00db9f09cf84f04f4e2c64ec9882156"><param name="Name" value="updatePaths"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1ScopedTimer.html"><param name="Name" value="GSLAM::ScopedTimer"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1ScopedTimer.html#ac6c6568f629811a15a5a9680c6669db4"><param name="Name" value="_func_name"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1ScopedTimer.html#a6a0f72f337b452b9edbb446181a139a9"><param name="Name" value="ScopedTimer"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html"><param name="Name" value="GSLAM::SharedLibrary"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ac2837b5a53ad7882ce136891497e56be"><param name="Name" value="getPath"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a96fbcad7bb4f1d92dbca13579dcef0d3"><param name="Name" value="getSymbol"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a578cb942bca6c2f5cd199d47f5f39301"><param name="Name" value="hasSymbol"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a75f2618c1eff1978d2595af80bb258d4"><param name="Name" value="isLoaded"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ae79ed87c1526a4f78eb4d0359beb0700"><param name="Name" value="load"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a51bb8ad0f5481dbabc2e88fedb7cee10"><param name="Name" value="MutexRW"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ab62ee91cb01ea049e5de8ba2db981021"><param name="Name" value="SharedLibrary"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a24bd12831ffc0d355465c4212ff463d9"><param name="Name" value="suffix"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a75d84312cb36261792b879ffc61e7e16"><param name="Name" value="unload"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ae2da3bbe5565f40f9789aec9a6078629"><param name="Name" value="WriteMutex"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a3011d61acf4971407f0f5d7d45db91a2"><param name="Name" value="~SharedLibrary"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html"><param name="Name" value="GSLAM::Svar"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html"><param name="Name" value="GSLAM::Svar::svar_interator"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a571286a3f8d6a4ced7c54bc0c69b16cb"><param name="Name" value="_it"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a00e0ad96548d4503c504b2888d0d59d6"><param name="Name" value="_type"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a29641f875134974872c6712ba1d5bd87"><param name="Name" value="operator!="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a79981302b9bf594c8fe6a19d7acb3a6f"><param name="Name" value="operator*"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#aac5aad85e1d17ce95f190db976b4b125"><param name="Name" value="operator++"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#aa6e56e7a796f05eb37b992cb506b2a37"><param name="Name" value="operator=="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a9a46a164a8321e79e2ef270473b26e15"><param name="Name" value="svar_interator"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html"><param name="Name" value="GSLAM::Svar"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a6200d62d9a8e68345d9234968761a699"><param name="Name" value="_obj"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af486d437ca83bff3de868962797b7dfa"><param name="Name" value="arg"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a19d147d00faf43034a672c6dd1fc1e13"><param name="Name" value="Arg"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#afb2fc4b5464c01ddd5aba4f9a7605bb9"><param name="Name" value="array"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a08773c77163453a2ce55b7145e3c7ba8"><param name="Name" value="as"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a58e7a201b941b80a71b625ddec1c6c32"><param name="Name" value="begin"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a244e9f10e4f3959a160118e2acf9cd10"><param name="Name" value="call"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a01876ee06f17e72e9e1af2e4e313e2af"><param name="Name" value="castAs"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a7a4afab2161301d0f892acadc20b7014"><param name="Name" value="classObject"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a543343527eebcf1bd1614a5b33ba03d3"><param name="Name" value="classPtr"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af318263cfeaf4bec98b2f6e2ff6ce127"><param name="Name" value="clone"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#adee237b89897e980c44fe0a2ba714a71"><param name="Name" value="cpptype"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aaa19826445f82f8208e81b822d1deb21"><param name="Name" value="create"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aa2d692eca140375108b2a22d77ff8db4"><param name="Name" value="dict"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ad17ac92eab2b866cc205bcf72c85ffcf"><param name="Name" value="dump_json"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a49181655387ca530d0dfc73213f57089"><param name="Name" value="end"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af8bb039895b5b3d5251385f44a06e522"><param name="Name" value="erase"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3cf3c136eb3134117975f13efdb9adec"><param name="Name" value="exist"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac8425d3191cde8479f26c84e0044aef9"><param name="Name" value="False"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a92da9f64ce440bdaee8d213e5d0b2ff3"><param name="Name" value="find"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a91e586a2f699351839e2fe40c8ec7e42"><param name="Name" value="get"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1b42f2b17dd6cdc0f2704152674cbb78"><param name="Name" value="Get"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab4b55ba01421cca6917316135a97d907"><param name="Name" value="GetDouble"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aeeb564224b1f0e7e8d57ce2cf2e99921"><param name="Name" value="GetInt"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#afc6d28da41dbcc91e6ae58227ad3cee4"><param name="Name" value="GetPointer"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a49fb706b251aa5cec67d35ca2d3851a3"><param name="Name" value="GetString"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a13166be76043b3dfccc0f830c846dc26"><param name="Name" value="help"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a968a0994d4878edae35dcf2ce7e764bc"><param name="Name" value="helpInfo"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af4024bc32cfabb05d4b71c1974ca6aef"><param name="Name" value="instance"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a69cc23c360314b4a44710c6dd69d4933"><param name="Name" value="is"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aef40eedcc1e197c3cb158f66fb385e43"><param name="Name" value="isArray"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af359df5ed36d8f2e3a708895063ac12e"><param name="Name" value="isClass"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af067ebd6556d359d3428a4160f6f9338"><param name="Name" value="isDict"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9a5180209fe373e11d99491f0d418854"><param name="Name" value="isException"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a708d9062d7209170526841fe64b1b799"><param name="Name" value="isFunction"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac02f2a4d7312eb91f40980adfd4e31b2"><param name="Name" value="isNull"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1618990b0a14bfbdfc702735b2d6ac4f"><param name="Name" value="isObject"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af347d82581ab0fc61c35e3053111810c"><param name="Name" value="isProperty"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a5b9400ba0c41c8636a72640cc52a96c8"><param name="Name" value="isUndefined"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9d1c8c19d22f2463e2fa072de124e4eb"><param name="Name" value="lambda"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a2edf269e5cd490f7863c9150bb910c85"><param name="Name" value="length"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3e8509bb5013c21db75cb048b661ba0e"><param name="Name" value="loadFile"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abdda942102beb9e8e438b4d5fa780686"><param name="Name" value="Null"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac17482c1278cc4ef8e2ae536ae2f2ade"><param name="Name" value="object"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aa96432abbd27da7b656952cf6e2922fc"><param name="Name" value="operator std::pair< std::string, Svar >"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae675e3fe7ae7b0f96e3de41c8ef78da6"><param name="Name" value="operator!="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a01257ceb6e0e30041dac5c7ccef10061"><param name="Name" value="operator%"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aec953f57e8f68905c802a275676ece75"><param name="Name" value="operator&"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a56fef956e6ec9f9d5b07a47515a7bba5"><param name="Name" value="operator()"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a35fb887992c74c467f371fad90109a75"><param name="Name" value="operator*"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1c73eb66e0a61920148968a763b422ab"><param name="Name" value="operator+"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a062e69913ad714f920de76f3db4e16bb"><param name="Name" value="operator-"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9064021fc9be402a852ef7769de4e55e"><param name="Name" value="operator/"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae4e1b90cbd3e022bca099df30c396777"><param name="Name" value="operator<"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a755944002e8ee134ae3a9504133f8ddf"><param name="Name" value="operator<<"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abc03800cbb2329aa85b1769723ad4eff"><param name="Name" value="operator<="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae893616f33d3a011d279e067dbde40a0"><param name="Name" value="operator="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a90ac3b3f06e6b63b6e1944736d109f60"><param name="Name" value="operator=="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab21f5d298d6bee77446cf54d27e50504"><param name="Name" value="operator>"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a95e34c8143d2cf285561885bf78cfd45"><param name="Name" value="operator>="></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a174e35e696e0165e30339ec58672bda9"><param name="Name" value="operator>>"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3bca8564626e4038c8f27396769bc7a3"><param name="Name" value="operator[]"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a180ee3fae97f9dd0fb57dee65b295d08"><param name="Name" value="operator^"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a8d613cdeacaf0226c1fd382a0ca249a9"><param name="Name" value="operator|"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a610260187a6f33f43f78e8fa9a52cbc5"><param name="Name" value="parse_json"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a07bd3d71bda857e2f41896b6ba796ad5"><param name="Name" value="parseFile"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abfee0c43d62fb5530d03aca6dffae473"><param name="Name" value="ParseFile"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a0824f478c3bd6d9c163ce2c1520e8130"><param name="Name" value="parseMain"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a415c802db11acfe4c21b9951419108ba"><param name="Name" value="ParseMain"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a22ce7e5bd642d4a28ba9ede933578d6e"><param name="Name" value="printTable"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ad8b2d1badc9986144bfcbd9cc55d7d99"><param name="Name" value="push_back"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9896b29df8c8817d9cb465dab20fcb6f"><param name="Name" value="set"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a86573a853030491ee354f95980b0afb1"><param name="Name" value="Set"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aac782da1f912bceb5d8ad00c8dc892ac"><param name="Name" value="size"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aadb9014ab0ae42542bf95d89e271e0ff"><param name="Name" value="Svar"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a2bc466b23ac171d20268611437835475"><param name="Name" value="toString"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a54b3d80e20c4dd834f23b08f8bf2ba69"><param name="Name" value="True"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab4d3891d6af377f32aa6b7ca92f63a01"><param name="Name" value="typeName"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a131862d1fa7e9a804a9cae932fa559d5"><param name="Name" value="Undefined"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a44bd2276466c74243395946bc726acd1"><param name="Name" value="value"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html"><param name="Name" value="GSLAM::SvarPy"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a032e4fe8ededac4a872e00bccde08256"><param name="Name" value="decref"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a15dccd53dccb2f0c55b3a815ff36409e"><param name="Name" value="fromPy"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a7a18d3947d3bb422fc329eca1e9f32b4"><param name="Name" value="getModule"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a2b3760447863def25f3e7048d0427e2c"><param name="Name" value="getPy"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#ac316525bdfdf56d66dacc90c273c9011"><param name="Name" value="getPyClass"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#aba10cde12647d19336fdc4bdac34be5b"><param name="Name" value="getPyFunction"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a4d25524d9c0f55c81a8859bc5d2ae6a0"><param name="Name" value="getPyProperty"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#ada91010b91b4cd59e9736234a9fb1fa7"><param name="Name" value="incref"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a495e3ac66a3bf65e23c2f04977352412"><param name="Name" value="svar_object"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a193567f1a86b6d172688701e2f93bcd1"><param name="Name" value="type_decref"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a50dc534205928384756c98ae320dafab"><param name="Name" value="type_incref"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a9a89f366197195591726a6d3a1be4e1c"><param name="Name" value="var"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SvarValue__.html"><param name="Name" value="GSLAM::SvarValue_"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html"><param name="Name" value="GSLAM::TicToc"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#ab6b19968b90edb4cc389d06936590138"><param name="Name" value="_tmBegin"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a735bdf6664b7aaf6eb79f9c836d4bf96"><param name="Name" value="Tac"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#adeae34b9b91d67fa71f5b35717cc31d5"><param name="Name" value="Tic"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a97ddd2dc6256011c51737ca9522418f8"><param name="Name" value="timestamp"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a22efaaa91796c974c442dc90c07b5dd3"><param name="Name" value="Toc"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html"><param name="Name" value="GSLAM::Timer"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a8cfbbe53c1cf6e3054736daea3044c0f"><param name="Name" value="disable"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#af567799e456dbae81256eb22ff261ac8"><param name="Name" value="dumpAllStats"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a412540c097deebc800432ef0fefc0f15"><param name="Name" value="enable"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#af04d14073086e82d9da30f99830691b1"><param name="Name" value="enter"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a305912d4a4a1a62eb6c323b76d626087"><param name="Name" value="getMeanTime"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a3dd0aaa14063b9fc0871115e27b46239"><param name="Name" value="getStatsAsText"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a09b6143021900238c6fb703887439193"><param name="Name" value="instance"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a67dde7d7edf33b2b8708bdf5f64acc52"><param name="Name" value="leave"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a67eafb492acfaafcaf32687cd11ab552"><param name="Name" value="Timer"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a578cb942bca6c2f5cd199d47f5f39301"><param name="Name" value="hasSymbol"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a13166be76043b3dfccc0f830c846dc26"><param name="Name" value="help"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a968a0994d4878edae35dcf2ce7e764bc"><param name="Name" value="helpInfo"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#ada91010b91b4cd59e9736234a9fb1fa7"><param name="Name" value="incref"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aa9d8fca0f9aa453803cfc0aeb399eea0"><param name="Name" value="instance"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aa9d8fca0f9aa453803cfc0aeb399eea0"><param name="Name" value="GSLAM::Registry"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af4024bc32cfabb05d4b71c1974ca6aef"><param name="Name" value="GSLAM::Svar"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a09b6143021900238c6fb703887439193"><param name="Name" value="GSLAM::Timer"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a69cc23c360314b4a44710c6dd69d4933"><param name="Name" value="is"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aef40eedcc1e197c3cb158f66fb385e43"><param name="Name" value="isArray"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af359df5ed36d8f2e3a708895063ac12e"><param name="Name" value="isClass"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af067ebd6556d359d3428a4160f6f9338"><param name="Name" value="isDict"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9a5180209fe373e11d99491f0d418854"><param name="Name" value="isException"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a708d9062d7209170526841fe64b1b799"><param name="Name" value="isFunction"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a75f2618c1eff1978d2595af80bb258d4"><param name="Name" value="isLoaded"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac02f2a4d7312eb91f40980adfd4e31b2"><param name="Name" value="isNull"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1618990b0a14bfbdfc702735b2d6ac4f"><param name="Name" value="isObject"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#af347d82581ab0fc61c35e3053111810c"><param name="Name" value="isProperty"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a5b9400ba0c41c8636a72640cc52a96c8"><param name="Name" value="isUndefined"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9d1c8c19d22f2463e2fa072de124e4eb"><param name="Name" value="lambda"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a67dde7d7edf33b2b8708bdf5f64acc52"><param name="Name" value="leave"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a2edf269e5cd490f7863c9150bb910c85"><param name="Name" value="length"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#adc2da251c19d39160e66d0e2effb236d"><param name="Name" value="load"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#adc2da251c19d39160e66d0e2effb236d"><param name="Name" value="GSLAM::Registry"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ae79ed87c1526a4f78eb4d0359beb0700"><param name="Name" value="GSLAM::SharedLibrary"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3e8509bb5013c21db75cb048b661ba0e"><param name="Name" value="loadFile"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a614d2340f61f4ac50f6b50bdd6260c88"><param name="Name" value="LogFileSink"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a0b5e17071c14e75e8c7397e29b036a86"><param name="Name" value="m_baseFileName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#acf48957d5ddf612c374ce47dabc0cb9e"><param name="Name" value="m_logFile"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a3c55222cf58f968dfc88ae00668491f1"><param name="Name" value="m_logFileName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#a101eee954e651d1f484eaffaff800b1a"><param name="Name" value="m_severity"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1MessageLogger.html#a7c5d47c436f38bc8819a917e2d2b85ec"><param name="Name" value="MessageLogger"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a51bb8ad0f5481dbabc2e88fedb7cee10"><param name="Name" value="MutexRW"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abdda942102beb9e8e438b4d5fa780686"><param name="Name" value="Null"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1PyObjectHolder.html#aaa12580403a2cc24c96324b4c5715889"><param name="Name" value="obj"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ac17482c1278cc4ef8e2ae536ae2f2ade"><param name="Name" value="object"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aa96432abbd27da7b656952cf6e2922fc"><param name="Name" value="operator std::pair< std::string, Svar >"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae675e3fe7ae7b0f96e3de41c8ef78da6"><param name="Name" value="operator!="></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae675e3fe7ae7b0f96e3de41c8ef78da6"><param name="Name" value="GSLAM::Svar"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a29641f875134974872c6712ba1d5bd87"><param name="Name" value="GSLAM::Svar::svar_interator"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a01257ceb6e0e30041dac5c7ccef10061"><param name="Name" value="operator%"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LoggerVoidify.html#a3cdbebbca781311a798be87332089412"><param name="Name" value="operator&"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LoggerVoidify.html#a3cdbebbca781311a798be87332089412"><param name="Name" value="GSLAM::LoggerVoidify"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aec953f57e8f68905c802a275676ece75"><param name="Name" value="GSLAM::Svar"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a56fef956e6ec9f9d5b07a47515a7bba5"><param name="Name" value="operator()"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a35fb887992c74c467f371fad90109a75"><param name="Name" value="operator*"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a35fb887992c74c467f371fad90109a75"><param name="Name" value="GSLAM::Svar"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a79981302b9bf594c8fe6a19d7acb3a6f"><param name="Name" value="GSLAM::Svar::svar_interator"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#aac5aad85e1d17ce95f190db976b4b125"><param name="Name" value="operator++"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a1c73eb66e0a61920148968a763b422ab"><param name="Name" value="operator+"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a062e69913ad714f920de76f3db4e16bb"><param name="Name" value="operator-"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9064021fc9be402a852ef7769de4e55e"><param name="Name" value="operator/"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a755944002e8ee134ae3a9504133f8ddf"><param name="Name" value="operator<<"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abc03800cbb2329aa85b1769723ad4eff"><param name="Name" value="operator<="></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae4e1b90cbd3e022bca099df30c396777"><param name="Name" value="operator<"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a90ac3b3f06e6b63b6e1944736d109f60"><param name="Name" value="operator=="></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a90ac3b3f06e6b63b6e1944736d109f60"><param name="Name" value="GSLAM::Svar"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#aa6e56e7a796f05eb37b992cb506b2a37"><param name="Name" value="GSLAM::Svar::svar_interator"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ae893616f33d3a011d279e067dbde40a0"><param name="Name" value="operator="></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a95e34c8143d2cf285561885bf78cfd45"><param name="Name" value="operator>="></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a174e35e696e0165e30339ec58672bda9"><param name="Name" value="operator>>"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab21f5d298d6bee77446cf54d27e50504"><param name="Name" value="operator>"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a3bca8564626e4038c8f27396769bc7a3"><param name="Name" value="operator[]"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a180ee3fae97f9dd0fb57dee65b295d08"><param name="Name" value="operator^"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a8d613cdeacaf0226c1fd382a0ca249a9"><param name="Name" value="operator|"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a610260187a6f33f43f78e8fa9a52cbc5"><param name="Name" value="parse_json"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#abfee0c43d62fb5530d03aca6dffae473"><param name="Name" value="ParseFile"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a07bd3d71bda857e2f41896b6ba796ad5"><param name="Name" value="parseFile"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a415c802db11acfe4c21b9951419108ba"><param name="Name" value="ParseMain"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a0824f478c3bd6d9c163ce2c1520e8130"><param name="Name" value="parseMain"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a22ce7e5bd642d4a28ba9ede933578d6e"><param name="Name" value="printTable"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ad8b2d1badc9986144bfcbd9cc55d7d99"><param name="Name" value="push_back"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1PyObjectHolder.html#ac8a95ab9e399424caf119c81b86ce579"><param name="Name" value="PyObjectHolder"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#ad4721ba72b8f51da8a63478837e51337"><param name="Name" value="Rate"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1ScopedTimer.html#a6a0f72f337b452b9edbb446181a139a9"><param name="Name" value="ScopedTimer"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#ae5dac19a1a52b09b77a5de349666e1da"><param name="Name" value="send"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#ae5dac19a1a52b09b77a5de349666e1da"><param name="Name" value="GSLAM::LogFileSink"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#aadd78ccc12ee5334a84cc5ea9dbecdc3"><param name="Name" value="GSLAM::LogSink"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a86573a853030491ee354f95980b0afb1"><param name="Name" value="Set"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a9896b29df8c8817d9cb465dab20fcb6f"><param name="Name" value="set"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ab62ee91cb01ea049e5de8ba2db981021"><param name="Name" value="SharedLibrary"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aac782da1f912bceb5d8ad00c8dc892ac"><param name="Name" value="size"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Rate.html#a14a11029699a982ceb1e798082d611d6"><param name="Name" value="sleep"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1MessageLogger.html#a019e962817e4ba80f37f1ae05d2c73da"><param name="Name" value="stream"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a24bd12831ffc0d355465c4212ff463d9"><param name="Name" value="suffix"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="dynamic.html"><param name="Name" value="Svar holding everything"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#aadb9014ab0ae42542bf95d89e271e0ff"><param name="Name" value="Svar"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1Svar_1_1svar__interator.html#a9a46a164a8321e79e2ef270473b26e15"><param name="Name" value="svar_interator"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a495e3ac66a3bf65e23c2f04977352412"><param name="Name" value="svar_object"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a735bdf6664b7aaf6eb79f9c836d4bf96"><param name="Name" value="Tac"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#adeae34b9b91d67fa71f5b35717cc31d5"><param name="Name" value="Tic"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Timer.html#a67eafb492acfaafcaf32687cd11ab552"><param name="Name" value="Timer"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a97ddd2dc6256011c51737ca9522418f8"><param name="Name" value="timestamp"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1TicToc.html#a22efaaa91796c974c442dc90c07b5dd3"><param name="Name" value="Toc"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="todo.html"><param name="Name" value="Todo List"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#a200c80b4950b9e74a852cf23e3cb7522"><param name="Name" value="ToString"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a2bc466b23ac171d20268611437835475"><param name="Name" value="toString"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a54b3d80e20c4dd834f23b08f8bf2ba69"><param name="Name" value="True"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a193567f1a86b6d172688701e2f93bcd1"><param name="Name" value="type_decref"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a50dc534205928384756c98ae320dafab"><param name="Name" value="type_incref"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#ab4d3891d6af377f32aa6b7ca92f63a01"><param name="Name" value="typeName"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a131862d1fa7e9a804a9cae932fa559d5"><param name="Name" value="Undefined"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a75d84312cb36261792b879ffc61e7e16"><param name="Name" value="unload"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Registry.html#aa00db9f09cf84f04f4e2c64ec9882156"><param name="Name" value="updatePaths"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="argument.html"><param name="Name" value="Use Svar for Argument Parsing"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="json.html"><param name="Name" value="Use Svar like JSON"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="languages.html"><param name="Name" value="Use Svar Module in Other Languages"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1Svar.html#a44bd2276466c74243395946bc726acd1"><param name="Name" value="value"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structGSLAM_1_1SvarPy.html#a9a89f366197195591726a6d3a1be4e1c"><param name="Name" value="var"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#af279d00e333b15cc6331a43861551e9f"><param name="Name" value="WaitTillSent"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogFileSink.html#af279d00e333b15cc6331a43861551e9f"><param name="Name" value="GSLAM::LogFileSink"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1LogSink.html#a387abf843ace923ad63b4fa3942ba43b"><param name="Name" value="GSLAM::LogSink"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#ae2da3bbe5565f40f9789aec9a6078629"><param name="Name" value="WriteMutex"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classGSLAM_1_1SharedLibrary.html#a3011d61acf4971407f0f5d7d45db91a2"><param name="Name" value="~SharedLibrary"></OBJECT>
+</UL>
+</BODY>
+</HTML>
