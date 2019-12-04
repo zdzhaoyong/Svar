@@ -1,0 +1,139 @@
+/**
+@page dynamic Svar holding everything
+
+\section sInstance Hold Other Class Instances
+
+Svar support to hold different values:
+
+@code
+    struct A{int a,b,c;}; // define a struct
+
+    A a={1,2,3};
+    Svar avar=a;      // support directly value copy assign
+    Svar aptrvar=&a;  // support pointer value assign
+    Svar uptrvar=std::unique_ptr<A>(new A({2,3,4}));
+    Svar sptrvar=std::shared_ptr<A>(new A({2,3,4})); // support shared_ptr lvalue
+
+    std::cout<<avar.as<A>().a<<std::endl;
+    std::cout<<aptrvar.as<A>().a<<std::endl;
+    std::cout<<uptrvar.as<A>().a<<std::endl;
+    std::cout<<sptrvar.as<A>().a<<std::endl;
+
+    std::cout<<avar.castAs<A*>()->b<<std::endl;
+    std::cout<<aptrvar.as<A*>()->b<<std::endl;
+    std::cout<<uptrvar.castAs<A*>()->b<<std::endl;
+    std::cout<<sptrvar.castAs<A*>()->b<<std::endl;
+
+    std::cout<<uptrvar.as<std::unique_ptr<A>>()->b<<std::endl;
+    std::cout<<sptrvar.as<std::shared_ptr<A>>()->b<<std::endl;
+@endcode
+
+Run the above sample with 'svar sample -instance'.
+
+\section sFunc Hold Functions
+
+@code
+void c_func_demo(Svar arg){
+    std::cout<<"Calling a c_func with arg "<<arg<<std::endl;
+}
+
+int sample_func(){
+    Svar c_func=c_func_demo;
+    c_func("I love Svar");
+
+    Svar lambda=Svar::lambda([](std::string arg){std::cout<<arg<<std::endl;});
+    lambda("Using a lambda");
+
+    Svar member_func(&SvarBuffer::md5);
+    std::cout<<"Obtain md5 with member function: "
+            <<member_func(SvarBuffer(3)).as<std::string>()<<std::endl;
+
+    return 0;
+}
+@endcode
+
+Run the above sample with 'svar sample -func'.
+
+\section sCls Hold and use a Class
+
+@code
+
+class Person{
+public:
+    Person(int age,std::string name)
+        : _age(age),_name(name){
+        all_person()[name]=_age;
+    }
+
+    virtual std::string intro()const{
+        return Svar({{"Person",{_age,_name}}}).dump_json();
+    }
+
+    int age()const{return _age;}
+
+    static Svar& all_person(){
+        static Svar all;
+        return all;
+    }
+
+    int _age;
+    std::string _name;
+};
+
+class Student: public Person{
+public:
+    Student(int age,std::string name,std::string school)
+        : Person(age,name),_school(school){}
+
+    virtual std::string intro()const{
+        return Svar({{"Student",{_age,_name,_school}}}).dump_json();
+    }
+
+    void setSchool(const std::string& school){
+        _school=school;
+    }
+
+    std::string _school;
+};
+
+{
+    // define the class to svar
+    Class<Person>("Person","The base class")
+            .construct<int,std::string>()
+            .def("intro",&Person::intro)
+            .def_static("all",&Person::all_person)
+            .def("age",&Person::age)
+            .def_readonly("name",&Person::_name,"The name of a person");
+
+    Class<Student>("Student","The derived class")
+            .construct<int,std::string,std::string>()
+            .inherit<Person>()
+            .def("intro",&Student::intro)
+            .def("setSchool",&Student::setSchool)
+            .def("getSchool",[](Student& self){return self._school;})
+            .def_readwrite("school",&Student::_school,"The school of a student");
+
+    // use the class with svar
+    Svar Person=svar["Person"];
+    Svar Student=svar["Student"];
+    std::cout<<Person.as<SvarClass>();
+    std::cout<<Student.as<SvarClass>();
+
+    Svar father=Person(40,"father");
+    Svar mother=Person(39,"mother");
+    Svar sister=Student(15,"sister","high");
+    Svar me    =Student(13,"me","juniar");
+    me.call("setSchool","school1");
+
+    std::cout<<"all:"<<Person.call("all")<<std::endl;
+    std::cout<<father.call("intro").as<std::string>()<<std::endl;
+    std::cout<<sister.call("intro").as<std::string>()<<std::endl;
+    std::cout<<mother.call("age")<<std::endl;
+    std::cout<<me.call("age")<<std::endl;
+    std::cout<<sister.call("getSchool")<<std::endl;
+    std::cout<<me.call("getSchool")<<std::endl;
+}
+@endcode
+
+Run the above code with "svar sample -module".
+*/

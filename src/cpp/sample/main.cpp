@@ -50,6 +50,31 @@ int sample_func(){
     return 0;
 }
 
+int sample_instance()
+{
+    struct A{int a,b,c;}; // define a struct
+
+    A a={1,2,3};
+    Svar avar=a;      // support directly value copy assign
+    Svar aptrvar=&a;  // support pointer value assign
+    Svar uptrvar=std::unique_ptr<A>(new A({2,3,4}));
+    Svar sptrvar=std::shared_ptr<A>(new A({2,3,4})); // support shared_ptr lvalue
+
+    std::cout<<avar.as<A>().a<<std::endl;
+    std::cout<<aptrvar.as<A>().a<<std::endl;
+    std::cout<<uptrvar.as<A>().a<<std::endl;
+    std::cout<<sptrvar.as<A>().a<<std::endl;
+
+    std::cout<<avar.castAs<A*>()->b<<std::endl;
+    std::cout<<aptrvar.as<A*>()->b<<std::endl;
+    std::cout<<uptrvar.castAs<A*>()->b<<std::endl;
+    std::cout<<sptrvar.castAs<A*>()->b<<std::endl;
+
+    std::cout<<uptrvar.as<std::unique_ptr<A>>()->b<<std::endl;
+    std::cout<<sptrvar.as<std::shared_ptr<A>>()->b<<std::endl;
+    return 0;
+}
+
 int sample_cppclass()
 {
     // 1. define a class with c++
@@ -118,12 +143,15 @@ int sample_module(Svar config){
     Svar mother=Person(39,"mother");
     Svar sister=Student(15,"sister","high");
     Svar me    =Student(13,"me","juniar");
+    me.call("setSchool","school1");
 
     std::cout<<"all:"<<Person.call("all")<<std::endl;
     std::cout<<father.call("intro").as<std::string>()<<std::endl;
     std::cout<<sister.call("intro").as<std::string>()<<std::endl;
     std::cout<<mother.call("age")<<std::endl;
     std::cout<<me.call("age")<<std::endl;
+    std::cout<<sister.call("getSchool")<<std::endl;
+    std::cout<<me.call("getSchool")<<std::endl;
 
     return 0;
 }
@@ -134,6 +162,7 @@ int sample(Svar config){
     bool cppclass=config.arg("cppclass",false,"run cpp class sample");
     bool svarclass=config.arg("svarclass",false,"run svar class sample");
     bool module=config.arg("module",false,"show how to use a svar module");
+    bool instance=config.arg("instance",false,"use svar to hold values");
 
     if(config.get("help",false)) return config.help();
 
@@ -142,6 +171,7 @@ int sample(Svar config){
     if(cppclass) return sample_cppclass();
     if(svarclass) return sample_svarclass();
     if(module) return sample_module(config);
+    if(instance) return sample_instance();
 
     return 0;
 }

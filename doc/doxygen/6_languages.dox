@@ -1,0 +1,44 @@
+/**
+@page languages Use Svar Module in Other Languages
+
+The last page shows how to use a Svar module in c++.
+Can the module also be imported by other languages?
+Yes!Yes!Yes!
+But we only implemented the python3 interface now, if you are familar with bindings, please contact me and we can cooperate on this!
+
+\section sPython Use the Sample Module with Python
+
+Firstly, please install the svar module with pip3:
+@code
+cd Svar
+pip3 install .
+@endcode
+
+Then, we can run the following python script with python3 in the 'libsample_module.so" folder:
+
+@code
+import svar
+
+s=svar.load('./libsample_module.so')
+
+father=s.Person(40,'father') # constructor
+mother=s.Person(39,'mother')
+sister=s.Student(15,'sister','high')
+me=s.Student(13,'me','juniar')
+
+me.setSchool('school1')
+
+print("all:",s.Person.all())
+
+print(father.intro())
+print(sister.intro())
+print(mother.age())
+#print(me.age()) # TODO: derivation is not implemented yet by the python binding
+print(sister.getSchool())
+print(me.getSchool())
+
+print(father.name) # property
+print(me.school)
+@endcode
+
+*/

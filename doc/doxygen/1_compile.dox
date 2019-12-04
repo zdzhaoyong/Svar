@@ -1,0 +1,42 @@
+/**
+@page compile Compile and Install
+
+Obtain source code from github
+
+```
+git clone https://github.com/zdzhaoyong/Svar
+```
+
+Compile the source code with cmake:
+```
+cd Svar
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+sudo make install
+```
+
+Usage help:
+```
+svar --help
+```
+
+Perform tests:
+```
+svar tests
+```
+
+Show the context of the sample plugin module:
+
+```
+# Show the structure of a plugin
+svar doc -plugin libsample_module.so
+# Show the documentation of a named class
+svar doc -plugin libsample_module.so -key Person
+# Show the documentation of a named function
+svar doc -plugin libsample_module.so -key add
+```
+*/
+
+

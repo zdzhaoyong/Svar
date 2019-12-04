@@ -1,0 +1,120 @@
+// Svar, A Tiny Modern C++ Header Brings Unified Interface for Different Languages
+// Copyright 2018 PILAB Inc. All rights reserved.
+// https://github.com/zdzhaoyong/Svar
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// * Redistributions of source code must retain the above copyright notice,
+//   this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright notice,
+//   this list of conditions and the following disclaimer in the documentation
+//   and/or other materials provided with the distribution.
+// * Neither the name of Google Inc. nor the names of its contributors may be
+//   used to endorse or promote products derived from this software without
+//   specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+///////////////////////////////////////////////////////
+// General Doxygen documentation
+///////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////
+// The main title page
+/**
+@mainpage
+
+\section sIntro Introduction
+
+[![Build Status](https://travis-ci.org/zdzhaoyong/Svar.svg?branch=master)](https://travis-ci.org/zdzhaoyong/Svar)
+[![Build Status](https://circleci.com/gh/zdzhaoyong/Svar.svg?style=svg)](https://circleci.com/gh/zdzhaoyong/Svar)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/9f6efa9443de498fa91a4e99f632dbd2)](https://www.codacy.com/app/zdzhaoyong/Svar)
+[![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](./LICENSE)
+[![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
+
+Svar is a powerful tiny modern c++ header implemented the following functionals:
+
+- JSON with buffer: Svar natually support JSON, but more than JSON, where JSON is only a subset of Svar data structure.
+- Argument parsing: Svar manages parameter in tree style, so that configuration in JSON format can be supported.
+- More than std::any after c++17: Svar is able to hold everything, including variables, functions, and classes. They can be used directly without declare header.
+- A general plugin form. The released library comes with documentation, making *.h header file interface description unnecessary. 
+- Auto multi-languages api. By Using Svar, your C++ library can be called easily with different languages like C++, Java, Python and Javascript.
+
+To learn about Svar, please follow the below tutorial:
+
+- \ref compile
+- \ref json
+- \ref argument
+- \ref dynamic
+- \ref module
+- \ref languages
+
+\section sDonate Donation
+Svar is a free personal software without commertial support, and this project is now accepting donation from the following links:
+
+| Wechat | Alipay | PayPal |
+| -- | -- | -- |
+| <img src="http://zhaoyong.win/resource/weixin.png" width = "20%" /> | <img src="http://zhaoyong.win/resource/alipay.png" width = "30%" /> | Not Ready|
+
+Here below listed some donors names (Please note you name):
+
+- Nobody donated this project, let's support it!
+ 
+Thanks for your help!
+
+
+\section sContacts Contacts
+
+YongZhao: zd5945@126.com
+
+\section sLic License
+
+The Svar library is licensed under the BSD license. Note that this text refers only to the license for Svar itself, independent of its optional dependencies, which are separately licensed. Building Svar with these optional dependencies may affect the resulting Svar license.
+
+```
+Copyright (c) 2018 Northwestern Polytechnical University, Yong Zhao. All rights reserved.
+
+This software was developed by the Yong Zhao at Northwestern Polytechnical University.
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this
+list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+3. All advertising materials mentioning features or use of this software must
+display the following acknowledgement: This product includes software developed
+by Northwestern Polytechnical University and its contributors.
+4. Neither the name of the University nor the names of its contributors may be
+used to endorse or promote products derived from this software without specific
+prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+*/
+
+
+
+

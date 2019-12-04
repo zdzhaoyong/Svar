@@ -1,0 +1,59 @@
+/**
+@page argument Use Svar for Argument Parsing
+
+Svar provides argument parsing functional with JSON configuration loading.
+Here is a small demo shows how to use Svar for argument parsing:
+
+@code
+
+int main(int argc,char** argv)
+{
+    svar.parseMain(argc,argv);
+
+    int  argInt=svar.arg<int>("i",0,"This is a demo int parameter");
+    bool bv=svar.arg("b.dump",false,"Svar supports tree item assign");
+    Svar m =svar.arg("obj",Svar(),"Svar support json parameter");
+
+    if(svar.get<bool>("help",false)){
+        svar.help();
+        return 0;
+    }
+    if(svar["b"]["dump"].as<bool>())
+        std::cerr<<svar;
+    return 0;
+}
+
+@endcode
+
+When you use "--help" or "-help", the terminal should show the below introduction:
+@code
+-> sample_use --help
+Usage:
+sample_use [--help] [-conf configure_file] [-arg_name arg_value]...
+
+Using Svar supported argument parsing. The following table listed several argume
+nt introductions.
+
+Argument        Type(default->setted)           Introduction
+--------------------------------------------------------------------------------
+-i              int(0)                          This is a demo int parameter
+-b.dump         bool(false)                     Svar supports tree item assign
+-obj            svar(undefined)                 Svar support json parameter
+-conf           str("Default.cfg")              The default configure file going
+                                                 to parse.
+-help           bool(false->true)               Show the help information.
+@endcode
+"help" and "conf" is two default parameters and users can use "conf" to load JSON file for configuration loading.
+
+
+Svar supports the following parsing styles:
+- "-arg value": two '-' such as "--arg value" is the same
+- "-arg=value": two "--" such as "--arg=value" is the same
+- "arg=value"
+- "-arg" : this is the same with "arg=true", but the next argument should not be a value
+
+Svar supports to use brief Json instead of strict Json:
+@code
+sample_use -b.dump -obj '{a:1,b:false}'
+@endcode
+*/

@@ -9,7 +9,7 @@ pi_add_target(svar BIN src/cpp REQUIRED System)
 pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)
 
 pi_report_targets()
-pi_install(TARGETS svar HEADERS src/Svar)
+pi_install(TARGETS svar sample_module HEADERS src/Svar)
 
 #####################################################################
 # Add Tab Completion Support

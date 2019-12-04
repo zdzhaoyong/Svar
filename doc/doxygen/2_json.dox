@@ -1,0 +1,40 @@
+/**
+@page json Use Svar like JSON
+
+Svar natually support JSON and here is some basic usage demo:
+
+\code
+    Svar null=nullptr;
+    Svar b=false;
+    Svar i=1;
+    Svar d=2.1;
+    Svar s="hello world";
+    Svar v={1,2,3};
+    Svar m={{"b",false},{"s","hello world"},{"n",nullptr},{"u",Svar()}};
+
+    Svar obj;
+    obj["m"]=m;
+    obj["pi"]=3.14159;
+
+    std::cout<<obj<<std::endl;
+
+    if(s.is<std::string>()) // use is to check type
+        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl; // use as to cast, never throw
+
+    double db=i.castAs<double>();// use castAs, this may throw SvarException
+
+    for(auto it:v) std::cout<<it<<std::endl;
+
+    for(std::pair<std::string,Svar> it:m) std::cout<<it.first<<":"<<it.second<<std::endl;
+
+    std::string json=m.dump_json();
+    m=Svar::parse_json(json);;
+\endcode
+
+You can run the above code with:
+@code
+svar sample -json
+@endcode
+*/
+
+

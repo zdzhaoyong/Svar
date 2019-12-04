@@ -1,3 +1,13 @@
+/**
+@page module Create and Use a Svar Module
+
+The last page shows that we can use functions and classes with Svar.
+What if we expose only Svar instead of headers for a c++ shared library?
+Yes we don't need headers any more!
+We call that shared library Svar module, which can be imported and call directly.
+
+\section sCreate Create a Svar module
+@code
 #include "Svar.h"
 
 using namespace GSLAM;
@@ -67,3 +77,40 @@ REGISTER_SVAR_MODULE(sample)// see, so easy, haha
 }
 
 EXPORT_SVAR_INSTANCE // export the symbol of Svar::instance
+
+@endcode
+
+We compile the above code to a shared library "libsample_module.so" or "sample_module.dll".
+
+
+\section sCall Import and Use a Svar Module
+
+For the Svar module, we can import and use them in different languages!
+Here we show how to use it in c++, source code is available in file "src/sample/main.cpp".
+
+@code
+    Svar sampleModule=Registry::load("sample_module");
+
+    Svar Person=sampleModule["Person"];
+    Svar Student=sampleModule["Student"];
+    std::cout<<Person.as<SvarClass>();
+    std::cout<<Student.as<SvarClass>();
+
+    Svar father=Person(40,"father");
+    Svar mother=Person(39,"mother");
+    Svar sister=Student(15,"sister","high");
+    Svar me    =Student(13,"me","juniar");
+    me.call("setSchool","school1");
+
+    std::cout<<"all:"<<Person.call("all")<<std::endl;
+    std::cout<<father.call("intro").as<std::string>()<<std::endl;
+    std::cout<<sister.call("intro").as<std::string>()<<std::endl;
+    std::cout<<mother.call("age")<<std::endl;
+    std::cout<<me.call("age")<<std::endl;
+    std::cout<<sister.call("getSchool")<<std::endl;
+    std::cout<<me.call("getSchool")<<std::endl;
+
+@endcode
+
+Run the above code with "svar sample -module".
+*/
