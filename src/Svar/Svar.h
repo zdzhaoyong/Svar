@@ -2122,7 +2122,19 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     }
     else if(isUndefined())
         *this=object();// force to be an object
-    else throw SvarExeption("Can not get an item from "+typeName());
+    else {
+        const SvarClass& cl=classObject().as<SvarClass>();
+        if(cl.__getitem__.isFunction()){
+            return cl.__getitem__((*this),name).as<T>();
+        }
+        Svar property=cl._attr[name];
+        if(property.isProperty()){
+            return property.as<SvarClass::SvarProperty>()._fget(*this).as<T>();
+        }
+        else{
+            throw SvarExeption(typeName()+": get called without property "+name);
+        }
+    }
 
     if(!var.isUndefined()){
         Svar casted=caster<T>::from(var);
@@ -2149,11 +2161,26 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
         *this=object({{name,def}});
         return;
     }
-    Svar var=as<SvarObject>()[name];
-    if(!std::is_same<T,Svar>::value&&var.is<T>())
-        var.as<T>()=def;
-    else
-        as<SvarObject>().set(name,def);
+    if(isObject()){
+        Svar var=as<SvarObject>()[name];
+        if(!std::is_same<T,Svar>::value&&var.is<T>())
+            var.as<T>()=def;
+        else
+            as<SvarObject>().set(name,def);
+        return;
+    }
+    const SvarClass& cl=classObject().as<SvarClass>();
+    if(cl.__setitem__.isFunction()){
+        cl.__setitem__((*this),name,def);
+        return;
+    }
+    Svar property=cl._attr[name];
+    if(!property.isProperty())
+        throw SvarExeption(typeName()+": set called without property "+name);
+
+    Svar fset=property.as<SvarClass::SvarProperty>()._fset;
+    if(!fset.isFunction()) throw SvarExeption(typeName()+": property "+name+" is readonly.");
+    fset(*this,def);
 }
 
 inline bool Svar::exist(const Svar& id)const

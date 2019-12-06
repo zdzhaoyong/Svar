@@ -19,7 +19,7 @@ int sample_json(Svar config){
     std::cout<<obj<<std::endl;
 
     if(s.is<std::string>()) // use is to check type
-        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl; // use as to cast, never throw
+        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl;
 
     double db=i.castAs<double>();// use castAs, this may throw SvarException
 
@@ -98,11 +98,11 @@ int sample_cppclass()
     // 3. use the class with c++ or other languages
     Svar DemoClass=SvarClass::instance<MyClass>();
 
-    Svar inst=DemoClass(3);
+    Svar inst=DemoClass(3);// construct a instance
     inst.call("print");
 
-    const Svar& inst2=DemoClass.call("create");
-    int  a=inst2["a"].as<int>();// const & is essential to correctly get property
+    Svar inst2=DemoClass.call("create");
+    int  a=inst2.get<int>("a",0); // const & is essential to correctly get property
     std::cout<<a<<std::endl;
 
     return 0;
@@ -152,6 +152,9 @@ int sample_module(Svar config){
     std::cout<<me.call("age")<<std::endl;
     std::cout<<sister.call("getSchool")<<std::endl;
     std::cout<<me.call("getSchool")<<std::endl;
+
+    me.set<std::string>("school","school2");
+    std::cout<<me.get<std::string>("school","")<<std::endl;
 
     return 0;
 }

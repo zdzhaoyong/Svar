@@ -25,6 +25,7 @@
   - [Use Svar Module in Other Languages](#use-svar-module-in-other-languages)
 - [Supported Compilers](#supported-compilers)
 - [Contact and Donation](#contact-and-donation)
+- [License](#license)
 
 ---
 
@@ -302,6 +303,9 @@ public:
     std::cout<<me.call("age")<<std::endl;
     std::cout<<sister.call("getSchool")<<std::endl;
     std::cout<<me.call("getSchool")<<std::endl;
+
+    me.set<std::string>("school","school2");
+    std::cout<<me.get<std::string>("school","")<<std::endl;
 }
 ```
 
@@ -428,6 +432,9 @@ Here we show how to use it in c++, source code is available in file "src/sample/
     std::cout<<me.call("age")<<std::endl;
     std::cout<<sister.call("getSchool")<<std::endl;
     std::cout<<me.call("getSchool")<<std::endl;
+
+    me.set<std::string>("school","school2");
+    std::cout<<me.get<std::string>("school","")<<std::endl;
 ```
 
 Run the above code with "svar sample -module".
