@@ -512,7 +512,7 @@ Svar is a personal free project with BSD license, if you like it, donation is ac
 
 |     Wechat    |      Alipay         |  PayPal   |
 | :--------: | :-----------: | :-------: |
-| <img src="http://zhaoyong.win/resource/weixin.png" width = "20%" /> | <img src="http://zhaoyong.win/resource/alipay.png" width = "30%" /> | Not Ready |
+| <img src="http://zhaoyong.win/resource/weixin.png" width = "40%" /> | <img src="http://zhaoyong.win/resource/alipay.png" width = "60%" /> | Not Ready |
 
 
 # License
