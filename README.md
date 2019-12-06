@@ -443,6 +443,7 @@ Run the above code with "svar sample -module".
 
 The last page shows how to use a Svar module in c++.
 Can the module also be imported by other languages?
+
 Yes!Yes!Yes!
 But we only implemented the python3 interface now, if you are familar with bindings, please contact me and we can cooperate on this!
 
@@ -486,10 +487,15 @@ print(me.school)
 Currently, the following compilers are known to work:
 
 GCC 4.8 - 9.2 (and possibly later)
+
 Clang 3.4 - 9.0 (and possibly later)
+
 Intel C++ Compiler 17.0.2 (and possibly later)
+
 Microsoft Visual C++ 2015 / Build Tools 14.0.25123.0 (and possibly later)
+
 Microsoft Visual C++ 2017 / Build Tools 15.5.180.51428 (and possibly later)
+
 Microsoft Visual C++ 2019 / Build Tools 16.3.1+1def00d3d (and possibly later)
 
 
@@ -498,6 +504,15 @@ Microsoft Visual C++ 2019 / Build Tools 16.3.1+1def00d3d (and possibly later)
 Any question or suggestion please contact:
 
 Yong Zhao : *zdzhaoyong@mail.nwpu.edu.cn*
+
+
+
+Svar is a personal free project with BSD license, if you like it, donation is accepted with the following approaches to support the author:
+
+
+|     Wechat    |      Alipay         |  PayPal   |
+| :--------: | :-----------: | :-------: |
+| <img src="http://zhaoyong.win/resource/weixin.png" width = "20%" /> | <img src="http://zhaoyong.win/resource/alipay.png" width = "30%" /> | Not Ready |
 
 
 # License
