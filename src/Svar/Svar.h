@@ -40,8 +40,8 @@
 // 4. Built-in Json support, parameter configuration parsing, thread-safe reading and writing,
 //    data decoupling sharing between modules, etc.
 
-#ifndef GSLAM_JVAR_H
-#define GSLAM_JVAR_H
+#ifndef GSLAM_CORE_SVAR_H
+#define GSLAM_CORE_SVAR_H
 
 #include <assert.h>
 #include <string.h>
@@ -68,7 +68,7 @@
 #endif
 
 #define svar GSLAM::Svar::instance()
-#define SVAR_VERSION 0x000100 // 0.1.0
+#define SVAR_VERSION 0x000101 // 0.1.1
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
@@ -2125,11 +2125,13 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     else {
         const SvarClass& cl=classObject().as<SvarClass>();
         if(cl.__getitem__.isFunction()){
-            return cl.__getitem__((*this),name).as<T>();
+            Svar ret=cl.__getitem__((*this),name);
+            return ret.as<T>();
         }
         Svar property=cl._attr[name];
         if(property.isProperty()){
-            return property.as<SvarClass::SvarProperty>()._fget(*this).as<T>();
+            Svar ret=property.as<SvarClass::SvarProperty>()._fget(*this);
+            return ret.as<T>();
         }
         else{
             throw SvarExeption(typeName()+": get called without property "+name);
@@ -3448,8 +3450,12 @@ public:
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
 
-        Svar::instance()["__builtin__"]["Json"]=SvarClass::instance<Json>();
-        Svar::instance()["__builtin__"]["version"]=SVAR_VERSION;
+        Svar::instance()["__builtin__"]={
+        {"version",SVAR_VERSION},
+        {"author","Yong Zhao"},
+        {"email","zdzhaoyong@mail.nwpu.edu.cn"},
+        {"license","BSD"},
+        {"Json",SvarClass::instance<Json>()}};
     }
 
     static Svar int_create(const Svar& rh){

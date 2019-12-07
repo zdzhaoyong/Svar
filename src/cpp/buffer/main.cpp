@@ -46,6 +46,7 @@ int speed(Svar config)
         ScopedTimer tm("Base64Decode");
         buf=SvarBuffer::fromBase64(str);
     }
+    return 0;
 }
 
 int buffer(Svar config){
