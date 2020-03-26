@@ -493,7 +493,7 @@ struct SvarPy: public PyObject{
     }
 
 
-    static PyObject* getModule(GSLAM::Svar var){
+    static PyObject* getModule(Svar var){
         if(var.isObject())
         {
             PyObject* pyModule = nullptr;
