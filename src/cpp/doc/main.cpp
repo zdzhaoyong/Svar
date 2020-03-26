@@ -1,6 +1,6 @@
 #include <Registry.h>
 
-using namespace GSLAM;
+using namespace jv;
 
 int doc(Svar config){
 
@@ -13,7 +13,7 @@ int doc(Svar config){
     std::string key=config.get<std::string>("key","");
 
     Svar inst=Registry::load(pluginPath);
-    GSLAM::Svar var=key.empty()?(inst):inst.get(key,Svar(),true);
+    jv::Svar var=key.empty()?(inst):inst.get(key,Svar(),true);
 
     if(var.isFunction())
         std::cout<<var.as<SvarFunction>()<<std::endl;
@@ -24,5 +24,5 @@ int doc(Svar config){
 }
 
 REGISTER_SVAR_MODULE(doc){
-    svar["apps"]["doc"]={doc,"Use 'svar doc libsample_module.so' to show module description"};
+    jvar["apps"]["doc"]={doc,"Use 'svar doc libsample_module.so' to show module description"};
 }

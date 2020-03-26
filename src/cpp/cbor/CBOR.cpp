@@ -5,7 +5,7 @@
 
 #include "Timer.h"
 
-namespace GSLAM {
+namespace jv {
 
 /// Yaml save and load class
 class CBOR final{

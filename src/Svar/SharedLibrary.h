@@ -73,7 +73,7 @@
 #include "Glog.h"
 
 
-namespace GSLAM {
+namespace jv {
 class SharedLibrary
     /// The SharedLibrary class dynamically
     /// loads shared libraries at run-time.

@@ -67,9 +67,9 @@
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
 
-#define svar GSLAM::Svar::instance()
+#define jvar jv::Svar::instance()
 #define SVAR_VERSION 0x000100 // 0.1.0
-#define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT GSLAM::Svar* svarInstance(){return &GSLAM::Svar::instance();}
+#define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT jv::Svar* svarInstance(){return &jv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
     public: SVAR_MODULE_##MODULE_NAME();\
@@ -82,7 +82,7 @@
 #    define SVAR_EXPORT __attribute__ ((visibility("default")))
 #  endif
 
-namespace GSLAM {
+namespace jv {
 
 #ifndef DOXYGEN_IGNORE_INTERNAL
 namespace detail {
@@ -810,7 +810,7 @@ public:
 
     /// Create from Json String
     static Svar parse_json(const std::string& str){
-        return svar["__builtin__"]["Json"].call("load",str);
+        return jvar["__builtin__"]["Json"].call("load",str);
     }
 
     /// Dump Json String
@@ -1219,7 +1219,7 @@ public:
         :_cls(SvarClass::Class<C>()){
         _cls.setName(name);
         _cls.__doc__=doc;
-        svar[name]=SvarClass::instance<C>();
+        jvar[name]=SvarClass::instance<C>();
     }
 
     Class& def(const std::string& name,const Svar& function,bool isMethod=true)
@@ -2849,7 +2849,7 @@ public:
 
 inline std::istream& operator >>(std::istream& ist,Svar& self)
 {
-    Svar json=svar["__builtin__"]["Json"];
+    Svar json=jvar["__builtin__"]["Json"];
     self=json.call("load",std::string( (std::istreambuf_iterator<char>(ist)) , std::istreambuf_iterator<char>() ));
     return ist;
 }

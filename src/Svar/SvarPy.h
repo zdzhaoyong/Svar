@@ -59,7 +59,7 @@
     PyObject *SVAR_init_wrapper()
 #endif
 
-namespace GSLAM {
+namespace jv {
 
 
 struct PyObjectHolder{

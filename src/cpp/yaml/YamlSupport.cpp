@@ -3,7 +3,7 @@
 #include <yaml-cpp/yaml.h>
 #endif
 
-namespace GSLAM {
+namespace jv {
 
 /// Yaml save and load class
 class Yaml final{

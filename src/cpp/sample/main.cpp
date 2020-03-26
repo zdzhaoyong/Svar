@@ -1,7 +1,7 @@
 #include "Svar.h"
 #include "Registry.h"
 
-using namespace GSLAM;
+using namespace jv;
 
 int sample_json(Svar config){
     Svar null=nullptr;
@@ -180,5 +180,5 @@ int sample(Svar config){
 }
 
 REGISTER_SVAR_MODULE(sample){
-    svar["apps"]["sample"]={sample,"This is a collection of sample to show Svar usages"};
+    jvar["apps"]["sample"]={sample,"This is a collection of sample to show Svar usages"};
 }

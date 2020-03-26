@@ -2,6 +2,7 @@
 #include "Glog.h"
 #include "Timer.h"
 
+using namespace jv;
 using namespace GSLAM;
 
 int md5(Svar config){
@@ -65,5 +66,5 @@ int buffer(Svar config){
 }
 
 REGISTER_SVAR_MODULE(buffer){
-    svar["apps"]["buffer"]={buffer,"SvarBuffer to operate md5, base64 and hex"};
+    jvar["apps"]["buffer"]={buffer,"SvarBuffer to operate md5, base64 and hex"};
 }

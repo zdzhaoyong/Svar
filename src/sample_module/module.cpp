@@ -1,6 +1,6 @@
 #include "Svar.h"
 
-using namespace GSLAM;
+using namespace jv;
 
 int add(int a,int b){
     return a+b;
@@ -46,9 +46,9 @@ public:
 
 REGISTER_SVAR_MODULE(sample)// see, so easy, haha
 {
-    svar["__name__"]="sample_module";
-    svar["__doc__"]="This is a demo to show how to export a module using svar.";
-    svar["add"]=add;
+    jvar["__name__"]="sample_module";
+    jvar["__doc__"]="This is a demo to show how to export a module using svar.";
+    jvar["add"]=add;
 
     Class<Person>("Person","The base class")
             .construct<int,std::string>()

@@ -2,13 +2,13 @@
 #include "Registry.h"
 #include "Timer.h"
 
-using namespace GSLAM;
+using namespace jv;
 
 int main(int argc,char** argv){
-    Svar var=svar;
+    Svar var=jvar;
     std::vector<std::string> unParsed=var.parseMain(argc,argv);
 
-    Svar apps=svar["apps"];
+    Svar apps=jvar["apps"];
 
     if(var.get("complete_function_request",false)&&unParsed.empty())
     {
