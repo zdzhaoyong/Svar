@@ -1,6 +1,6 @@
 #include "Svar.h"
 
-namespace jv {
+namespace sv {
 
 /// This is for the old Svar version style support
 template <typename VarType, typename KeyType=std::string>

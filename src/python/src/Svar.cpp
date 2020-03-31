@@ -1,7 +1,7 @@
 #include <Svar/SvarPy.h>
 #include <Svar/Registry.h>
 
-using namespace jv;
+using namespace sv;
 
 PyObject* load(std::string pluginPath){
     return SvarPy::getModule(Registry::load(pluginPath));
@@ -9,6 +9,6 @@ PyObject* load(std::string pluginPath){
 
 SVAR_PYTHON_IMPL(svar)
 {
-    jvar.set("load",Svar(load));
-    return SvarPy::getModule(jvar);
+    svar.set("load",Svar(load));
+    return SvarPy::getModule(svar);
 }

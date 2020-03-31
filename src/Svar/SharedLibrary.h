@@ -4,6 +4,7 @@
 #include <iostream>
 #include <set>
 #include <mutex>
+#include <memory>
 
 #if (defined(_WIN32) || defined(_WIN64)) && !defined(__CYGWIN__)// Windows
 
@@ -70,10 +71,7 @@
 
 #endif
 
-#include "Glog.h"
-
-
-namespace jv {
+namespace sv {
 class SharedLibrary
     /// The SharedLibrary class dynamically
     /// loads shared libraries at run-time.

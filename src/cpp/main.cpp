@@ -1,14 +1,15 @@
 #include "Svar.h"
 #include "Registry.h"
 #include "Timer.h"
+#include "Glog.h"
 
-using namespace jv;
+using namespace sv;
 
 int main(int argc,char** argv){
-    Svar var=jvar;
+    Svar var=svar;
     std::vector<std::string> unParsed=var.parseMain(argc,argv);
 
-    Svar apps=jvar["apps"];
+    Svar apps=var["apps"];
 
     if(var.get("complete_function_request",false)&&unParsed.empty())
     {

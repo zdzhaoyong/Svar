@@ -1,7 +1,7 @@
 #include  <Svar.h>
 #include  <Glog.h>
 
-using namespace jv;
+using namespace sv;
 
 int cbor(Svar config){
     std::string cborf=config.arg("in",std::string(""),"the cbor file want to load and show");
@@ -11,7 +11,7 @@ int cbor(Svar config){
 
     if(config.get("help",false)) return config.help();
 
-    Svar CBOR=jvar["__builtin__"]["CBOR"];
+    Svar CBOR=svar["__builtin__"]["CBOR"];
     if(cborf.size()){
         std::cerr<<CBOR.call("load",SvarBuffer::load(cborf));
         return 0;
@@ -36,5 +36,5 @@ int cbor(Svar config){
 }
 
 REGISTER_SVAR_MODULE(cbor){
-    jvar["apps"]["cbor"]=cbor;
+    svar["apps"]["cbor"]=cbor;
 }

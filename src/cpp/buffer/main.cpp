@@ -2,7 +2,7 @@
 #include "Glog.h"
 #include "Timer.h"
 
-using namespace jv;
+using namespace sv;
 using namespace GSLAM;
 
 int md5(Svar config){
@@ -47,6 +47,7 @@ int speed(Svar config)
         ScopedTimer tm("Base64Decode");
         buf=SvarBuffer::fromBase64(str);
     }
+    return 0;
 }
 
 int buffer(Svar config){
@@ -66,5 +67,5 @@ int buffer(Svar config){
 }
 
 REGISTER_SVAR_MODULE(buffer){
-    jvar["apps"]["buffer"]={buffer,"SvarBuffer to operate md5, base64 and hex"};
+    svar["apps"]["buffer"]={buffer,"SvarBuffer to operate md5, base64 and hex"};
 }

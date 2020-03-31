@@ -2,7 +2,7 @@
 #include "SharedLibrary.h"
 #include "Svar.h"
 
-namespace jv {
+namespace sv {
 
 class Registry
 {
@@ -29,12 +29,12 @@ public:
             return Svar();
         }
 
-        jv::Svar* (*getInst)()=(jv::Svar* (*)())plugin->getSymbol("svarInstance");
+        sv::Svar* (*getInst)()=(sv::Svar* (*)())plugin->getSymbol("svarInstance");
         if(!getInst){
             std::cerr<<"No svarInstance found in "<<pluginName<<std::endl;
             return Svar();
         }
-        jv::Svar* inst=getInst();
+        sv::Svar* inst=getInst();
         if(!inst){
             std::cerr<<"svarInstance returned null.\n";
             return Svar();
@@ -150,7 +150,7 @@ protected:
     {
         _libraryFilePath.clear();
 
-        char** argv=jvar.get<char**>("argv",nullptr);
+        char** argv=svar.get<char**>("argv",nullptr);
         if(argv)
         {
             _libraryFilePath.insert(getFolderPath(argv[0]));//application folder
@@ -175,7 +175,7 @@ protected:
 #endif
         for(std::string env:envs)
         {
-            std::string ptr=jvar.GetString(env,"");
+            std::string ptr=svar.GetString(env,"");
             if(!ptr.empty())
                 convertStringPathIntoFilePathList(ptr,_libraryFilePath);
         }

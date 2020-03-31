@@ -6,7 +6,7 @@
 #include <GSLAM/core/XML.h>
 #endif
 
-namespace jv {
+namespace sv {
 
 /// Xml save and load class
 class Xml final{

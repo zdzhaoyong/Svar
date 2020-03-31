@@ -1,6 +1,6 @@
-// GSLAM - A general SLAM framework and benchmark
+// Svar - A Tiny Modern C++ Header Brings Unified Interface for Different Languages
 // Copyright 2018 PILAB Inc. All rights reserved.
-// https://github.com/zdzhaoyong/GSLAM
+// https://github.com/zdzhaoyong/Svar
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: zd5945@126.com (Yong Zhao) 353184965@qq.com(Guochen Liu)
+// Author: zd5945@126.com (Yong Zhao)
 //
 // By Using Svar, your C++ library can be called easily with different
 // languages like C++, Java, Python and Javascript.
@@ -40,8 +40,8 @@
 // 4. Built-in Json support, parameter configuration parsing, thread-safe reading and writing,
 //    data decoupling sharing between modules, etc.
 
-#ifndef GSLAM_JVAR_H
-#define GSLAM_JVAR_H
+#ifndef SVAR_SVAR_H
+#define SVAR_SVAR_H
 
 #include <assert.h>
 #include <string.h>
@@ -67,9 +67,11 @@
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
 
-#define jvar jv::Svar::instance()
-#define SVAR_VERSION 0x000100 // 0.1.0
-#define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT jv::Svar* svarInstance(){return &jv::Svar::instance();}
+#ifndef svar
+#define svar sv::Svar::instance()
+#endif
+#define SVAR_VERSION 0x000101 // 0.1.1
+#define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
     public: SVAR_MODULE_##MODULE_NAME();\
@@ -82,7 +84,7 @@
 #    define SVAR_EXPORT __attribute__ ((visibility("default")))
 #  endif
 
-namespace jv {
+namespace sv {
 
 #ifndef DOXYGEN_IGNORE_INTERNAL
 namespace detail {
@@ -283,7 +285,7 @@ Svar can not only hold JSON types, but also any other c++ elements including fun
 \subsection s_svar_cppelements_sample A tiny sample of Svar holding functions and classes.
 
 @code
-#include <GSLAM/core/Svar.h>
+#include <Svar/Svar.h>
 
 int c_func(int a,int b){return a+b;}
 
@@ -414,9 +416,9 @@ The following table listed some operators that often used.
 \subsection s_svar_inherit Inherit of Classes
 
 @code
-#include <GSLAM/core/Svar.h>
+#include <Svar/Svar.h>
 
-using namespace GSLAM;
+using namespace sv;
 
 class BBase{
 public:
@@ -465,9 +467,9 @@ The only thing needs to do is to put what you want to the singleton of Svar: Sva
 which is defined as 'svar', and expose the symbol with macro EXPORT_SVAR_INSTANCE.
 
 @code
-#include "GSLAM/core/Svar.h"
+#include "sv/Svar.h"
 
-using namespace GSLAM;
+using namespace sv;
 
 int add(int a,int b){
     return a+b;
@@ -506,8 +508,7 @@ Compile this file to a shared library "libsample.so" or "sample.dll", and we are
 A Svar module is designed to be self maintained, which means the module can be called without header or documentation.
 Since SvarFunction auto generated function signatures, so that users are able to know how to call Svar functions.
 
-One can use the 'svar' application from https://github.com/zdzhaoyong/Svar,
-or the "gslam" application of https://github.com/zdzhaoyong/GSLAM to access the context.
+One can use the 'svar' application from https://github.com/zdzhaoyong/Svar to access the context.
 
 @code
 -> svar doc -plugin sample
@@ -547,10 +548,10 @@ We are able to load the Svar instance exported by marco with EXPORT_SVAR_INSTANC
 using Registry::load().
 
 @code
-#include "GSLAM/core/Svar.h"
-#include "GSLAM/core/Registry.h"
+#include "Svar/Svar.h"
+#include "Svar/Registry.h"
 
-using namespace GSLAM;
+using namespace sv;
 
 int main(int argc,char** argv){
     Svar sampleModule=Registry::load("sample");
@@ -810,7 +811,7 @@ public:
 
     /// Create from Json String
     static Svar parse_json(const std::string& str){
-        return jvar["__builtin__"]["Json"].call("load",str);
+        return instance()["__builtin__"]["Json"].call("load",str);
     }
 
     /// Dump Json String
@@ -1219,7 +1220,7 @@ public:
         :_cls(SvarClass::Class<C>()){
         _cls.setName(name);
         _cls.__doc__=doc;
-        jvar[name]=SvarClass::instance<C>();
+        Svar::instance()[name]=SvarClass::instance<C>();
     }
 
     Class& def(const std::string& name,const Svar& function,bool isMethod=true)
@@ -2125,11 +2126,13 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     else {
         const SvarClass& cl=classObject().as<SvarClass>();
         if(cl.__getitem__.isFunction()){
-            return cl.__getitem__((*this),name).as<T>();
+            Svar ret=cl.__getitem__((*this),name);
+            return ret.as<T>();
         }
         Svar property=cl._attr[name];
         if(property.isProperty()){
-            return property.as<SvarClass::SvarProperty>()._fget(*this).as<T>();
+            Svar ret=property.as<SvarClass::SvarProperty>()._fget(*this);
+            return ret.as<T>();
         }
         else{
             throw SvarExeption(typeName()+": get called without property "+name);
@@ -2849,7 +2852,7 @@ public:
 
 inline std::istream& operator >>(std::istream& ist,Svar& self)
 {
-    Svar json=jvar["__builtin__"]["Json"];
+    Svar json=Svar::instance()["__builtin__"]["Json"];
     self=json.call("load",std::string( (std::istreambuf_iterator<char>(ist)) , std::istreambuf_iterator<char>() ));
     return ist;
 }
@@ -3448,8 +3451,12 @@ public:
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
 
-        Svar::instance()["__builtin__"]["Json"]=SvarClass::instance<Json>();
-        Svar::instance()["__builtin__"]["version"]=SVAR_VERSION;
+        Svar::instance()["__builtin__"]={
+        {"version",SVAR_VERSION},
+        {"author","Yong Zhao"},
+        {"email","zdzhaoyong@mail.nwpu.edu.cn"},
+        {"license","BSD"},
+        {"Json",SvarClass::instance<Json>()}};
     }
 
     static Svar int_create(const Svar& rh){

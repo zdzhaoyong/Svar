@@ -3,7 +3,7 @@ project(Svar)
 include(cmake/PICMake.cmake)
 
 set(CMAKE_CXX_STANDARD 11)
-INCLUDE_DIRECTORIES(src/Svar)
+INCLUDE_DIRECTORIES(src/Svar src/GSLAM/core)
 
 pi_add_target(svar BIN src/cpp REQUIRED System)
 pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)

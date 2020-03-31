@@ -1,6 +1,6 @@
 #include <Registry.h>
 
-using namespace jv;
+using namespace sv;
 
 int doc(Svar config){
 
@@ -13,7 +13,7 @@ int doc(Svar config){
     std::string key=config.get<std::string>("key","");
 
     Svar inst=Registry::load(pluginPath);
-    jv::Svar var=key.empty()?(inst):inst.get(key,Svar(),true);
+    sv::Svar var=key.empty()?(inst):inst.get(key,Svar(),true);
 
     if(var.isFunction())
         std::cout<<var.as<SvarFunction>()<<std::endl;
@@ -24,5 +24,5 @@ int doc(Svar config){
 }
 
 REGISTER_SVAR_MODULE(doc){
-    jvar["apps"]["doc"]={doc,"Use 'svar doc libsample_module.so' to show module description"};
+    svar["apps"]["doc"]={doc,"Use 'svar doc libsample_module.so' to show module description"};
 }

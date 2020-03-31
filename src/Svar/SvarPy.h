@@ -2,7 +2,7 @@
 #define SVAR_SVARPY_H
 
 #include "Svar.h"
-#include "Glog.h"
+//#include "Glog.h"
 #include <Python.h>
 #include <cstring>
 
@@ -59,7 +59,11 @@
     PyObject *SVAR_init_wrapper()
 #endif
 
-namespace jv {
+#ifndef LOG
+#define LOG(c) std::cout
+#endif
+
+namespace sv {
 
 
 struct PyObjectHolder{
@@ -111,7 +115,7 @@ struct SvarPy: public PyObject{
             auto inst = reinterpret_cast<SvarPy*>(self);
             // Allocate the value/holder internals:
             inst->var=nullptr;
-            LOG(INFO)<<"Creating <"<<type->tp_name<<" object at "<<self<<">";
+//            LOG(INFO)<<"Creating <"<<type->tp_name<<" object at "<<self<<">";
             return self;
         };
 
@@ -137,7 +141,7 @@ struct SvarPy: public PyObject{
             SvarPy* obj=(SvarPy*)self;
             if(obj->var)
             {
-                LOG(INFO)<<"Deleting <"<<self->ob_type->tp_name<<" object at "<<self<<">";
+//                LOG(INFO)<<"Deleting <"<<self->ob_type->tp_name<<" object at "<<self<<">";
                 delete obj->var;
                 obj->var=nullptr;
             }
@@ -344,7 +348,7 @@ struct SvarPy: public PyObject{
             auto inst = reinterpret_cast<SvarPy*>(self);
             // Allocate the value/holder internals:
             inst->var=nullptr;
-            DLOG(INFO)<<"Creating <"<<type->tp_name<<" object at "<<self<<">";
+//            DLOG(INFO)<<"Creating <"<<type->tp_name<<" object at "<<self<<">";
             return self;
         };
 
@@ -374,7 +378,7 @@ struct SvarPy: public PyObject{
             SvarPy* obj=(SvarPy*)self;
             if(obj->var)
             {
-                DLOG(INFO)<<"Deleting <"<<self->ob_type->tp_name<<" object at "<<self<<">";
+//                DLOG(INFO)<<"Deleting <"<<self->ob_type->tp_name<<" object at "<<self<<">";
                 delete obj->var;
                 obj->var=nullptr;
             }
