@@ -190,7 +190,9 @@ struct SvarPy: public PyObject{
 
         std::function<PyObject*(Svar)> convert;
 
-        if(src.is<int>())
+        if(src.is<bool>())
+          convert=[](Svar src){return src.as<bool>()?Py_True:Py_False;};
+        else if(src.is<int>())
             convert=[](Svar src){return PyLong_FromLong(src.as<int>());};
         else if(src.is<double>())
             convert=[](Svar src){return PyFloat_FromDouble(src.as<double>());};
