@@ -1629,7 +1629,7 @@ public:
 class SvarObject : public SvarValue_<std::unordered_map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
-        : SvarValue_<std::unordered_map<std::string,Svar>>({}){
+        : SvarValue_<std::unordered_map<std::string,Svar>>(std::unordered_map<std::string,Svar>()){
         _var.insert(m.begin(),m.end());
     }
 
