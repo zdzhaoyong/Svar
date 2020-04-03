@@ -8,21 +8,21 @@ using namespace GSLAM;
 int md5(Svar config){
     auto filename=config["md5"].as<std::string>();
     SvarBuffer buf=SvarBuffer::load(filename);
-    std::cerr<<buf.md5()<<" "<<filename;
+    std::cerr<<buf.md5()<<" "<<filename<<std::endl;
     return 0;
 }
 
 int base64(Svar config){
     auto filename=config["base64"].as<std::string>();
     SvarBuffer buf=SvarBuffer::load(filename);
-    std::cerr<<buf.base64();
+    std::cerr<<buf.base64()<<std::endl;
     return 0;
 }
 
 int hex(Svar config){
     auto filename=config["hex"].as<std::string>();
     SvarBuffer buf=SvarBuffer::load(filename);
-    std::cerr<<buf.hex();
+    std::cerr<<buf.hex()<<std::endl;
     return 0;
 }
 

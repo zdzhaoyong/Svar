@@ -1319,7 +1319,7 @@ public:
     }
 
     bool save(std::string path){
-        std::ofstream out(path,std::ios_base::out);
+        std::ofstream out(path,std::ios_base::binary);
         if(out.is_open()){
             out.write((const char*)_ptr,_size);
             out.close();
@@ -3460,6 +3460,8 @@ public:
             {"author","Yong Zhao"},
             {"email","zdzhaoyong@mail.nwpu.edu.cn"},
             {"license","BSD"},
+            {"date",std::string(__DATE__)},
+            {"time",std::string(__TIME__)},
             {"Json",SvarClass::instance<Json>()}};
         builtin = addon + builtin;
 #ifdef BUILD_VERSION
