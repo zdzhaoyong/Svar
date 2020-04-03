@@ -32,6 +32,12 @@ int main(int argc,char** argv){
     if(unParsed.size()>1) LOG(ERROR)<<"Should only has one app, there are "<<Svar(unParsed);
 
     Svar app=apps[unParsed.front()];
-    if(!app.isFunction()) app=app[0];
+    if(app.isArray())
+        app=app[0];
+    else if(app.isUndefined())
+    {
+        LOG(ERROR)<<unParsed.front()<<" is not a valid app";
+    }
+
     return app(var).as<int>();
 }

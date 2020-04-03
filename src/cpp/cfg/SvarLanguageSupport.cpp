@@ -749,7 +749,7 @@ REGISTER_SVAR_MODULE(Cfg){
         SvarClass::Class<SvarConfigLanguage>()
                 .def("loadFile",&SvarConfigLanguage::loadFile);
 
-        Svar::instance().set("__builtin__.Cfg",SvarClass::instance<SvarConfigLanguage>());
+        Svar::instance().set("__builtin__.Cfg",SvarClass::instance<SvarConfigLanguage>(),true);
 
 }
 
