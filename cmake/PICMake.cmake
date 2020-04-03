@@ -1,4 +1,5 @@
 # Original code by Yong Zhao (www.zhaoyong.win)
+# https://github.com/zdzhaoyong/PICMake
 
 # This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 # Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -7,7 +8,7 @@
 # 3. This notice may not be removed or altered from any source distribution.
 
 ######################################################################################
-# PICMake VERSION 1.2.6
+# PICMake VERSION 1.2.8
 # HISTORY:
 #   1.0.0 2017.01.04 : first commit, one include for one target.
 #   1.1.0 2017.01.09 : support multi targets, reorgnized functions and macros.
@@ -24,6 +25,7 @@
 #   1.2.5 2018.09.17 : add GLOBAL value TARGETS2COMPILE, let add_definition only for one target
 #   1.2.6 2018.11.19 : add AUTORCC AUTOUIC support and compile flags tips when reporting targets
 #   1.2.7 2019.07.27 : auto strip for MinSizeRel and support dependency compile option
+#   1.2.8 2020.04.03 : add pi_git_hash
 ######################################################################################
 #                               FUNCTIONS
 # pi_collect_packagenames(<RESULT_NAME>　[VERBOSE] [path1 path2 ...])
@@ -32,6 +34,7 @@
 # pi_report_target([LIBS2COMPILE] [APPS2COMPILE])
 # pi_install([HEADERS header1|dir1 ...] [TARGETS target1 ...] [CMAKE cmake_config] [BIN_DESTINATION dir] [LIB_DESTINATION dir] [HEADER_DESTINATION dir])
 # pi_parse_arguments(<prefix> <options> <one_value_keywords> <multi_value_keywords> args...)
+# pi_git_hash(<RESULT_NAME>)
 ######################################################################################
 #                               MACROS
 # pi_add_target(<name> <BIN | STATIC | SHARED> [src1|dir1 ...] [MODULES module1 ...] [REQUIRED module1 ...] [DEPENDENCY target1 ...])
@@ -370,7 +373,7 @@ function(pi_add_target_f TARGET_NAME TARGET_TYPE)
 
     endif()
   endforeach()
-  
+
   if(QT_FOUND)
     list(APPEND TARGET_SRCS ${QRC_FILES})
   endif()
@@ -669,7 +672,20 @@ macro(reportTargets)
   pi_report_target()
 endmacro()
 
+macro(pi_git_hash _git_hash)
+    find_package(Git QUIET)
+    if(GIT_FOUND)
+      execute_process(
+        COMMAND ${GIT_EXECUTABLE} log -1 --pretty=format:%h
+        OUTPUT_VARIABLE ${_git_hash}
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        WORKING_DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    endif()
+endmacro()
+
 
 set(PICMAKE_UTILS_LOADED TRUE)
 set(PICMAKE_LOADED TRUE)
-

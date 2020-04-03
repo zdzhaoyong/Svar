@@ -55,6 +55,8 @@ TEST(Svar,Variable)
     std::vector<int> rvec=vec.castAs<std::vector<int>>();
     EXPECT_EQ(rvec[0],0);
 
+    EXPECT_THROW(vec.as<std::vector<int>>(),SvarExeption);
+
 
     Svar svarMtx(std::shared_ptr<std::mutex>(new std::mutex()));
     auto mtx=svarMtx.castAs<std::shared_ptr<std::mutex>>();

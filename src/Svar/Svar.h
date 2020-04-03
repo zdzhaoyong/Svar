@@ -67,9 +67,8 @@
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
 
-#ifndef svar
+
 #define svar sv::Svar::instance()
-#endif
 #define SVAR_VERSION 0x000101 // 0.1.1
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
@@ -749,7 +748,7 @@ public:
 
         bool operator!=(const svar_interator& other) const
         {
-            return not operator==(other);
+            return ! operator==(other);
         }
     };
 
@@ -1629,7 +1628,7 @@ public:
 class SvarObject : public SvarValue_<std::unordered_map<std::string,Svar> >{
 public:
     SvarObject(const std::map<std::string,Svar>& m)
-        : SvarValue_<std::unordered_map<std::string,Svar>>(std::unordered_map<std::string,Svar>()){
+        : SvarValue_<std::unordered_map<std::string,Svar>>({}){
         _var.insert(m.begin(),m.end());
     }
 
@@ -3427,10 +3426,10 @@ public:
         SvarClass::Class<SvarObject>()
                 .def("__getitem__",&SvarObject::operator [])
                 .def("__delitem__",[](SvarObject& self,const std::string& id){
-                         std::unique_lock<std::mutex> lock(self._mutex);
-                         self._var.erase(id);
-                     })
-                .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
+            std::unique_lock<std::mutex> lock(self._mutex);
+            self._var.erase(id);
+        })
+        .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
                 .def("__add__",[](const SvarObject& self,const SvarObject& rh){
             std::unique_lock<std::mutex> lock1(self._mutex);
             std::unique_lock<std::mutex> lock2(rh._mutex);
@@ -3438,7 +3437,9 @@ public:
             for(auto it:rh._var){
                 if(ret.find(it.first)==ret.end())
                     ret.insert(it);
-            }});
+            }
+            return ret;
+        });
 
         SvarClass::Class<SvarFunction>()
                 .def("__doc__",[](SvarFunction& self){return Svar::toString(self);});
@@ -3451,12 +3452,19 @@ public:
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
 
-        Svar::instance()["__builtin__"]={
-        {"version",SVAR_VERSION},
-        {"author","Yong Zhao"},
-        {"email","zdzhaoyong@mail.nwpu.edu.cn"},
-        {"license","BSD"},
-        {"Json",SvarClass::instance<Json>()}};
+        Svar& builtin=Svar::instance()["__builtin__"];
+        if(builtin.isUndefined())
+            builtin=Svar::object();
+        Svar  addon  ={
+            {"version",SVAR_VERSION},
+            {"author","Yong Zhao"},
+            {"email","zdzhaoyong@mail.nwpu.edu.cn"},
+            {"license","BSD"},
+            {"Json",SvarClass::instance<Json>()}};
+        builtin = addon + builtin;
+#ifdef BUILD_VERSION
+        builtin["tag"]=std::string(BUILD_VERSION);
+#endif
     }
 
     static Svar int_create(const Svar& rh){
@@ -3514,4 +3522,5 @@ static SvarBuiltin SvarBuiltinInitializerinstance;
 
 
 }
+
 #endif

@@ -5,6 +5,9 @@ include(cmake/PICMake.cmake)
 set(CMAKE_CXX_STANDARD 11)
 INCLUDE_DIRECTORIES(src/Svar src/GSLAM/core)
 
+pi_git_hash(GIT_VERSION)
+add_definitions(-DBUILD_VERSION=\"${GIT_VERSION}\")
+
 pi_add_target(svar BIN src/cpp REQUIRED System)
 pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)
 

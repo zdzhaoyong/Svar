@@ -1,3 +1,9 @@
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(LTO_FOUND TRUE)
+  return()
+endif()
+
+
 include(CheckCXXCompilerFlag)
 include(CMakeParseArguments)
 
