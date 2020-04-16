@@ -1015,7 +1015,7 @@ public:
     Svar          next;
 
     std::function<Svar(std::vector<Svar>&)> _func;
-    bool          is_method,is_constructor=false,do_argcheck=true;
+    bool          is_method=false,is_constructor=false,do_argcheck=true;
 };
 
 class SvarClass{
@@ -1795,6 +1795,8 @@ void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... ext
 }
 
 inline std::string SvarFunction::signature()const{
+  if(sign.size()) return sign;
+  if(arg_types.empty()) return "";
     std::stringstream sst;
     sst<<"(";
     for(size_t i=1;i<arg_types.size();i++)
