@@ -44,11 +44,44 @@ public:
     std::string _school;
 };
 
+Svar call_func(Svar func,Svar a){
+    switch (a.size()) {
+    case 0:
+        return func();
+        break;
+    case 1:
+        return func(a[0]);
+        break;
+    case 2:
+        return func(a[0],a[1]);
+        break;
+    case 3:
+        return func(a[0],a[1],a[2]);
+        break;
+    case 4:
+        return func(a[0],a[1],a[2],a[3]);
+        break;
+    default:
+        return Svar();
+        break;
+    }
+}
+
+Svar use_module(Svar module){
+    std::cout<<module<<std::endl;
+    Svar uname=module["sayHello"];
+    if(uname.isFunction())
+        return uname();
+    return Svar();
+}
+
 REGISTER_SVAR_MODULE(sample)// see, so easy, haha
 {
     svar["__name__"]="sample_module";
     svar["__doc__"]="This is a demo to show how to export a module using svar.";
     svar["add"]=add;
+    svar["call_func"]=call_func;
+    svar["use_module"]=use_module;
 
     Class<Person>("Person","The base class")
             .construct<int,std::string>()

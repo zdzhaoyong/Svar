@@ -495,6 +495,23 @@ struct SvarPy: public PyObject{
           return func;
         }
 
+        if(PyModule_Check(obj)){
+          incref(obj);
+          obj=PyModule_GetDict(obj);
+          incref(obj);
+          std::map<std::string,Svar> dict;
+          PyObject *key, *value;
+          Py_ssize_t pos = 0;
+
+          while (PyDict_Next(obj, &pos, &key, &value)) {
+              std::string keyStr=fromPy(key).castAs<std::string>();
+              if(keyStr.find_first_of("_")==0) continue;
+              dict.insert(make_pair(keyStr,
+                                    fromPy(value)));
+          }
+          return dict;
+        }
+
         return Svar(PyObjectHolder(obj));
     }
 
