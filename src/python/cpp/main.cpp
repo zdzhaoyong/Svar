@@ -8,7 +8,7 @@ const auto math=python["import"]("math");
 
 int main(int argc,char** argv){
     std::cerr<<math<<std::endl;
-    std::cerr<<"PID from main thread: "<<math["sqrt"](100)<<std::endl;// FIXME: Why undefined?
+    
 
     std::thread thread([os,math](){
         std::cerr<<"PID from work thread: "<<os["getpid"]()<<std::endl;

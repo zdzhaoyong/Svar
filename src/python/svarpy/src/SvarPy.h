@@ -297,7 +297,7 @@ struct SvarPy: public PyObject{
 
 //            SvarPy* obj=(SvarPy*)py_class->tp_new(py_class,nullptr,nullptr);
             obj->var=new Svar(src);
-            return PyObjectHolder(obj);
+            return PyObjectHolder(obj,false);
         };
 
         cls->def("getPy",convert);

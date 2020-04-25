@@ -11,6 +11,7 @@ PyObject* load(std::string pluginPath){
 
 SVAR_PYTHON_IMPL(svar)
 {
+    PyEval_InitThreads();
     Svar module;
     module["load"]=load;
     module["__name__"]="svarpy";
