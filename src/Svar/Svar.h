@@ -1289,20 +1289,36 @@ public:
 class SvarBuffer
 {
 public:
-    SvarBuffer(const void* ptr,size_t size,Svar holder=Svar())
-        : _ptr(ptr),_size(size),_holder(holder){}
+  SvarBuffer(void *ptr, ssize_t itemsize, const std::string &format,
+             std::vector<ssize_t> shape_in, std::vector<ssize_t> strides_in, Svar holder=Svar())
+  : _ptr(ptr), _size(itemsize), _format(format), _holder(holder),
+    shape(std::move(shape_in)), strides(std::move(strides_in)) {
+      if (shape.size() != strides.size()){
+        strides=shape;
+        ssize_t stride=itemsize;
+        for(int i=shape.size()-1;i>=0;--i)
+        {
+          strides[i]=stride;
+          stride*=shape[i];
+          std::cout<<stride<<","<<shape[i]<<std::endl;
+        }
+      }
 
-    SvarBuffer(size_t size):_size(size){
-        _holder = Svar::create(std::vector<char>(size));
-        _ptr = _holder.as<std::vector<char>>().data();
-    }
+      for (size_t i : shape)
+          _size *= shape[i];
+  }
 
-    SvarBuffer(const void* ptr,size_t size,const std::vector<int>& shape,
-               const std::string& format,Svar holder)
-        : _ptr(ptr),_size(size)
-    {
-        _holder={{"holder",holder},{"format",format},{"shape",shape}};
-    }
+  template <typename T>
+  SvarBuffer(T *ptr, std::vector<ssize_t> shape_in, Svar holder=Svar(), std::vector<ssize_t> strides_in={})
+    : SvarBuffer(ptr, sizeof(T), format<T>(), std::move(shape_in), std::move(strides_in), holder) { }
+
+  SvarBuffer(const void *ptr, ssize_t size, Svar holder=Svar())
+    : SvarBuffer( (char*)ptr, std::vector<ssize_t>({size}) , holder ) {}
+
+  SvarBuffer(size_t size)
+    : SvarBuffer((char*)nullptr,size,Svar::create(std::vector<char>(size))){
+    _ptr = _holder.as<std::vector<char>>().data();
+  }
 
     const void*     ptr() const{return this;}
     size_t          size() const {return _size;}
@@ -1539,12 +1555,36 @@ public:
     SvarBuffer clone(){
         SvarBuffer buf(_size);
         memcpy((void*)buf._ptr,_ptr,_size);
+        buf._format   = _format;
+        buf.shape     = shape;
+        buf.strides   = strides;
         return buf;
     }
 
-    const void*  _ptr;
-    size_t _size;
-    Svar   _holder;
+    inline static constexpr int log2(size_t n, int k = 0) { return (n <= 1) ? k : log2(n >> 1, k + 1); }
+
+    template <typename T>
+    static detail::enable_if_t<std::is_arithmetic<T>::value,std::string> format(){
+      int index = std::is_same<T, bool>::value ? 0 : 1 + (
+          std::is_integral<T>::value ? log2(sizeof(T))*2 + std::is_unsigned<T>::value : 8 + (
+          std::is_same<T, double>::value ? 1 : std::is_same<T, long double>::value ? 2 : 0));
+      return std::string(1,"?bBhHiIqQfdg"[index]);
+    }
+
+    int itemsize(){
+      static int lut[256]={0};
+      lut['b']=lut['B']=1;
+      lut['h']=lut['H']=2;
+      lut['i']=lut['I']=lut['f']=4;
+      lut['d']=lut['g']=lut['q']=lut['Q']=8;
+      return lut[_format.front()];
+    }
+
+    void*   _ptr= nullptr;
+    ssize_t _size = 0;
+    Svar    _holder;
+    std::string _format = format<uint8_t>();
+    std::vector<ssize_t> shape,strides;
 };
 
 class SvarValue{
@@ -3431,7 +3471,7 @@ public:
             std::unique_lock<std::mutex> lock(self._mutex);
             self._var.erase(id);
         })
-                .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
+        .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
                 .def("__add__",[](const SvarObject& self,const SvarObject& rh){
             if(&self==&rh)
             {
@@ -3461,6 +3501,18 @@ public:
         SvarClass::Class<Json>()
                 .def_static("load",&Json::load)
                 .def_static("dump",&Json::dump);
+
+        SvarClass::Class<SvarBuffer>()
+                .def("size",&SvarBuffer::size)
+            .def("__buffer__",[](Svar& self){return self;})
+        .def("__str__",[](SvarBuffer& self){
+          std::stringstream sst;
+          sst<<"<buffer ";
+          for(auto s:self.shape)
+            sst<<s<<"X";
+          sst<<self._format<<">";
+          return sst.str();
+        });
 
         Svar& builtin=Svar::instance()["__builtin__"];
         if(builtin.isUndefined())

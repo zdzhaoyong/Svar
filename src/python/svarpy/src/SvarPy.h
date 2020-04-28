@@ -393,6 +393,38 @@ struct SvarPy: public PyObject{
         type->tp_as_sequence = &heap_type->as_sequence;
         type->tp_as_mapping = &heap_type->as_mapping;
 
+        if(cls._attr["__buffer__"].isFunction()){
+          type->tp_as_buffer= & heap_type->as_buffer;
+          heap_type->as_buffer.bf_getbuffer=[](PyObject *obj, Py_buffer *view, int flags)->int{
+             Svar* var=((SvarPy*)obj)->var;
+             Svar  ret=var->call("__buffer__");
+             if (view == nullptr || obj == nullptr || ret.isUndefined()) {
+                 if (view)
+                     view->obj = nullptr;
+                 PyErr_SetString(PyExc_BufferError, "Svar: bf_getbuffer Internal error");
+                 return -1;
+             }
+             SvarBuffer& buffer=ret.as<SvarBuffer>();
+             std::memset(view, 0, sizeof(Py_buffer));
+             view->buf=buffer._ptr;
+             view->format   = (char*) buffer._format.c_str();
+             view->internal = new Svar(ret);
+             view->obj      = obj;
+             view->itemsize = buffer.itemsize();
+             view->len      = buffer.size();
+             view->ndim     = buffer.shape.size();
+             view->readonly = buffer._holder.isUndefined();
+             view->shape    = buffer.shape.data();
+             view->strides  = buffer.strides.data();
+             incref(obj);
+             return 0;
+          };
+
+          heap_type->as_buffer.bf_releasebuffer=[](PyObject *obj, Py_buffer *view)->void {
+            delete (Svar*) view->internal;
+          };
+        }
+
         type->tp_new=[](PyTypeObject *type, PyObject *, PyObject *)->PyObject * {
     #if defined(PYPY_VERSION)
             // PyPy gets tp_basicsize wrong (issue 2482) under multiple inheritance when the first inherited
