@@ -3431,16 +3431,24 @@ public:
             std::unique_lock<std::mutex> lock(self._mutex);
             self._var.erase(id);
         })
-        .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
+                .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
                 .def("__add__",[](const SvarObject& self,const SvarObject& rh){
-            std::unique_lock<std::mutex> lock1(self._mutex);
-            std::unique_lock<std::mutex> lock2(rh._mutex);
-            auto ret=self._var;
-            for(auto it:rh._var){
-                if(ret.find(it.first)==ret.end())
-                    ret.insert(it);
+            if(&self==&rh)
+            {
+                std::unique_lock<std::mutex> lock1(self._mutex);
+                return self._var;
             }
-            return ret;
+            else
+            {
+                auto ret=self._var;
+                std::unique_lock<std::mutex> lock1(self._mutex);
+                std::unique_lock<std::mutex> lock2(rh._mutex);
+                for(auto it:rh._var){
+                    if(ret.find(it.first)==ret.end())
+                        ret.insert(it);
+                }
+                return ret;
+            }
         });
 
         SvarClass::Class<SvarFunction>()
