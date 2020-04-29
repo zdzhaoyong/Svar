@@ -69,7 +69,7 @@
 
 
 #define svar sv::Svar::instance()
-#define SVAR_VERSION 0x000101 // 0.1.1
+#define SVAR_VERSION 0x000201
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
@@ -1300,12 +1300,11 @@ public:
         {
           strides[i]=stride;
           stride*=shape[i];
-          std::cout<<stride<<","<<shape[i]<<std::endl;
         }
       }
 
       for (size_t i : shape)
-          _size *= shape[i];
+          _size *= i;
   }
 
   template <typename T>

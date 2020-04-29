@@ -629,6 +629,13 @@ struct SvarPy: public PyObject{
           return dict;
         }
 
+        if(PyMemoryView_Check(obj)){
+          PyMemoryViewObject* view_obj=(PyMemoryViewObject*)obj;
+          Py_buffer& view=view_obj->view;
+          return SvarBuffer(view.buf, view.itemsize, view.format, std::vector<ssize_t>(view.shape,view.shape+view.ndim)
+                            , std::vector<ssize_t>(view.strides,view.strides+view.ndim), PyObjectHolder(obj));
+        }
+
         if(PyType_Check(obj)){// this is class
 
             if(PyObject_HasAttrString((PyObject*)obj,"svar_class"))// this is a c++ class
