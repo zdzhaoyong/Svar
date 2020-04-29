@@ -19,8 +19,27 @@ SVAR_PYTHON_IMPL(svar)
 }
 
 sv::Svar import(std::string package){
-    if(!pythonSpace)
+    if(!pythonSpace){
+//        std::thread t([]{
         pythonSpace=std::make_shared<PythonSpace>();
+//        });
+//        t.join();
+//        Py_Initialize();
+//        PyEval_InitThreads();
+//        PyEval_ReleaseThread(PyThreadState_Get());
+//        PyThreadStateLock lock;
+////        PyObject* pModule = PyImport_ImportModule(package.c_str());
+//        PyObject* pModule = PyImport_ImportModule("os");
+//        const auto module = sv::SvarPy::fromPy(pModule,true);
+//        Svar func= module["getpid"];
+////        auto ret=func();
+////        std::cout<<func<<std::endl;
+////        std::cout<<ret<<std::endl;
+//        auto pFunction = PyObject_GetAttrString(pModule, "getpid");
+//        auto pArgs = PyTuple_New(0);
+//        auto pRetValue = PyObject_CallObject(pFunction, pArgs);
+//        return Svar();
+    }
 
     {
         sv::PyThreadStateLock PyThreadLock;
@@ -60,6 +79,11 @@ REGISTER_SVAR_MODULE(python){
             sv::PyThreadStateLock PyThreadLock;
             auto pyobj=sv::SvarPy::getModule(obj);
       return pyobj;
+    });
+
+    sv::Class<sv::PythonSpace>("PythonSpace")
+            .def("__init__",[](){
+        return std::make_shared<PythonSpace>();
     });
 
     sv::Class<sv::PyObjectHolder>("PyObjectHolder")

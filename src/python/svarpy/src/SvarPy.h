@@ -592,12 +592,15 @@ struct SvarPy: public PyObject{
         }
 
         if(PyCFunction_Check(obj)){
-            PyObject*  capsule=PyCFunction_GetSelf(obj);
-            void* svar_func=PyCapsule_GetPointer(capsule,"svar_function");
-            if(capsule&&svar_func){
-                return *(Svar*)svar_func;
-            }
-            else{
+            // FIXME: why svarpy need thread import with enable this
+//            PyObject*  capsule=PyCFunction_GetSelf(obj);
+//            void* svar_func=PyCapsule_GetPointer(capsule,"svar_function");
+//            if(capsule&&svar_func){
+//                return *(Svar*)svar_func;
+//            }
+//            else
+            {
+//                if(capsule) incref(capsule);
                 SvarFunction func;
                 Svar holder=PyObjectHolder(obj);
                 func._func=[holder](std::vector<Svar>& args)->Svar{

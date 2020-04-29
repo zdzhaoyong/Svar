@@ -586,8 +586,8 @@ public:
     template <typename T>
     Svar(std::unique_ptr<T>&& v);
 
-    /// Wrap bool to static instances
-    Svar(bool b):Svar(b?True():False()){}
+    /// Wrap bool (static instance may have problem so changed
+    Svar(bool b):Svar(create(b)){}
 
     /// Wrap a int, uint_8, int_8, short .ext
     Svar(int  i):Svar(create(i)){}
@@ -639,8 +639,6 @@ public:
 
     /// Null is corrosponding to the c++ nullptr
     static const Svar& Null();
-    static const Svar& True();
-    static const Svar& False();
     static Svar&       instance();
 
     /// Return the raw holder
@@ -2565,16 +2563,6 @@ inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
     }
     ost<<"<"<<self.typeName()<<" at "<<self.value().get()<<">";
     return ost;
-}
-
-inline const Svar& Svar::True(){
-    static Svar v((SvarValue*)new SvarValue_<bool>(true));
-    return v;
-}
-
-inline const Svar& Svar::False(){
-    static Svar v((SvarValue*)new SvarValue_<bool>(false));
-    return v;
 }
 
 inline const Svar& Svar::Undefined(){
