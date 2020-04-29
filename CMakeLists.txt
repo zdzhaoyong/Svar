@@ -3,15 +3,28 @@ project(Svar)
 include(cmake/PICMake.cmake)
 
 set(CMAKE_CXX_STANDARD 11)
-INCLUDE_DIRECTORIES(src/Svar src/GSLAM/core)
+
+option(BUILD_PYTHON "build svarpy module to support call python from c++" ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release")
+endif()
 
 pi_git_hash(GIT_VERSION)
 add_definitions(-DBUILD_VERSION=\"${GIT_VERSION}\")
 
-pi_add_target(svar BIN src/cpp REQUIRED System)
+include_directories(src/Svar src/GSLAM/core)
+
+pi_add_target(svar BIN src/cpp REQUIRED System LTO)
+pi_add_target(svar_cbor SHARED src/svar_cbor REQUIRED System LTO)
 pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)
 
-pi_report_targets()
+if(BUILD_PYTHON)
+  add_subdirectory(src/python/svarpy)
+else()
+  pi_report_targets()
+endif()
+
 pi_install(TARGETS svar sample_module HEADERS src/Svar)
 
 #####################################################################

@@ -170,6 +170,9 @@ public:
     template <typename T>
     static T& dumpStream(T& o,Svar var)
     {
+        if(var.isUndefined())
+            return o<<c(0xF6);
+
         if(var.is<bool>())
             return o<<(var.as<bool>()? c(0xF5) : c(0xF4));
 
@@ -365,18 +368,21 @@ public:
             return o;
         }
 
-        return o<<c(0xF6);
+        Svar func_buffer=var.classPtr()->_attr["__buffer__"];
+        if(func_buffer.isFunction()){
+            dumpStream(o,func_buffer(var));
+        }
+
+        throw SvarExeption("Unable dump cbor for type " + var.typeName());
     }
 };
 
 REGISTER_SVAR_MODULE(CBOR){
-
-        SvarClass::Class<CBOR>()
-                .def_static("load",&CBOR::load)
-                .def_static("dump",&CBOR::dump);
-
-        Svar::instance().set("__builtin__.CBOR",SvarClass::instance<CBOR>(),true);
+    svar["parse_cbor"]=&CBOR::load;
+    svar["dump_cbor"]=&CBOR::dump;
 }
+
+EXPORT_SVAR_INSTANCE
 
 }
 

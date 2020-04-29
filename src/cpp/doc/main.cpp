@@ -19,7 +19,7 @@ int doc(Svar config){
         std::cout<<var.as<SvarFunction>()<<std::endl;
     else if(var.isClass())
         std::cout<<var.as<SvarClass>()<<std::endl;
-    else std::cout<<var;
+    else std::cout<<var<<std::endl;
     return 0;
 }
 

@@ -1,4 +1,5 @@
 #include  <Svar.h>
+#include  <Registry.h>
 #include  <Glog.h>
 
 using namespace sv;
@@ -11,9 +12,13 @@ int cbor(Svar config){
 
     if(config.get("help",false)) return config.help();
 
-    Svar CBOR=svar["__builtin__"]["CBOR"];
+    Svar CBOR=Registry::load("svar_cbor");
+    if(CBOR.isUndefined()){
+        return -1;
+    }
+
     if(cborf.size()){
-        std::cerr<<CBOR.call("load",SvarBuffer::load(cborf));
+        std::cerr<<CBOR["parse_cbor"](SvarBuffer::load(cborf));
         return 0;
     }
 
@@ -28,7 +33,7 @@ int cbor(Svar config){
     if(bufsize){
         var["buffer"]=SvarBuffer(bufsize);
     }
-    SvarBuffer bin=CBOR.call("dump",var).as<SvarBuffer>();
+    SvarBuffer bin=CBOR["dump_cbor"](var).as<SvarBuffer>();
     LOG(INFO)<<"cbor size is "<<bin.size();
     if(output.size())
         bin.save(output);
