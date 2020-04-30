@@ -13,7 +13,7 @@ endif()
 pi_git_hash(GIT_VERSION)
 add_definitions(-DBUILD_VERSION=\"${GIT_VERSION}\")
 
-include_directories(src/Svar src/GSLAM/core)
+include_directories(src src/Svar src/GSLAM/core)
 
 pi_add_target(svar BIN src/cpp REQUIRED System LTO)
 pi_add_target(svar_cbor SHARED src/svar_cbor REQUIRED System LTO)
