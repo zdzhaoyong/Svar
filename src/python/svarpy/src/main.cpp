@@ -5,40 +5,55 @@ using namespace sv;
 
 std::shared_ptr<PythonSpace> pythonSpace;
 
+std::string  getFileName(const std::string& path){
+    auto idx = std::string::npos;
+    if ((idx = path.find_last_of('/')) == std::string::npos)
+        idx = path.find_last_of('\\');
+    if (idx != std::string::npos)
+        return path.substr(idx + 1);
+    else
+        return path;
+}
+
+std::string getBaseName(const std::string& path) {
+  std::string filename = getFileName(path);
+  auto idx = filename.find_last_of('.');
+  if (idx == std::string::npos)
+    return filename;
+  else
+    return filename.substr(0, idx);
+}
+
+
 PyObject* load(std::string pluginPath){
-    return SvarPy::getModule(Registry::load(pluginPath));
+    return SvarPy::getModule(Registry::load(pluginPath),getBaseName(pluginPath).c_str());
+}
+
+void set(std::string name, Svar value){
+    svar.set(name,value);
 }
 
 SVAR_PYTHON_IMPL(svar)
 {
     PyEval_InitThreads();
+
+//    auto py_load=SvarPy::getPyFunction(load);
+//    auto svar_exif= PyCFunction_Call(py_load, SvarPy::getPy({"svar_exif"}),nullptr);
+
+//    auto var=SvarPy::fromPy(svar_exif);
+//    LOG(INFO)<<var;
+
     Svar module;
     module["load"]=load;
-    module["__name__"]="svarpy";
-    return SvarPy::getModule(module);
+    module["set"] =set;
+    module["__name__"]="svar";
+    PyObjectHolder pymodule= SvarPy::getModule(module);
+    return pymodule;
 }
 
 sv::Svar import(std::string package){
     if(!pythonSpace){
-//        std::thread t([]{
         pythonSpace=std::make_shared<PythonSpace>();
-//        });
-//        t.join();
-//        Py_Initialize();
-//        PyEval_InitThreads();
-//        PyEval_ReleaseThread(PyThreadState_Get());
-//        PyThreadStateLock lock;
-////        PyObject* pModule = PyImport_ImportModule(package.c_str());
-//        PyObject* pModule = PyImport_ImportModule("os");
-//        const auto module = sv::SvarPy::fromPy(pModule,true);
-//        Svar func= module["getpid"];
-////        auto ret=func();
-////        std::cout<<func<<std::endl;
-////        std::cout<<ret<<std::endl;
-//        auto pFunction = PyObject_GetAttrString(pModule, "getpid");
-//        auto pArgs = PyTuple_New(0);
-//        auto pRetValue = PyObject_CallObject(pFunction, pArgs);
-//        return Svar();
     }
 
     {
@@ -110,11 +125,11 @@ REGISTER_SVAR_MODULE(python){
         if(PyTuple_Check(h.obj))
             return PyTuple_SetItem(h.obj,name.as<int>(),SvarPy::getPy(def));
 
-        PyObject_SetAttrString(h.obj, name.as<std::string>().c_str(),SvarPy::getPy(def));
+        return PyObject_SetAttrString(h.obj, name.as<std::string>().c_str(),SvarPy::getPy(def));
     })
     .def("__delitem__",[](sv::PyObjectHolder& h,const std::string& name){
         sv::PyThreadStateLock PyThreadLock;
-        return PyObject_DelItemString(h.obj, name.c_str());
+        return PyObject_DelItemString(h.obj, (char*)name.c_str());
     })
     .def("append",[](sv::PyObjectHolder& h,const Svar& obj){
         sv::PyThreadStateLock PyThreadLock;

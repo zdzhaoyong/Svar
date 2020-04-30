@@ -7,49 +7,15 @@
 
 #if PY_MAJOR_VERSION >= 3 /// Compatibility macros for various Python versions
 #define SVAR_INSTANCE_METHOD_NEW(ptr, class_) PyInstanceMethod_New(ptr)
-#define SVAR_INSTANCE_METHOD_CHECK PyInstanceMethod_Check
-#define SVAR_INSTANCE_METHOD_GET_FUNCTION PyInstanceMethod_GET_FUNCTION
-#define SVAR_BYTES_CHECK PyBytes_Check
-#define SVAR_BYTES_FROM_STRING PyBytes_FromString
-#define SVAR_BYTES_FROM_STRING_AND_SIZE PyBytes_FromStringAndSize
 #define SVAR_BYTES_AS_STRING_AND_SIZE PyBytes_AsStringAndSize
-#define SVAR_BYTES_AS_STRING PyBytes_AsString
-#define SVAR_BYTES_SIZE PyBytes_Size
-#define SVAR_LONG_CHECK(o) PyLong_Check(o)
-#define SVAR_LONG_AS_LONGLONG(o) PyLong_AsLongLong(o)
-#define SVAR_LONG_FROM_SIGNED(o) PyLong_FromSsize_t((ssize_t) o)
-#define SVAR_LONG_FROM_UNSIGNED(o) PyLong_FromSize_t((size_t) o)
-#define SVAR_BYTES_NAME "bytes"
-#define SVAR_STRING_NAME "str"
-#define SVAR_SLICE_OBJECT PyObject
 #define SVAR_FROM_STRING PyUnicode_FromString
-#define SVAR_STR_TYPE ::SVAR::str
-#define SVAR_BOOL_ATTR "__bool__"
-#define SVAR_NB_BOOL(ptr) ((ptr)->nb_bool)
 #define SVAR_PYTHON_IMPL(name) \
     extern "C" SVAR_EXPORT PyObject *PyInit_##name()
 
 #else
 #define SVAR_INSTANCE_METHOD_NEW(ptr, class_) PyMethod_New(ptr, nullptr, class_)
-#define SVAR_INSTANCE_METHOD_CHECK PyMethod_Check
-#define SVAR_INSTANCE_METHOD_GET_FUNCTION PyMethod_GET_FUNCTION
-#define SVAR_BYTES_CHECK PyString_Check
-#define SVAR_BYTES_FROM_STRING PyString_FromString
-#define SVAR_BYTES_FROM_STRING_AND_SIZE PyString_FromStringAndSize
 #define SVAR_BYTES_AS_STRING_AND_SIZE PyString_AsStringAndSize
-#define SVAR_BYTES_AS_STRING PyString_AsString
-#define SVAR_BYTES_SIZE PyString_Size
-#define SVAR_LONG_CHECK(o) (PyInt_Check(o) || PyLong_Check(o))
-#define SVAR_LONG_AS_LONGLONG(o) (PyInt_Check(o) ? (long long) PyLong_AsLong(o) : PyLong_AsLongLong(o))
-#define SVAR_LONG_FROM_SIGNED(o) PyInt_FromSsize_t((ssize_t) o) // Returns long if needed.
-#define SVAR_LONG_FROM_UNSIGNED(o) PyInt_FromSize_t((size_t) o) // Returns long if needed.
-#define SVAR_BYTES_NAME "str"
-#define SVAR_STRING_NAME "unicode"
-#define SVAR_SLICE_OBJECT PySliceObject
 #define SVAR_FROM_STRING PyString_FromString
-#define SVAR_STR_TYPE ::SVAR::bytes
-#define SVAR_BOOL_ATTR "__nonzero__"
-#define SVAR_NB_BOOL(ptr) ((ptr)->nb_nonzero)
 #define SVAR_PYTHON_IMPL(name) \
     static PyObject *SVAR_init_wrapper();               \
     extern "C" SVAR_EXPORT void init##name() {          \
@@ -557,6 +523,10 @@ struct SvarPy: public PyObject{
             return std::string(buffer, (size_t) length);
         }
 
+        if (PyString_Check(obj)){
+          return std::string(PyString_AsString(obj));
+        }
+
         if(PyTuple_Check(obj)){
             if(abortComplex) return PyObjectHolder(obj);
             std::vector<Svar> array(PyTuple_Size(obj));
@@ -657,15 +627,14 @@ struct SvarPy: public PyObject{
     }
 
 
-    static PyObjectHolder getModule(Svar var){
+    static PyObjectHolder getModule(Svar var,const char* name="svar"){
         if(var.isObject())
         {
             PyObject* pyModule = nullptr;
-            const char* name="svar";
             const char* doc="";
 
             if(var.exist("__name__"))
-                name= var["__name__"].castAs<std::string>().c_str();
+                name= var["__name__"].as<std::string>().c_str();
 
             if(var.exist("__doc__"))
                 doc = var["__doc__"].castAs<std::string>().c_str();
@@ -687,7 +656,7 @@ struct SvarPy: public PyObject{
 
             for(std::pair<std::string,Svar> pair:var.as<SvarObject>()._var)
             {
-                PyObject* obj=getModule(pair.second);
+                PyObject* obj=getModule(pair.second,pair.first.c_str());
                 PyModule_AddObject(pyModule, pair.first.c_str(), obj);
             }
 

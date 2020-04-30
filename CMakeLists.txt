@@ -20,11 +20,10 @@ pi_add_target(svar_cbor SHARED src/svar_cbor REQUIRED System LTO)
 pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)
 
 if(BUILD_PYTHON)
-  add_subdirectory(src/python/svarpy)
-else()
-  pi_report_targets()
+  pi_add_target(svarpy SHARED src/python/svarpy/src REQUIRED Python System LTO)
 endif()
 
+pi_report_targets()
 pi_install(TARGETS svar sample_module HEADERS src/Svar)
 
 #####################################################################
