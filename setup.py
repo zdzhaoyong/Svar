@@ -53,12 +53,13 @@ class CMakeBuild(build_ext):
                                                               self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+        print('cmake', ext.sourcedir, cmake_args)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 setup(
     name='svar',
-    version='0.1.0',
+    version='0.2.0',
     author='Chen Lin',
     author_email='npuchenlin@foxmail.com',
     description='The Python interface for Svar plugins',

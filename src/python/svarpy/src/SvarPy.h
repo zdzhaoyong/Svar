@@ -523,9 +523,11 @@ struct SvarPy: public PyObject{
             return std::string(buffer, (size_t) length);
         }
 
+#if PY_MAJOR_VERSION < 3
         if (PyString_Check(obj)){
           return std::string(PyString_AsString(obj));
         }
+#endif
 
         if(PyTuple_Check(obj)){
             if(abortComplex) return PyObjectHolder(obj);

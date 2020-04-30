@@ -37,12 +37,6 @@ SVAR_PYTHON_IMPL(svar)
 {
     PyEval_InitThreads();
 
-//    auto py_load=SvarPy::getPyFunction(load);
-//    auto svar_exif= PyCFunction_Call(py_load, SvarPy::getPy({"svar_exif"}),nullptr);
-
-//    auto var=SvarPy::fromPy(svar_exif);
-//    LOG(INFO)<<var;
-
     Svar module;
     module["load"]=load;
     module["set"] =set;

@@ -49,6 +49,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #=============================================================================
+set(Python_ADDITIONAL_VERSIONS 3.7 3.6 3.5 3.4)
 
 # Checking for the extension makes sure that `LibsNew` was found and not just `Libs`.
 if(PYTHONLIBS_FOUND AND PYTHON_MODULE_EXTENSION)
