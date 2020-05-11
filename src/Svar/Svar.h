@@ -1289,7 +1289,7 @@ class SvarBuffer
 public:
   SvarBuffer(void *ptr, ssize_t itemsize, const std::string &format,
              std::vector<ssize_t> shape_in, std::vector<ssize_t> strides_in, Svar holder=Svar())
-  : _ptr(ptr), _size(itemsize), _format(format), _holder(holder),
+  : _ptr(ptr), _size(itemsize), _holder(holder), _format(format),
     shape(std::move(shape_in)), strides(std::move(strides_in)) {
       if (shape.size() != strides.size()){
         strides=shape;
@@ -1345,7 +1345,7 @@ public:
     std::string hex()const{
         const std::string h = "0123456789ABCDEF";
         std::string ret;ret.resize(_size*2);
-        for(size_t i=0;i<_size;i++){
+        for(ssize_t i=0;i<_size;i++){
             ret[i<<1]=h[((uint8_t*)_ptr)[i] >> 4];
             ret[(i<<1)+1]=h[((uint8_t*)_ptr)[i] & 0xf];
         }
@@ -1527,7 +1527,7 @@ public:
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
         std::vector<uint32_t> vec(total_ints,0);
-        for(size_t i = 0; i < _size; i++)
+        for(ssize_t i = 0; i < _size; i++)
             vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
         uint64_t size = _size*8;
@@ -1577,10 +1577,10 @@ public:
       return lut[_format.front()];
     }
 
-    void*   _ptr= nullptr;
-    ssize_t _size = 0;
+    void*   _ptr;
+    ssize_t _size;
     Svar    _holder;
-    std::string _format = format<uint8_t>();
+    std::string _format;
     std::vector<ssize_t> shape,strides;
 };
 
@@ -2294,7 +2294,6 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
   auto setvar=[this,setjson](std::string s)->bool{
       // Execution failed. Maybe its an assignment.
       std::string::size_type n = s.find("=");
-      bool shouldOverwrite = true;
 
       if (n != std::string::npos) {
         std::string var = s.substr(0, n);
@@ -2304,7 +2303,6 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
         std::string::size_type s = 0, e = var.length() - 1;
         if ('?' == var[e]) {
           e--;
-          shouldOverwrite = false;
         }
         for (; std::isspace(var[s]) && s < var.length(); s++) {
         }

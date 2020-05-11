@@ -132,7 +132,7 @@ public:
             if(n.IsArray()){
                 Array array=n.As<Array>();
                 std::vector<Svar> vec(array.Length());
-                for(size_t i=0;i<array.Length();i++)
+                for(int i=0;i<array.Length();i++)
                 {
                     vec[i]=fromNode(array[i]);
                 }
@@ -227,7 +227,7 @@ public:
         else if(src.is<SvarArray>())
             convert=[](Napi::Env env,Svar src){
                 Array array=Array::New(env,src.size());
-                for(size_t i = 0; i < src.size(); ++i) {
+                for(int i = 0; i < src.size(); ++i) {
                     array.Set(i,getNode(env,src[i]));
                 }
                 return array;
@@ -289,5 +289,4 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
 #undef svar
 NODE_API_MODULE(hello,Init)
-
 
