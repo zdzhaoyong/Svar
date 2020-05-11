@@ -13,18 +13,18 @@ endif()
 pi_git_hash(GIT_VERSION)
 add_definitions(-DBUILD_VERSION=\"${GIT_VERSION}\")
 
-include_directories(src src/Svar src/GSLAM/core)
+include_directories(src src/Svar src/cpp/GSLAM/core)
 
 pi_add_target(svar BIN src/cpp REQUIRED System LTO)
-pi_add_target(svar_cbor SHARED src/svar_cbor REQUIRED System LTO)
-pi_add_target(sample_module SHARED src/sample_module REQUIRED System LTO)
+pi_add_target(svar_cbor SHARED src/modules/svar_cbor REQUIRED System LTO)
+pi_add_target(sample_module SHARED src/modules/sample_module REQUIRED System LTO)
 
 if(BUILD_PYTHON)
   pi_add_target(svarpy SHARED src/python/svarpy/src REQUIRED Python System LTO)
 endif()
 
 pi_report_targets()
-pi_install(TARGETS svar sample_module HEADERS src/Svar)
+pi_install(TARGETS svar sample_module svar_cbor svarpy HEADERS src/Svar)
 
 #####################################################################
 # Add Tab Completion Support
