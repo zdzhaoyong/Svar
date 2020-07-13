@@ -1,0 +1,69 @@
+# This module supports requiring a minimum version, e.g. you can do
+#   find_package(Svar 0.1.0)
+# to require version 0.1.0 or newer of Svar, support after 0.2.1.
+#
+# Once done this will define
+#
+#  SVAR_FOUND - system has SVAR lib with correct version
+#  SVAR_INCLUDES  - the SVAR include directory
+#  SVAR_VERSION - SVAR version
+
+
+# Copyright (c) 2016 Yong Zhao, <zd5945@126.com>
+
+# Find at least 1.1.0
+if(NOT SVAR_FIND_VERSION)
+  if(NOT SVAR_FIND_VERSION_MAJOR)
+    set(SVAR_FIND_VERSION_MAJOR 0)
+  endif(NOT SVAR_FIND_VERSION_MAJOR)
+  if(NOT SVAR_FIND_VERSION_MINOR)
+    set(SVAR_FIND_VERSION_MINOR 1)
+  endif(NOT SVAR_FIND_VERSION_MINOR)
+  if(NOT SVAR_FIND_VERSION_PATCH)
+    set(SVAR_FIND_VERSION_PATCH 0)
+  endif(NOT SVAR_FIND_VERSION_PATCH)
+
+  set(SVAR_FIND_VERSION "${SVAR_FIND_VERSION_MAJOR}.${SVAR_FIND_VERSION_MINOR}.${SVAR_FIND_VERSION_PATCH}")
+endif(NOT SVAR_FIND_VERSION)
+
+macro(svar_check_version)
+  file(READ "${SVAR_INCLUDE_DIR}/Svar/Svar.h" _svar_version_header)
+
+  string(REGEX MATCH "define[ \t]+SVAR_VERSION[ \t]+0x([0-9][0-9])([0-9][0-9])([0-9][0-9])" _svar_version_match "${_svar_version_header}")
+  set(SVAR_VERSION_MAJOR "${CMAKE_MATCH_1}")
+  set(SVAR_VERSION_MINOR "${CMAKE_MATCH_2}")
+  set(SVAR_VERSION_PATCH "${CMAKE_MATCH_3}")
+
+  set(SVAR_VERSION ${SVAR_VERSION_MAJOR}.${SVAR_VERSION_MINOR}.${SVAR_VERSION_PATCH})
+
+  if(${SVAR_VERSION} VERSION_LESS ${SVAR_FIND_VERSION})
+    set(SVAR_VERSION_OK FALSE)
+  else(${SVAR_VERSION} VERSION_LESS ${SVAR_FIND_VERSION})
+    set(SVAR_VERSION_OK TRUE)
+  endif(${SVAR_VERSION} VERSION_LESS ${SVAR_FIND_VERSION})
+
+	get_filename_component(SVAR_PATH "${SVAR_INCLUDE_DIR}/.." ABSOLUTE)
+  
+  if(NOT SVAR_VERSION_OK)
+
+    message(STATUS "Svar version ${SVAR_VERSION} found in ${SVAR_PATH}, "
+                   "but at least version ${SVAR_FIND_VERSION} is required")
+  endif(NOT SVAR_VERSION_OK)
+endmacro(svar_check_version)
+
+FIND_PATH( SVAR_INCLUDE_DIR Svar/Svar.h
+	# installation selected by user
+	$ENV{SVAR_PATH}
+	$ENV{SVAR_HOME}
+	# system placed in /usr/local/include
+	@CMAKE_INSTALL_PREFIX@/include
+)
+
+if(SVAR_INCLUDE_DIR)
+	svar_check_version()
+	set(SVAR_INCLUDES ${SVAR_INCLUDE_DIR})
+  set(SVAR_FOUND 1)
+else()
+  message("Unable to find include directory of Svar")
+endif(SVAR_INCLUDE_DIR)
+

@@ -24,7 +24,7 @@ if(BUILD_PYTHON)
 endif()
 
 pi_report_targets()
-pi_install(TARGETS svar sample_module svar_cbor svarpy HEADERS src/Svar)
+pi_install(TARGETS svar sample_module svar_cbor svarpy HEADERS src/Svar CMAKE "${PROJECT_SOURCE_DIR}/cmake/FindSvar.cmake.in")
 
 #####################################################################
 # Add Tab Completion Support
