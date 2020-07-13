@@ -1691,7 +1691,7 @@ public:
 
     virtual Svar            clone(int depth=0)const{
         std::unique_lock<std::mutex> lock(_mutex);
-        if(!depth)
+        if(depth<=0)
             return _var;
         auto var=_var;
         for(auto it=var.begin();it!=var.end();it++){
@@ -1761,11 +1761,11 @@ public:
 
     virtual Svar            clone(int depth=0)const{
         std::unique_lock<std::mutex> lock(_mutex);
-        if(!depth)
+        if(depth<=0)
             return _var;
         std::vector<Svar> var=_var;
         for(auto& it:var){
-            it=it.clone();
+            it=it.clone(depth-1);
         }
         return var;
     }

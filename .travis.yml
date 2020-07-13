@@ -160,6 +160,7 @@ script:
        brew install cmake ninja
        brew upgrade cmake
        cmake --version
+       export CMAKE_OPTIONS="-DBUILD_PYTHON=OFF"
      fi
 
   # make sure CXX is correctly set

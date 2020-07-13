@@ -447,7 +447,7 @@ Can the module also be imported by other languages?
 Yes!Yes!Yes!
 But we only implemented the python3 interface now, if you are familar with bindings, please contact me and we can cooperate on this!
 
-## Use the Sample Module with Python
+### Use the Sample Module with Python
 
 Firstly, please install the svar module with pip3:
 
@@ -481,6 +481,38 @@ print(me.getSchool())
 
 print(father.name) # property
 print(me.school)
+```
+
+### Use the Sample Module with NodeJS (Tested on Ubuntu 16.04)
+
+Firstly, please install the svar module with npm:
+
+```
+cd Svar/src/nodejs
+npm install .
+```
+
+Then, we can run the demo javascript with node:
+
+```
+node sample_module.js
+```
+
+The file content is listed as below:
+
+```
+s    = require('bindings')('svar')('sample_module')
+
+console.log(s)
+
+p = new s.Person(3,'zy')
+console.log(p.age())
+console.log(s.Person.all())
+
+student = new s.Student(3,"zy","npu")
+
+console.log(student.school,student.intro())
+
 ```
 
 # Supported Compilers
