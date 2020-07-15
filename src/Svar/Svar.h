@@ -952,7 +952,7 @@ public:
 
         if(!overload){
             std::stringstream stream;
-            stream<<(*this)<<"Failed to call method with imput arguments: [";
+            stream<<(*this)<<"Failed to call method with input arguments: [";
             for(auto it=argv.begin();it!=argv.end();it++)
             {
                 stream<<(it==argv.begin()?"":",")<<it->typeName();
@@ -1317,7 +1317,7 @@ public:
     _ptr = _holder.as<std::vector<char>>().data();
   }
 
-    const void*     ptr() const{return this;}
+    void*           ptr() const {return _ptr;}
     size_t          size() const {return _size;}
     size_t          length() const{return _size;}
 
