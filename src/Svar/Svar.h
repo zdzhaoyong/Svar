@@ -1947,7 +1947,7 @@ template <>
 inline bool Svar::is<Svar>()const{return true;}
 
 inline bool Svar::isNull()const{
-    return Null()==(*this);
+    return classPtr()->_cpptype==typeid(std::nullptr_t);
 }
 
 inline bool Svar::isProperty() const{
