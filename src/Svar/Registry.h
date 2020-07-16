@@ -175,9 +175,9 @@ protected:
 #endif
         for(std::string env:envs)
         {
-            std::string ptr=svar.GetString(env,"");
-            if(!ptr.empty())
-                convertStringPathIntoFilePathList(ptr,_libraryFilePath);
+            char *ptr = std::getenv(env.c_str());
+            if (ptr)
+                convertStringPathIntoFilePathList(std::string(ptr),_libraryFilePath);
         }
         for(std::string ptr:paths)
             convertStringPathIntoFilePathList(ptr,_libraryFilePath);
