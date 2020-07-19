@@ -1255,6 +1255,20 @@ public:
         });
     }
 
+    template <typename... Args>
+    Class& unique_construct(){
+        return def("__init__",[](Args... args){
+            return std::unique_ptr<C>(new C(args...));
+        });
+    }
+
+    template <typename... Args>
+    Class& shared_construct(){
+        return def("__init__",[](Args... args){
+            return std::make_shared<C>(args...);
+        });
+    }
+
     Class& def_property(const std::string& name,
                         const Svar& fget,const Svar& fset=Svar(),
                         const std::string& doc=""){
