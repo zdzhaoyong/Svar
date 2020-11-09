@@ -1511,7 +1511,7 @@ public:
             unsigned int b=btemp;
             unsigned int c=ctemp;
             unsigned int d=dtemp;
-            for(uint8_t i;i<64;i++){
+            for(uint8_t i=0;i<64;i++){
                 f=funcs[i>>4](b,c,d);
                 g=func_g[i>>4](i);
                 unsigned int tmp=d;
