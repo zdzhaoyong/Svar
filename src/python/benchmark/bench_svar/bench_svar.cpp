@@ -1,6 +1,6 @@
 #include <Svar/SvarPy.h>
 
-using namespace GSLAM;
+using namespace sv;
 
 class BenchClass
 {
