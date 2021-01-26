@@ -499,6 +499,10 @@ struct SvarPy: public PyObject{
             return *o->var;
         }
 
+        if(Py_None == obj){
+            return sv::Svar::Null();
+        }
+
         if(PyNumber_Check(obj))
         {
             if(PyFloat_Check(obj))
