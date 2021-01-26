@@ -1250,8 +1250,11 @@ public:
 
     template <typename... Args>
     Class& construct(){
+//        return def("__init__",[](Args... args){
+//            return C(args...);
+//        });
         return def("__init__",[](Args... args){
-            return C(args...);
+            return std::unique_ptr<C>(new C(args...));
         });
     }
 
@@ -1331,7 +1334,8 @@ public:
     _ptr = _holder.as<std::vector<char>>().data();
   }
 
-    void*           ptr() const {return _ptr;}
+    template<typename T=char>
+    T*              ptr() const {return (T*)_ptr;}
     size_t          size() const {return _size;}
     size_t          length() const{return _size;}
 
