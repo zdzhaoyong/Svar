@@ -66,6 +66,10 @@
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
 
 
 #define svar sv::Svar::instance()
@@ -1250,9 +1254,6 @@ public:
 
     template <typename... Args>
     Class& construct(){
-//        return def("__init__",[](Args... args){
-//            return C(args...);
-//        });
         return def("__init__",[](Args... args){
             return std::unique_ptr<C>(new C(args...));
         });
@@ -1545,7 +1546,7 @@ public:
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
         std::vector<uint32_t> vec(total_ints,0);
-        for(ssize_t i = 0; i < _size; i++)
+        for(size_t i = 0; i < _size; i++)
             vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
         uint64_t size = _size*8;

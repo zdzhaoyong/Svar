@@ -640,21 +640,13 @@ struct SvarPy: public PyObject{
         if(var.isObject())
         {
             PyObject* pyModule = nullptr;
-            const char* doc="";
-
-            if(var.exist("__name__"))
-                name= var["__name__"].as<std::string>().c_str();
-
-            if(var.exist("__doc__"))
-                doc = var["__doc__"].castAs<std::string>().c_str();
-
 #if PY_MAJOR_VERSION<3
             pyModule=Py_InitModule3(name,nullptr,doc);
 #else
             PyModuleDef *def = new PyModuleDef();
             memset(def, 0, sizeof(PyModuleDef));
-            def->m_name=name;
-            def->m_doc=doc;
+            def->m_name=var.get<std::string>("__name",name).c_str();
+            def->m_doc=var.get<std::string>("__doc__","").c_str();
             def->m_size = -1;
             Py_INCREF(def);
 
