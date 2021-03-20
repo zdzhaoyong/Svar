@@ -41,6 +41,18 @@ public:
         PyGILState_Ensure();
         Py_Finalize();
     }
+
+    static const char* safe_c_str(std::string s){
+        static std::unordered_map<std::string,std::string> cache;
+        auto it=cache.find(s);
+        if(it == cache.end())
+        {
+            auto ret=cache.insert(std::pair<std::string,std::string>(s,s));
+            it=ret.first;
+        }
+
+        return it->second.c_str();
+    }
 };
 
 class PyThreadStateLock
@@ -84,85 +96,6 @@ public:
 
 struct SvarPy: public PyObject{
     Svar* var;
-
-    static PyTypeObject& svar_object()
-    {
-        static PyTypeObject* type=nullptr;
-        if(type) return *type;
-        constexpr auto *name = "svar_object";
-
-        auto heap_type = (PyHeapTypeObject *) PyType_Type.tp_alloc(&PyType_Type, 0);
-        if (!heap_type)
-            LOG(FATAL)<<"svar_object(): error allocating svar_object!";
-
-        heap_type->ht_name = SVAR_FROM_STRING(name);
-
-        type = &heap_type->ht_type;
-        type->tp_name = name;
-        type->tp_doc="";
-        type->tp_basicsize=sizeof(SvarPy);
-        type->tp_base = type_incref(&PyType_Type);
-        type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
-
-        type->tp_as_number = &heap_type->as_number;
-        type->tp_as_sequence = &heap_type->as_sequence;
-        type->tp_as_mapping = &heap_type->as_mapping;
-
-        type->tp_new=[](PyTypeObject *type, PyObject *, PyObject *)->PyObject * {
-    #if defined(PYPY_VERSION)
-            // PyPy gets tp_basicsize wrong (issue 2482) under multiple inheritance when the first inherited
-            // object is a a plain Python type (i.e. not derived from an extension type).  Fix it.
-            ssize_t instance_size = static_cast<ssize_t>(sizeof(instance));
-            if (type->tp_basicsize < instance_size) {
-                type->tp_basicsize = instance_size;
-            }
-    #endif
-            PyObject *self = type->tp_alloc(type, 0);
-            auto inst = reinterpret_cast<SvarPy*>(self);
-            // Allocate the value/holder internals:
-            inst->var=nullptr;
-//            LOG(INFO)<<"Creating <"<<type->tp_name<<" object at "<<self<<">";
-            return self;
-        };
-
-        type->tp_repr = [](PyObject* obj){
-            std::stringstream sst;
-            sst<<"<"<<obj->ob_type->tp_name<<" object at "<<obj<<">";
-            return SVAR_FROM_STRING(sst.str().c_str());
-        };
-
-        type->tp_init=[](PyObject *self, PyObject *, PyObject *)->int{
-            PyTypeObject *type = Py_TYPE(self);
-            std::string msg;
-        #if defined(PYPY_VERSION)
-            msg += handle((PyObject *) type).attr("__module__").cast<std::string>() + ".";
-        #endif
-            msg += type->tp_name;
-            msg += ": No constructor defined!";
-            PyErr_SetString(PyExc_TypeError, msg.c_str());
-            return -1;
-        };
-
-        type->tp_dealloc=[](PyObject *self) {
-            SvarPy* obj=(SvarPy*)self;
-            if(obj->var)
-            {
-//                LOG(INFO)<<"Deleting <"<<self->ob_type->tp_name<<" object at "<<self<<">";
-                delete obj->var;
-                obj->var=nullptr;
-            }
-
-            auto type = Py_TYPE(self);
-            type->tp_free(self);
-            Py_DECREF(type);
-        };
-
-        if (PyType_Ready(type) < 0)
-            LOG(FATAL)<<("svar_object(): failure in PyType_Ready()!");
-
-        PyObject_SetAttrString((PyObject *) type, "__module__", PyUnicode_FromString("svar_builtin"));
-        return *type;
-    }
 
     static PyObject* incref(PyObject* obj){
         Py_IncRef(obj);
@@ -234,7 +167,7 @@ struct SvarPy: public PyObject{
         else if(src.is<SvarObject>())
             convert=[](Svar src)->PyObjectHolder{
             PyObject* dict=PyDict_New();
-            for (auto kv : src.as<SvarObject>()._var) {
+            for (std::pair<std::string,Svar> kv : src) {
                 PyObject* key = PyUnicode_FromStringAndSize(kv.first.data(),kv.first.size());
                 PyObject* value = SvarPy::getPy(kv.second);
                 if (!key || !value){
@@ -393,14 +326,6 @@ struct SvarPy: public PyObject{
         }
 
         type->tp_new=[](PyTypeObject *type, PyObject *, PyObject *)->PyObject * {
-    #if defined(PYPY_VERSION)
-            // PyPy gets tp_basicsize wrong (issue 2482) under multiple inheritance when the first inherited
-            // object is a a plain Python type (i.e. not derived from an extension type).  Fix it.
-            ssize_t instance_size = static_cast<ssize_t>(sizeof(instance));
-            if (type->tp_basicsize < instance_size) {
-                type->tp_basicsize = instance_size;
-            }
-    #endif
             PyObject *self = type->tp_alloc(type, 0);
             auto inst = reinterpret_cast<SvarPy*>(self);
             // Allocate the value/holder internals:
@@ -417,18 +342,14 @@ struct SvarPy: public PyObject{
         #endif
             msg += type->tp_name;
             msg += ": No constructor defined!";
-            PyErr_SetString(PyExc_TypeError, msg.c_str());
+            PyErr_SetString(PyExc_TypeError, PythonSpace::safe_c_str(msg));
             return -1;
-        };
-
-        auto init=[](PyObject *self, PyObject *, PyObject *)->int{
-            return 0;
         };
 
         type->tp_repr = [](PyObject* obj){
             std::stringstream sst;
             sst<<"<"<<obj->ob_type->tp_name<<" object at "<<obj<<">";
-            return SVAR_FROM_STRING(sst.str().c_str());
+            return SVAR_FROM_STRING(PythonSpace::safe_c_str(sst.str()));
         };
 
         type->tp_dealloc=[](PyObject *self) {
@@ -448,7 +369,7 @@ struct SvarPy: public PyObject{
         if (PyType_Ready(type) < 0)
             LOG(ERROR)<<("make_static_property_type(): failure in PyType_Ready()!");
 
-        for(std::pair<std::string,Svar> f:cls._attr.as<SvarObject>()._var)
+        for(std::pair<std::string,Svar> f:cls._attr)
         {
             if(f.first=="__init__"){
                 Svar func_init=Svar::lambda([f](std::vector<Svar> args){
@@ -467,8 +388,9 @@ struct SvarPy: public PyObject{
                 continue;
             }
             else
-                PyObject_SetAttrString((PyObject*)type,f.first.c_str(),getPy(f.second));
+                PyObject_SetAttrString((PyObject*)type,PythonSpace::safe_c_str(f.first),getPy(f.second));
         }
+
         PyObject_SetAttrString((PyObject *) type, "__module__", SVAR_FROM_STRING("svar_builtins"));
         cls._attr.set("PyTypeObject",type);
 
@@ -483,7 +405,6 @@ struct SvarPy: public PyObject{
 
     static Svar fromPy(PyObject* obj,bool abortComplex=false)// this never fails
     {
-//        incref(obj);// FIXME: Why SegmentFault without incref?
         if(!obj)
           return Svar();
 
@@ -636,17 +557,19 @@ struct SvarPy: public PyObject{
     }
 
 
-    static PyObjectHolder getModule(Svar var,const char* name="svar"){
+    static PyObjectHolder getModule(Svar var,std::string name="svar"){
         if(var.isObject())
         {
             PyObject* pyModule = nullptr;
 #if PY_MAJOR_VERSION<3
-            pyModule=Py_InitModule3(name,nullptr,doc);
+            pyModule=Py_InitModule3(PythonSpace::safe_c_str(var.get<std::string>("__name__",name)),
+                                    nullptr,
+                                    PythonSpace::safe_c_str(var.get<std::string>("__doc__","")));
 #else
             PyModuleDef *def = new PyModuleDef();
             memset(def, 0, sizeof(PyModuleDef));
-            def->m_name=var.get<std::string>("__name",name).c_str();
-            def->m_doc=var.get<std::string>("__doc__","").c_str();
+            def->m_name= PythonSpace::safe_c_str(var.get<std::string>("__name__",name));
+            def->m_doc = PythonSpace::safe_c_str(var.get<std::string>("__doc__",""));
             def->m_size = -1;
             Py_INCREF(def);
 
@@ -655,9 +578,9 @@ struct SvarPy: public PyObject{
             if(!pyModule)
                 return nullptr;
 
-            for(std::pair<std::string,Svar> pair:var.as<SvarObject>()._var)
+            for(std::pair<std::string,Svar> pair:var)
             {
-                PyObject* obj=getModule(pair.second,pair.first.c_str());
+                PyObject* obj=getModule(pair.second,pair.first);
                 PyModule_AddObject(pyModule, pair.first.c_str(), obj);
             }
 
