@@ -15,10 +15,10 @@ TEST(Svar,Cast){
     Svar uptrvar=std::unique_ptr<A>(new A({2,3,4}));
     Svar sptrvar=std::shared_ptr<A>(new A({2,3,4})); // support shared_ptr lvalue
 
-    Svar checkA=(SvarFunction)[](A a_var, const A& a_ref,A* a_ptr){
+    Svar checkA=SvarFunction([](A a_var, const A& a_ref,A* a_ptr){
         EXPECT_EQ(a_var.a,a_ref.a);
         EXPECT_EQ(a_var.a,a_ptr->a);
-    };
+    });
 
     auto printA=[checkA](Svar a){
         checkA(a,a,a);
