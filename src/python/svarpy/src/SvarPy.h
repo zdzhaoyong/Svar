@@ -377,7 +377,6 @@ struct SvarPy: public PyObject{
                         std::vector<Svar> used_args(args.begin()+1,args.end());
                         Svar ret=f.second.as<SvarFunction>().Call(used_args);
                         self->var=new Svar(ret);
-                        Py_IncRef(self);
                         return incref(Py_None);
             });
                 func_init.as<SvarFunction>().is_constructor=true;
