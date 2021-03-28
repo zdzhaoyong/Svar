@@ -1,12 +1,11 @@
 #include "Svar.h"
-#include "Registry.h"
 #include "gtest.h"
 
 using namespace sv;
 
 TEST(Svar,PyMath)
 {
-   const Svar svarpy = Registry::load("svarpy");
+   const Svar svarpy = svar.import("svarpy");
    if(svarpy.isUndefined()) return;
 
    const Svar math = svarpy["import"]("math");
@@ -19,7 +18,7 @@ TEST(Svar,PyMath)
 
 TEST(Svar,PyOS)
 {
-   const Svar svarpy = Registry::load("svarpy");
+   const Svar svarpy = svar.import("svarpy");
    if(svarpy.isUndefined()) return;
 
    const Svar os = svarpy["import"]("os");
@@ -33,7 +32,7 @@ TEST(Svar,PyOS)
 TEST(Svar,PyOSThread)
 {
     std::thread t([]{
-        const Svar svarpy = Registry::load("svarpy");
+        const Svar svarpy =svar.import("svarpy");
         if(svarpy.isUndefined()) return;
 
         const Svar os = svarpy["import"]("os");

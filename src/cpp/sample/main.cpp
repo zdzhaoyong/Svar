@@ -1,5 +1,4 @@
 #include "Svar.h"
-#include "Registry.h"
 
 using namespace sv;
 
@@ -132,7 +131,7 @@ int sample_svarclass(){// users can also define a class without related c++ clas
 }
 
 int sample_module(Svar config){
-    Svar sampleModule=Registry::load("sample_module");
+    Svar sampleModule=svar.import("sample_module");
 
     Svar Person=sampleModule["Person"];
     Svar Student=sampleModule["Student"];

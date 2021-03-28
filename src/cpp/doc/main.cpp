@@ -1,4 +1,4 @@
-#include <Registry.h>
+#include <Svar.h>
 
 using namespace sv;
 
@@ -12,7 +12,7 @@ int doc(Svar config){
     std::string pluginPath=config.get<std::string>("plugin","");
     std::string key=config.get<std::string>("key","");
 
-    Svar inst=Registry::load(pluginPath);
+    Svar inst=svar.import(pluginPath);
     sv::Svar var=key.empty()?(inst):inst.get(key,Svar(),true);
 
     if(var.isFunction())
