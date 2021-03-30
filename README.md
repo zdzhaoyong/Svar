@@ -37,63 +37,66 @@
 	<th>3. Import and use in Python</th>
 </tr>
 <tr>
-<td valign="top"><br>
+<td valign="top">
 <pre>
 #include &lt;Svar.h&gt;
 &nbsp;
 void say(std::string v){
-	std::cerr&lt;&lt;v&lt;&lt;std::endl;
+  std::cerr&lt;&lt;v&lt;&lt;std::endl;
 }
-&nbsp;
-REGISTER_SVAR_MODULE(hello){
-	svar["say"] = say;
+REGISTER_SVAR_MODULE(hello)
+{
+  svar["say"] = say;
 }
 EXPORT_SVAR_INSTANCE
-</pre></br></td>
-<td valign="top"><br>
+</pre></td>
+<td valign="top">
 <pre>
 #include &lt;Svar.h&gt;
 &nbsp;
+auto hello=svar.import("hello");
 int main(){
-  auto hello = svar.import("hello");
   hello["say"]("hello world");
   return 0;
 }
-</pre></br></td>
-<td valign="top"><br>
+</pre></td>
+<td valign="top">
 <pre>
 import svar
 hello = svar.load("hello")
 hello.say("hello world")
-</pre></br></td>
+</pre></td>
 <tr>
 	<th>4. Import and use in Javascript</th>
-	<th>5. C++ import python module</th>
-	<th>6. Javascript import python module</th>
+	<th>5. C++ import Python module</th>
+	<th>6. Javascript import Python module</th>
 </tr>
 <tr>
-<td valign="top"><br>
+<td valign="top">
 <pre>
-hello = require('./svar')('hello')
+svar = require('./svar')
+hello =  svar('hello')
 hello.say("hello world")
-</pre></br></td>
-<td valign="top"><br>
+</pre></td>
+<td valign="top">
 <pre>
 #include &lt;Svar.h&gt;
 &nbsp;
 int main(){
-  auto python = svar.import("svarpy");
-  auto os = python["import]("os");
-  std::cout&lt;&lt;"Pid is:"&lt;&lt;os["getpid"]();
+  auto py=svar.import("svarpy");
+  auto os = py["import]("os");
+  std::cout&lt;&lt;"Pid is:"
+  &lt;&lt;os["getpid"]();
   return 0;
 }
-</pre></br></td>
-<td valign="top"><br>
+</pre></td>
+<td valign="top">
 <pre>
-python=require("./svar")("svarpy")
+svar=require("./svar")
+python=svar("svarpy")
 os=python.import("os")
 print("Pid is", os.getpid())
-</pre></br></td>
+</pre></td>
 </table>
 
 # Why Svar? 
