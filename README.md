@@ -28,6 +28,73 @@
 - [License](#license)
 
 ---
+# Quick start
+
+<table>
+<tr>
+	<th>1. Bind C++ to hello.so</th>
+	<th>2. Import and use in C++</th>
+	<th>3. Import and use in Python</th>
+</tr>
+<tr>
+<td valign="top"><br>
+<pre>
+#include &lt;Svar.h&gt;
+&nbsp;
+void say(std::string v){
+	std::cerr&lt;&lt;v&lt;&lt;std::endl;
+}
+&nbsp;
+REGISTER_SVAR_MODULE(hello){
+	svar["say"] = say;
+}
+EXPORT_SVAR_INSTANCE
+</pre></br></td>
+<td valign="top"><br>
+<pre>
+#include &lt;Svar.h&gt;
+&nbsp;
+int main(){
+  auto hello = svar.import("hello");
+  hello["say"]("hello world");
+  return 0;
+}
+</pre></br></td>
+<td valign="top"><br>
+<pre>
+import svar
+hello = svar.load("hello")
+hello.say("hello world")
+</pre></br></td>
+<tr>
+	<th>4. Import and use in Javascript</th>
+	<th>5. C++ import python module</th>
+	<th>6. Javascript import python module</th>
+</tr>
+<tr>
+<td valign="top"><br>
+<pre>
+hello = require('./svar')('hello')
+hello.say("hello world")
+</pre></br></td>
+<td valign="top"><br>
+<pre>
+#include &lt;Svar.h&gt;
+&nbsp;
+int main(){
+  auto python = svar.import("svarpy");
+  auto os = python["import]("os");
+  std::cout&lt;&lt;"Pid is:"&lt;&lt;os["getpid"]();
+  return 0;
+}
+</pre></br></td>
+<td valign="top"><br>
+<pre>
+python=require("./svar")("svarpy")
+os=python.import("os")
+print("Pid is", os.getpid())
+</pre></br></td>
+</table>
 
 # Why Svar? 
 
