@@ -33,8 +33,8 @@
 <table>
 <tr>
 	<th>1. Bind C++ to hello.so</th>
-	<th>2. Import and use in C++</th>
-	<th>3. Import and use in Python</th>
+	<th>2. Import by C++</th>
+	<th>3. Import by Python</th>
 </tr>
 <tr>
 <td valign="top">
@@ -54,9 +54,9 @@ EXPORT_SVAR_INSTANCE
 <pre>
 #include &lt;Svar.h&gt;
 &nbsp;
-auto hello=svar.import("hello");
+auto m=svar.import("hello");
 int main(){
-  hello["say"]("hello world");
+  m["say"]("hello world");
   return 0;
 }
 </pre></td>
@@ -67,9 +67,9 @@ hello = svar.load("hello")
 hello.say("hello world")
 </pre></td>
 <tr>
-	<th>4. Import and use in Javascript</th>
-	<th>5. C++ import Python module</th>
-	<th>6. Javascript import Python module</th>
+	<th>4. Import by Javascript</th>
+	<th>5. C++ import Python</th>
+	<th>6. Javascript import Python</th>
 </tr>
 <tr>
 <td valign="top">
@@ -82,8 +82,8 @@ hello.say("hello world")
 <pre>
 #include &lt;Svar.h&gt;
 &nbsp;
+auto py=svar.import("svarpy");
 int main(){
-  auto py=svar.import("svarpy");
   auto os = py["import]("os");
   std::cout&lt;&lt;"Pid is:"
   &lt;&lt;os["getpid"]();
