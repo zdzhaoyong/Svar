@@ -70,3 +70,14 @@ TEST(Svar,Call){
     EXPECT_EQ(Svar(1).call("__str__"),"1");// Call as member methods
     EXPECT_THROW(SvarClass::instance<int>().call("__str__",1),SvarExeption);// Call as static function
 }
+
+TEST(Svar,KWARGS){
+    Svar module;
+    module.def("add",[](int a,int b){return a+b;},"a"_a,"b"_a=0,"Add two int");
+    EXPECT_EQ(module["add"](1,2),3);
+    EXPECT_EQ(module["add"](1),1);
+    EXPECT_EQ(module["add"](1,"b"_a=2),3);
+    EXPECT_EQ(module["add"]("b"_a=2,"a"_a=3),5);
+
+    EXPECT_THROW(module["add"]("b"_a=1),SvarExeption); // a is not defined
+}

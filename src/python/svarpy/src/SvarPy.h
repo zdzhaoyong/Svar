@@ -204,6 +204,30 @@ struct SvarPy: public PyObject{
         return convert(src);
     }
 
+    static PyObject* svar_func_wrapper(PyObject *capsule, PyObject *args, PyObject *kwargs){
+        Svar* func=(Svar*)PyCapsule_GetPointer(capsule,"svar_function");
+        SvarFunction& svarFunc=func->as<SvarFunction>();
+
+        try{
+            Svar svar_args=SvarPy::fromPy(args);
+            if(kwargs){
+                Svar svar_kwargs=SvarPy::fromPy(kwargs);
+                for(std::pair<std::string,Svar> kw:svar_kwargs)
+                    svar_args.push_back(arg(kw.first)=kw.second);
+            }
+            if(svarFunc.is_constructor)// FIXME: constructor is different since first argument is self?
+            {
+                return SvarPy::getPy(svarFunc.Call({svar_args}));
+            }
+
+            return SvarPy::getPy(svarFunc.Call(svar_args.as<SvarArray>()._var));
+        }
+        catch(SvarExeption e){
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+            return incref(Py_None);
+        }
+    }
+
     static PyObject* getPyProperty(Svar src){
       SvarClass::SvarProperty& property=src.as<SvarClass::SvarProperty>();
       auto py_args=getPy({property._fget,property._fset,property._doc});
@@ -229,30 +253,13 @@ struct SvarPy: public PyObject{
         if(svar_func.is_constructor)
             func->ml_flags|=METH_CLASS;
         if(svar_func.arg_types.size()){
-            svar_func.sign=svar_func.signature();
-            func->ml_doc=svar_func.sign.c_str();
+            svar_func.meta["full_doc"]=svar_func.signature();
+            func->ml_doc=svar_func.meta["full_doc"].as<std::string>().c_str();
         }
         else
             func->ml_doc="";
 
-        func->ml_meth = [](PyObject *capsule, PyObject *args)->PyObject*{
-            Svar* func=(Svar*)PyCapsule_GetPointer(capsule,"svar_function");
-            SvarFunction& svarFunc=func->as<SvarFunction>();
-
-            try{
-                Svar svar_args=SvarPy::fromPy(args);
-                if(svarFunc.is_constructor)// FIXME: constructor is different since first argument is self?
-                {
-                    return SvarPy::getPy(svarFunc.Call({svar_args}));
-                }
-
-                return SvarPy::getPy(svarFunc.Call(svar_args.as<SvarArray>()._var));
-            }
-            catch(SvarExeption e){
-                PyErr_SetString(PyExc_RuntimeError, e.what());
-                return incref(Py_None);
-            }
-        };
+        func->ml_meth = reinterpret_cast<PyCFunction>(svar_func_wrapper);
 
         PyObject* capsule=PyCapsule_New(new Svar(src),"svar_function",[](PyObject *o) {
             delete (Svar*)PyCapsule_GetPointer(o, "svar_function");
@@ -335,21 +342,23 @@ struct SvarPy: public PyObject{
         };
 
         type->tp_init=[](PyObject *self, PyObject *, PyObject *)->int{
+            // In fact this function should never be called
             PyTypeObject *type = Py_TYPE(self);
-            std::string msg;
+            static std::string msg;
+            msg="";
         #if defined(PYPY_VERSION)
             msg += handle((PyObject *) type).attr("__module__").cast<std::string>() + ".";
         #endif
             msg += type->tp_name;
             msg += ": No constructor defined!";
-            PyErr_SetString(PyExc_TypeError, PythonSpace::safe_c_str(msg));
+            PyErr_SetString(PyExc_TypeError, msg.c_str());
             return -1;
         };
 
         type->tp_repr = [](PyObject* obj){
             std::stringstream sst;
             sst<<"<"<<obj->ob_type->tp_name<<" object at "<<obj<<">";
-            return SVAR_FROM_STRING(PythonSpace::safe_c_str(sst.str()));
+            return SVAR_FROM_STRING(sst.str().c_str());// TODO: this may safe?
         };
 
         type->tp_dealloc=[](PyObject *self) {
@@ -387,7 +396,7 @@ struct SvarPy: public PyObject{
                 continue;
             }
             else
-                PyObject_SetAttrString((PyObject*)type,PythonSpace::safe_c_str(f.first),getPy(f.second));
+                PyObject_SetAttrString((PyObject*)type,f.first.c_str(),getPy(f.second));
         }
 
         PyObject_SetAttrString((PyObject *) type, "__module__", SVAR_FROM_STRING("svar_builtins"));
@@ -485,7 +494,7 @@ struct SvarPy: public PyObject{
               return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, py_args.obj, nullptr));
           };
           func.do_argcheck=false;
-          func.sign="PyFunction";
+          func.doc="PyFunction";
           return func;
         }
 
@@ -507,7 +516,7 @@ struct SvarPy: public PyObject{
                     return SvarPy::fromPy(PyCFunction_Call(holder.as<PyObjectHolder>().obj, py_args.obj,nullptr));
                 };
                 func.do_argcheck=false;
-                func.sign="PyCFunction";
+                func.doc="PyCFunction";
                 return func;
             }
 
@@ -567,8 +576,10 @@ struct SvarPy: public PyObject{
 #else
             PyModuleDef *def = new PyModuleDef();
             memset(def, 0, sizeof(PyModuleDef));
-            def->m_name= PythonSpace::safe_c_str(var.get<std::string>("__name__",name));
-            def->m_doc = PythonSpace::safe_c_str(var.get<std::string>("__doc__",""));
+            if(!var.exist("__name__")) var["__name__"]=name;
+            if(!var.exist("__doc__"))  var["__doc__"] ="";
+            def->m_name= var["__name__"].as<std::string>().c_str();
+            def->m_doc = var["__doc__"].as<std::string>().c_str();
             def->m_size = -1;
             Py_INCREF(def);
 

@@ -95,7 +95,7 @@ REGISTER_SVAR_MODULE(sample)// see, so easy, haha
             .construct<int,std::string>()
             .def("intro",&Person::intro)
             .def_static("all",&Person::all_person)
-            .def_static("create",&Person::create)
+            .def_static("create",&Person::create,sv::arg("age"),sv::arg("name"),"create a person from age and name")
             .def("age",&Person::age)
             .def_readonly("name",&Person::_name,"The name of a person");
 
@@ -103,7 +103,7 @@ REGISTER_SVAR_MODULE(sample)// see, so easy, haha
             .construct<int,std::string,std::string>()
             .inherit<Person>()
             .def("intro",&Student::intro)
-            .def("setSchool",&Student::setSchool)
+            .def("setSchool",&Student::setSchool,"school"_a="nwpu")
             .def("getSchool",[](Student& self){return self._school;})
             .def_readwrite("school",&Student::_school,"The school of a student");
 }

@@ -48,16 +48,16 @@ public:
 
 TEST(Svar,Class){
 
-    SvarClass::Class<BBase>()
+    sv::Class<BBase>()
             .def("isBBase",&BBase::isBBase);
 
-    SvarClass::Class<BaseClass>()
-            .inherit<BBase,BaseClass>()
+    sv::Class<BaseClass>()
+            .inherit<BBase>()
             .def_static("__init__",[](){return BaseClass();})
             .def_static("__init__",[](int age){return BaseClass(age);})
             .def("getAge",&BaseClass::getAge)
             .def("setAge",&BaseClass::setAge)
-            .def_static("create",&BaseClass::create)
+            .def_static("create",&BaseClass::create,"age"_a=0)
             .def_static("create1",&BaseClass::create1)
             .def("intro",&BaseClass::intro);
     Svar a=BaseClass(10);
@@ -67,12 +67,12 @@ TEST(Svar,Class){
     EXPECT_EQ(a.call("getAge").as<int>(),10);
     EXPECT_EQ(a.call("intro").as<std::string>(),BaseClass(10).intro());
 
-    SvarClass::Class<BaseClass1>()
+    sv::Class<BaseClass1>()
             .def("getScore",&BaseClass1::getScore);
 
-    SvarClass::Class<InheritClass>()
-            .inherit<BaseClass,InheritClass>()
-            .inherit<BaseClass1,InheritClass>()// for none first parents
+    sv::Class<InheritClass>()
+            .inherit<BaseClass>()
+            .inherit<BaseClass1>()// for none first parents
             .def("__init__",[](int age,std::string name){return InheritClass(age,name);})
             .def("name",&InheritClass::name)
             .def("intro",&InheritClass::intro)
@@ -93,4 +93,12 @@ TEST(Svar,Class){
     EXPECT_EQ(Svar(&inst).call("getAge").as<int>(),20);
     InheritClass instCopy=Svar(&inst).as<InheritClass>();
     EXPECT_EQ(instCopy.name(),inst.name());
+
+    a = baseClass.call("create");
+    EXPECT_EQ(a.call("getAge"),0);
+    a = baseClass.call("create",100);
+    EXPECT_EQ(a.call("getAge"),100);
+    a = baseClass.call("create","age"_a=200);
+    EXPECT_EQ(a.call("getAge"),200);
+
 }

@@ -85,7 +85,7 @@ typedef SSIZE_T ssize_t;
 #endif
 
 #define svar sv::Svar::instance()
-#define SVAR_VERSION 0x000201
+#define SVAR_VERSION 0x000301
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
@@ -776,6 +776,17 @@ public:
     /// @endcode
     operator std::pair<std::string,Svar>()const{return castAs<std::pair<const std::string,Svar>>();}
 
+    /// Define a function with extra properties
+    template <typename... Extra>
+    Svar def(const std::string& name, Svar func, const Extra&... extra);
+
+    /// Define a lambda with extra properties
+    template <typename Func, typename... Extra>
+    Svar def(const std::string& name, Func func, const Extra&... extra)
+    {
+        return def(name,sv::Svar::lambda(func),extra...);
+    }
+
     /// Call function or class with name and arguments
     template <typename... Args>
     Svar call(const std::string function, Args... args)const;
@@ -903,6 +914,17 @@ public:
     Svar _wt;
 };
 
+struct arg{
+    arg(std::string name) : name(name) {}
+    arg& operator = (sv::Svar val){ value = val; return *this;}
+    std::string name;
+    sv::Svar    value;
+};
+
+inline arg operator"" _a(const char* str,size_t sz){
+    return arg(std::string(str,sz));
+}
+
 class SvarFunction{
 public:
     SvarFunction(){}
@@ -951,6 +973,33 @@ public:
         const SvarFunction* overload=this;
         std::vector<SvarExeption> catches;
         for(;true;overload=&overload->next.as<SvarFunction>()){
+            if(overload->kwargs.size()){// resort args here
+                std::vector<Svar> args;
+                Svar kwargs;
+                for(auto& a:argv){
+                    if(!a.is<arg>()){
+                        args.push_back(a);
+                        continue;
+                    }
+
+                    arg& a_ = a.as<arg>();
+                    kwargs[a_.name] = a_.value;
+                }
+                int fixarg_n = overload->arg_types.size()-overload->kwargs.size()-1;
+                if(args.size() < fixarg_n) continue;// not enough
+
+                for(int i=args.size()-fixarg_n;i<overload->kwargs.size();i++)
+                {
+                    arg  def_a = overload->kwargs[i].as<arg>();
+                    Svar val   = kwargs[def_a.name];
+                    if( val.isUndefined() )
+                        val = def_a.value;
+                    if( val.isUndefined())
+                        break;// no valid input
+                    args.push_back(val);
+                }
+                argv = args;
+            }
             if(do_argcheck&&overload->arg_types.size()!=argv.size()+1)
             {
                 if(!overload->next.isFunction()) {
@@ -1011,6 +1060,8 @@ public:
         return Svar(f(args[Is].castAs<Args>()...));
     }
 
+    void process_extra(Svar extra);
+
     std::string signature()const;
 
     friend std::ostream& operator<<(std::ostream& sst,const SvarFunction& self){
@@ -1018,7 +1069,7 @@ public:
             sst<<self.name<<"(...)\n";
         const SvarFunction* overload=&self;
         while(overload){
-            sst<<"    "<<overload->name<<overload->signature()<<std::endl;
+            sst<<"    "<<overload->signature()<<std::endl;
             if(!overload->next.isFunction()) {
                 return sst;
             }
@@ -1027,9 +1078,9 @@ public:
         return sst;
     }
 
-    std::string   name,sign;
-    std::vector<Svar> arg_types;
-    Svar          next;
+    std::string   name,doc;
+    Svar          meta,next;
+    std::vector<Svar> arg_types,kwargs;
 
     std::function<Svar(std::vector<Svar>&)> _func;
     bool          is_method=false,is_constructor=false,do_argcheck=true;
@@ -1037,7 +1088,6 @@ public:
 
 class SvarClass{
 public:
-
     class SvarProperty{
     public:
       SvarProperty(Svar fget,Svar fset,std::string name,std::string doc)
@@ -1061,7 +1111,8 @@ public:
     std::string name()const{return __name__;}
     void     setName(const std::string& nm){__name__=nm;}
 
-    SvarClass& def(const std::string& name,const Svar& function,bool isMethod=true)
+    SvarClass& def(const std::string& name,const Svar& function,
+                   bool isMethod=true, std::vector<Svar> extra={})
     {
         assert(function.isFunction());
         Svar* dest=&_attr[name];
@@ -1074,6 +1125,8 @@ public:
         *dest=function;
         dest->as<SvarFunction>().is_method=isMethod;
         dest->as<SvarFunction>().name=__name__+"."+name;
+        for(Svar e:extra)
+            dest->as<SvarFunction>().process_extra(e);
 
         if(__init__.is<void>()&&name=="__init__") {
             __init__=function;
@@ -1085,19 +1138,19 @@ public:
         return *this;
     }
 
-    SvarClass& def_static(const std::string& name,const Svar& function)
+    SvarClass& def_static(const std::string& name,const Svar& function, std::vector<Svar> extra={})
     {
         return def(name,function,false);
     }
 
     template <typename Func>
-    SvarClass& def(const std::string& name,Func &&f){
+    SvarClass& def(const std::string& name,Func &&f, std::vector<Svar> extra={}){
         return def(name,Svar::lambda(f),true);
     }
 
     /// Construct a cpp_function from a lambda function (possibly with internal state)
     template <typename Func>
-    SvarClass& def_static(const std::string& name,Func &&f){
+    SvarClass& def_static(const std::string& name,Func &&f, std::vector<Svar> extra={}){
         return def(name,Svar::lambda(f),false);
     }
 
@@ -1159,46 +1212,46 @@ public:
         return Call(inst,function,argv);
     }
 
-        Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
+    Svar Call(const Svar& inst,const std::string function, std::vector<Svar> args)const
+    {
+        Svar f=_attr[function];
+        if(f.isFunction())
         {
-            Svar f=_attr[function];
-            if(f.isFunction())
-            {
-                SvarFunction& func=f.as<SvarFunction>();
-                if(func.is_method){
-                    args.insert(args.begin(),inst);
-                    return func.Call(args);
-                }
-                else return func.Call(args);
+            SvarFunction& func=f.as<SvarFunction>();
+            if(func.is_method){
+                args.insert(args.begin(),inst);
+                return func.Call(args);
             }
-
-            std::stringstream sst;
-            for(const Svar& p:_parents){
-                try{
-                    if(p.isClass()){
-                        return p.as<SvarClass>().Call(inst,function,args);
-                    }
-                    return p[0].as<SvarClass>().Call(p[1](inst),function,args);
-                }
-                catch(SvarExeption e){
-                    sst<<e.what();
-                    continue;
-                }
-            }
-            throw SvarExeption("Class "+__name__+" has no function "+function+sst.str());
-            return Svar::Undefined();
+            else return func.Call(args);
         }
+
+        std::stringstream sst;
+        for(const Svar& p:_parents){
+            try{
+                if(p.isClass()){
+                    return p.as<SvarClass>().Call(inst,function,args);
+                }
+                return p[0].as<SvarClass>().Call(p[1](inst),function,args);
+            }
+            catch(SvarExeption e){
+                sst<<e.what();
+                continue;
+            }
+        }
+        throw SvarExeption("Class "+__name__+" has no function "+function+sst.str());
+        return Svar::Undefined();
+    }
 
     static std::string decodeName(const char* __mangled_name){
 #ifdef __GNUC__
-    int status;
-    char* realname = abi::__cxa_demangle(__mangled_name, 0, 0, &status);
-    std::string result(realname);
-    free(realname);
+        int status;
+        char* realname = abi::__cxa_demangle(__mangled_name, 0, 0, &status);
+        std::string result(realname);
+        free(realname);
 #else
-    std::string result(__mangled_name);
+        std::string result(__mangled_name);
 #endif
-    return result;
+        return result;
     }
 
     template <typename T>
@@ -1239,26 +1292,31 @@ public:
         Svar::instance()[name]=SvarClass::instance<C>();
     }
 
-    Class& def(const std::string& name,const Svar& function,bool isMethod=true)
+    template <typename... Extra>
+    Class& def(const std::string& name,const Svar& function, const Extra&... extra)
     {
-        _cls.def(name,function,isMethod);
+        _cls.def(name,function,true,{extra...});
         return *this;
     }
 
-    Class& def_static(const std::string& name,const Svar& function)
+    template <typename... Extra>
+    Class& def_static(const std::string& name,const Svar& function, const Extra&... extra)
     {
-        return def(name,function,false);
+        _cls.def(name,function,false,{extra...});
+        return *this;
     }
 
-    template <typename Func>
-    Class& def(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),true);
+    template <typename Func, typename... Extra>
+    Class& def(const std::string& name,Func &&f, const Extra&... extra){
+        _cls.def(name,Svar::lambda(f),true,{extra...});
+        return *this;
     }
 
     /// Construct a cpp_function from a lambda function (possibly with internal state)
-    template <typename Func>
-    Class& def_static(const std::string& name,Func &&f){
-        return def(name,Svar::lambda(f),false);
+    template <typename Func, typename... Extra>
+    Class& def_static(const std::string& name,Func &&f, const Extra&... extra){
+        _cls.def(name,Svar::lambda(f),false,{extra...});
+        return *this;
     }
 
     template <typename BaseType>
@@ -1859,6 +1917,9 @@ void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... ext
 {
     // FIXME: this template used over 50% percent of binary size and slow down compile speed
     this->arg_types={SvarClass::instance<Return>(),SvarClass::instance<Args>()...};// about 15%
+    std::vector<Svar> extras={extra...};
+    for(Svar e:extras) process_extra(e);
+
     _func=[this,f](std::vector<Svar>& args)->Svar{ // about 19%
         using indices = detail::make_index_sequence<sizeof...(Args)>;
         return call_impl(f,(Return (*) (Args...)) nullptr,args,indices{});// about 19%
@@ -1866,15 +1927,39 @@ void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... ext
 }
 
 inline std::string SvarFunction::signature()const{
-  if(sign.size()) return sign;
-  if(arg_types.empty()) return "";
     std::stringstream sst;
-    sst<<"(";
-    for(size_t i=1;i<arg_types.size();i++)
-        sst<<arg_types[i].as<SvarClass>().name()<<(i+1==arg_types.size()?"":",");
-    sst<<")->";
-    sst<<arg_types[0].as<SvarClass>().name();
+    sst << name << "(";
+    int fixarg_n = arg_types.size()-kwargs.size();
+    for(size_t i = 1;i < fixarg_n;i++){
+        if(is_method && i==1)
+            sst<< "self: ";
+        else
+            sst<< "arg" << i-1 << ": ";
+        sst<< arg_types[i].as<SvarClass>().name()
+           << (i+1==arg_types.size()?"":", ");
+    }
+
+    for(size_t i=fixarg_n;i<arg_types.size();i++){
+        arg a = kwargs[i-fixarg_n].as<arg>();
+        sst << a.name << ": ";
+        if(a.value.isUndefined())
+            sst << arg_types[i].as<SvarClass>().name();
+        else
+            sst << a.value;
+        sst << (i+1==arg_types.size()?"":", ");
+    }
+    sst << ") -> ";
+    sst << arg_types[0].as<SvarClass>().name();
+    sst << "\n" << doc;
     return sst.str();
+}
+
+inline void SvarFunction::process_extra(Svar extra)
+{
+    if(extra.is<std::string>())
+        doc = extra.as<std::string>();
+    else if(extra.is<arg>())
+        kwargs.push_back(extra);
 }
 
 template <typename T>
@@ -2273,6 +2358,15 @@ inline void Svar::push_back(const Svar& rh)
     SvarArray& self=as<SvarArray>();
     std::unique_lock<std::mutex> lock(self._mutex);
     self._var.push_back(rh);
+}
+
+template <typename... Extra>
+Svar Svar::def(const std::string& name, Svar func, const Extra&... extra){
+    std::vector<Svar> extras={extra...};
+    for(Svar e:extras)
+        func.as<SvarFunction>().process_extra(e);
+    (*this)[name] = func;
+    return (*this);
 }
 
 template <typename... Args>
@@ -2719,7 +2813,7 @@ inline std::ostream& operator<<(std::ostream& ost,const SvarClass& rh){
         for(std::pair<std::string,Svar> it:rh._attr)
         {
             if(!it.second.isFunction()) continue;
-            content<<it.second.as<SvarFunction>()<<std::endl;
+            content<<it.second.as<SvarFunction>();
         }
         content<<"Property defined here:\n\n";
         for(std::pair<std::string,Svar> it:rh._attr)
