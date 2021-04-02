@@ -129,52 +129,10 @@ using function_signature_t = conditional_t<
     >::type
 >;
 
-#  if __cplusplus >= 201402L
-using std::index_sequence;
-using std::make_index_sequence;
-#else
 template<size_t ...> struct index_sequence  { };
 template<size_t N, size_t ...S> struct make_index_sequence_impl : make_index_sequence_impl <N - 1, N - 1, S...> { };
 template<size_t ...S> struct make_index_sequence_impl <0, S...> { typedef index_sequence<S...> type; };
 template<size_t N> using make_index_sequence = typename make_index_sequence_impl<N>::type;
-#endif
-
-typedef char yes;
-typedef char (&no)[2];
-
-struct anyx {
-  template <class T>
-  anyx(const T&);
-};
-
-no operator<<(const anyx&, const anyx&);
-no operator>>(const anyx&, const anyx&);
-
-template <class T>
-yes check(T const&);
-no check(no);
-
-template <typename StreamType, typename T>
-struct has_loading_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream >> x)) == sizeof(yes);
-};
-
-template <typename StreamType, typename T>
-struct has_saving_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream << x)) == sizeof(yes);
-};
-
-template <typename StreamType, typename T>
-struct has_stream_operators {
-  static const bool can_load = has_loading_support<StreamType, T>::value;
-  static const bool can_save = has_saving_support<StreamType, T>::value;
-  static const bool value = can_load && can_save;
-};
-
 }
 #endif
 
@@ -1219,6 +1177,8 @@ public:
         {
             SvarFunction& func=f.as<SvarFunction>();
             if(func.is_method){
+                if(inst.isUndefined())
+                    throw SvarExeption("Method should be called with self.");
                 args.insert(args.begin(),inst);
                 return func.Call(args);
             }

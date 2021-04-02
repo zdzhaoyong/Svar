@@ -60,6 +60,7 @@ if(MSVC)
     set(Python_FOUND TRUE)
     set(Python_INCLUDES C:/Users/dev/AppData/Local/Programs/Python/Python38/include)
     set(Python_LIBS "C:/Users/dev/AppData/Local/Programs/Python/Python38/libs/python38.lib")
+    set(PYTHON_MODULE_EXTENSION ".pyd")
 endif()
 
 # Use the Python interpreter to find the libs.

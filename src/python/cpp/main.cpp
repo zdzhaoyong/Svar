@@ -1,8 +1,8 @@
-#include <Svar/Registry.h>
+#include <Svar/Svar.h>
 
 using namespace sv;
 
-Svar python=Registry::load("svarpy");
+Svar python=svar.import("svarpy");
 
 int main(int argc,char** argv){
 
