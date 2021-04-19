@@ -139,40 +139,50 @@ template<size_t ...S> struct make_index_sequence_impl <0, S...> { typedef index_
 template<size_t N> using make_index_sequence = typename make_index_sequence_impl<N>::type;
 #endif
 
-typedef char yes;
-typedef char (&no)[2];
+template<class T>
+struct sfinae_true : public std::true_type{
+  typedef T type;
 
-struct anyx {
-  template <class T>
-  anyx(const T&);
 };
 
-no operator<<(const anyx&, const anyx&);
-no operator>>(const anyx&, const anyx&);
-
-template <class T>
-yes check(T const&);
-no check(no);
-
-template <typename StreamType, typename T>
-struct has_loading_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream >> x)) == sizeof(yes);
+template<class T>
+struct sfinae_false : public std::false_type{
+  typedef T type;
 };
 
-template <typename StreamType, typename T>
-struct has_saving_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream << x)) == sizeof(yes);
+template<class T>
+static auto test_call_op(int)
+  ->sfinae_true < decltype(&T::operator()) >;
+template<class T>
+static auto test_call_op(long)->sfinae_false < T >;
+
+template<class T, class T2 =decltype( test_call_op<T>(0) )>
+struct has_call_op_ : public T2  {
+
 };
 
-template <typename StreamType, typename T>
-struct has_stream_operators {
-  static const bool can_load = has_loading_support<StreamType, T>::value;
-  static const bool can_save = has_saving_support<StreamType, T>::value;
-  static const bool value = can_load && can_save;
+template<class T>
+struct has_call_op : public std::is_member_function_pointer < typename has_call_op_<T>::type > {
+
+};
+
+template<typename T>
+struct is_callable :public has_call_op<T>
+{
+};
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)>{
+const static bool value = true;
+};
+
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)const>{
+const static bool value = true;
+};
+
+template<typename TRet, typename... TArgs>
+struct is_callable<TRet(*)(TArgs...)>{
+const static bool value = true;
 };
 
 }
@@ -2051,7 +2061,14 @@ public:
         return Svar::Undefined();
     }
 
-    static Svar to(const T& var){
+    template <typename T1>
+    static detail::enable_if_t<detail::is_callable<T1>::value,Svar> to(const T1& func)
+    {
+        return SvarFunction(func);
+    }
+
+    template <typename T1>
+    static detail::enable_if_t<!detail::is_callable<T1>::value,Svar> to(const T1& var){
         return Svar::create(var);
     }
 };
