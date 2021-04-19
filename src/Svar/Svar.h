@@ -133,6 +133,53 @@ template<size_t ...> struct index_sequence  { };
 template<size_t N, size_t ...S> struct make_index_sequence_impl : make_index_sequence_impl <N - 1, N - 1, S...> { };
 template<size_t ...S> struct make_index_sequence_impl <0, S...> { typedef index_sequence<S...> type; };
 template<size_t N> using make_index_sequence = typename make_index_sequence_impl<N>::type;
+
+template<class T>
+struct sfinae_true : public std::true_type{
+  typedef T type;
+
+};
+
+template<class T>
+struct sfinae_false : public std::false_type{
+  typedef T type;
+};
+
+template<class T>
+static auto test_call_op(int)
+  ->sfinae_true < decltype(&T::operator()) >;
+template<class T>
+static auto test_call_op(long)->sfinae_false < T >;
+
+template<class T, class T2 =decltype( test_call_op<T>(0) )>
+struct has_call_op_ : public T2  {
+
+};
+
+template<class T>
+struct has_call_op : public std::is_member_function_pointer < typename has_call_op_<T>::type > {
+
+};
+
+template<typename T>
+struct is_callable :public has_call_op<T>
+{
+};
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)>{
+const static bool value = true;
+};
+
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)const>{
+const static bool value = true;
+};
+
+template<typename TRet, typename... TArgs>
+struct is_callable<TRet(*)(TArgs...)>{
+const static bool value = true;
+};
+
 }
 #endif
 
@@ -2096,7 +2143,14 @@ public:
         return Svar::Undefined();
     }
 
-    static Svar to(const T& var){
+    template <typename T1>
+    static detail::enable_if_t<detail::is_callable<T1>::value,Svar> to(const T1& func)
+    {
+        return SvarFunction(func);
+    }
+
+    template <typename T1>
+    static detail::enable_if_t<!detail::is_callable<T1>::value,Svar> to(const T1& var){
         return Svar::create(var);
     }
 };

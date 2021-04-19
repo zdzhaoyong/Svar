@@ -3,6 +3,10 @@
 
 using namespace sv;
 
+
+
+
+
 std::string add(std::string left,const std::string& r){
     return left+r;
 }
@@ -19,27 +23,27 @@ TEST(Svar,Function)
     EXPECT_TRUE(refArg.call(1).as<bool>());
 
     // pointer
-    Svar::lambda([](int* ref){*ref=10;})(&intV);
-    Svar::lambda([](int* ref){*ref=10;})(intSvar);
+    Svar([](int* ref){*ref=10;})(&intV);
+    Svar([](int* ref){*ref=10;})(intSvar);
     EXPECT_EQ(intV,10);
     EXPECT_EQ(intSvar,10);
     // WARNNING!! ref, should pay attention that when using ref it should always input the svar instead of the raw ref
-    Svar::lambda([](int& ref){ref=20;})(intSvar);
+    Svar([](int& ref){ref=20;})(intSvar);
     EXPECT_EQ(intSvar,20);
     // const ref
-    Svar::lambda([](const int& ref,int* dst){*dst=ref;})(30,&intV);
+    Svar([](const int& ref,int* dst){*dst=ref;})(30,&intV);
     EXPECT_EQ(intV,30);
     // const pointer
-    Svar::lambda([](const int* ref,int* dst){*dst=*ref;})(&srcV,&intV);
+    Svar([](const int* ref,int* dst){*dst=*ref;})(&srcV,&intV);
     EXPECT_EQ(intV,srcV);
     // overload is only called when cast is not available!
-    Svar funcReturn=Svar::lambda([](int i){return i;});
-    funcReturn.as<SvarFunction>().next=Svar::lambda([](char c){return c;});
+    Svar funcReturn=Svar([](int i){return i;});
+    funcReturn.as<SvarFunction>().next=[](char c){return c;};
     EXPECT_EQ(funcReturn(1).cpptype(),typeid(int));
     EXPECT_EQ(funcReturn('c').cpptype(),typeid(char));
     // string argument
     Svar s("hello");
-    Svar::lambda([](std::string raw,
+    Svar([](std::string raw,
                  const std::string c,
                  const std::string& cref,
                  std::string& ref,
@@ -62,8 +66,12 @@ TEST(Svar,Function)
     // static method function binding
     EXPECT_TRUE(Svar::Null().isNull());
     EXPECT_TRUE(Svar(&Svar::Null)().isNull());
-    EXPECT_TRUE(Svar::lambda([](const int& a){return a;})(std::make_shared<int>(1))==1);
-    EXPECT_TRUE(Svar::lambda([](std::shared_ptr<int> a){return *a;})(std::make_shared<int>(1))==1);
+    EXPECT_TRUE(Svar([](const int& a){return a;})(std::make_shared<int>(1))==1);
+    EXPECT_TRUE(Svar([](std::shared_ptr<int> a){return *a;})(std::make_shared<int>(1))==1);
+
+    Svar var=[](std::string v){};
+    var("hello world");
+
 }
 
 TEST(Svar,Call){

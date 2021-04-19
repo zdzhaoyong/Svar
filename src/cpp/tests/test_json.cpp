@@ -9,7 +9,7 @@ TEST(Svar,Dump){
     std::cout<<obj<<std::endl;
     std::cout<<Svar::array({1,2,3})<<std::endl;
     std::cout<<Svar((std::type_index)typeid(1))<<std::endl;
-    std::cout<<Svar::lambda([](std::string sig){})<<std::endl;
+    std::cout<<Svar([](std::string sig){})<<std::endl;
     std::cout<<SvarClass::Class<int>();
     std::cout<<Svar::instance();
 }
