@@ -1311,12 +1311,11 @@ public:
 
     void make_constructor(sv::Svar fvar);
 
-    std::string  __name__,__doc__;
+    std::string     __name__,__doc__;
     std::type_index _cpptype;
-    Svar _attr,__init__,__str__,__getitem__,__setitem__;
+    Svar            _attr,__init__,__str__,__getitem__,__setitem__;
     std::vector<Svar> _parents;
-    value_t _json_type;
-    bool    _is_cpp_class;
+    value_t           _json_type;
 };
 
 template <typename C>
