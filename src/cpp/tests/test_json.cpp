@@ -3,18 +3,7 @@
 
 using namespace sv;
 
-TEST(Svar,Dump){
-    return;
-    Svar obj(std::map<std::string,int>({{"1",1}}));
-    std::cout<<obj<<std::endl;
-    std::cout<<Svar::array({1,2,3})<<std::endl;
-    std::cout<<Svar((std::type_index)typeid(1))<<std::endl;
-    std::cout<<Svar([](std::string sig){})<<std::endl;
-    std::cout<<SvarClass::Class<int>();
-    std::cout<<Svar::instance();
-}
-
-TEST(Svar,Json){
+TEST(JSON,Basic){
     Svar var;
     var.set("i",1);
     var.set("d",2.);
@@ -30,7 +19,7 @@ TEST(Svar,Json){
     EXPECT_EQ(v1["b"],true);
 }
 
-TEST(Svar,Iterator){
+TEST(JSON,Iterator){
     Svar var={1,2,3,4};
     int i=0;
     for(auto a:var) EXPECT_EQ(a,var[i++]);
@@ -39,7 +28,7 @@ TEST(Svar,Iterator){
 }
 
 
-TEST(Svar,GetSet){
+TEST(JSON,GetSet){
     Svar var;
     Svar testInt=var.get<Svar>("testInt",20);
     EXPECT_EQ(testInt,20);
@@ -61,7 +50,7 @@ TEST(Svar,GetSet){
 }
 
 
-TEST(Svar,Variable)
+TEST(JSON,Variable)
 {
     EXPECT_TRUE(Svar()==Svar::Undefined());
     EXPECT_TRUE(Svar(nullptr)==Svar::Null());

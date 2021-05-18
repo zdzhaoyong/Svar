@@ -3,15 +3,11 @@
 
 using namespace sv;
 
-
-
-
-
 std::string add(std::string left,const std::string& r){
     return left+r;
 }
 
-TEST(Svar,Function)
+TEST(Function,Basic)
 {
     int intV=0,srcV=0;
     Svar intSvar(0);
@@ -71,15 +67,28 @@ TEST(Svar,Function)
 
     Svar var=[](std::string v){};
     var("hello world");
-
 }
 
-TEST(Svar,Call){
+int add_int(int a,int b){return a+b;}
+
+TEST(Function,Overload){
+    Svar kw_f(add_int,"a"_a,"b"_a=0,"add two int");
+    EXPECT_EQ(kw_f(1,2),3); // call with arguments
+    EXPECT_EQ(kw_f(3),3); // b default is 0
+    EXPECT_EQ(kw_f("b"_a=1,"a"_a=2),3); // kwargs
+
+    kw_f.overload([](int a,int b,int c){
+        return a+b+c;
+    }); // overload is supported
+    EXPECT_EQ(kw_f(1,2,3),6);
+}
+
+TEST(Function,MemberFunction){
     EXPECT_EQ(Svar(1).call("__str__"),"1");// Call as member methods
     EXPECT_THROW(SvarClass::instance<int>().call("__str__",1),SvarExeption);// Call as static function
 }
 
-TEST(Svar,KWARGS){
+TEST(Function,KWARGS){
     Svar module;
     module.def("add",[](int a,int b){return a+b;},"a"_a,"b"_a=0,"Add two int");
     EXPECT_EQ(module["add"](1,2),3);

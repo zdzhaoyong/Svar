@@ -792,6 +792,8 @@ public:
         return def(name,sv::Svar::lambda(func),extra...);
     }
 
+    Svar& overload(Svar func);
+
     /// Call function or class with name and arguments
     template <typename... Args>
     Svar call(const std::string function, Args... args)const;
@@ -2025,7 +2027,7 @@ inline SvarClass::SvarClass(const std::string& name,std::type_index cpp_type,
         _json_type=value_t::null;
 }
 
-void SvarClass::make_constructor(sv::Svar fvar){
+inline void SvarClass::make_constructor(sv::Svar fvar){
     SvarFunction& f=fvar.as<SvarFunction>();
     auto func=f._func;
     f._func=[this,func](std::vector<Svar>& args)->Svar{
@@ -2459,6 +2461,10 @@ Svar Svar::def(const std::string& name, Svar func, const Extra&... extra){
         func.as<SvarFunction>().process_extra(e);
     (*this)[name] = func;
     return (*this);
+}
+
+inline Svar& Svar::overload(Svar func){
+    return as<SvarFunction>().overload(func);
 }
 
 template <typename... Args>

@@ -46,7 +46,7 @@ public:
     std::string name_;
 };
 
-TEST(Svar,Class){
+TEST(Class,Inherit){
 
     sv::Class<BBase>()
             .def("isBBase",&BBase::isBBase);
@@ -100,5 +100,19 @@ TEST(Svar,Class){
     EXPECT_EQ(a.call("getAge"),100);
     a = baseClass.call("create","age"_a=200);
     EXPECT_EQ(a.call("getAge"),200);
+}
 
+TEST(Class,Dynamic){
+    sv::Svar Person = sv::SvarClass("Person")
+        .def("__init__",[](sv::Svar self,std::string name,int age){
+            self["name"]=name;
+            self["age"]=age;
+        })
+        .def("__str__",[](sv::Svar self){
+            return "Person:"+sv::Svar({{"age",self["age"]},
+                                       {"name",self["name"]}}).dump_json();
+        });
+
+    auto p=Person("zhaoyong",10);
+    EXPECT_NO_THROW(p.call("__str__"));
 }
