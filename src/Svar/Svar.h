@@ -606,13 +606,13 @@ public:
     Svar(std::unique_ptr<T>&& v);
 
     /// Wrap bool (static instance may have problem so changed
-    Svar(bool b):Svar(create(b)){}
+    Svar(bool b);
 
     /// Wrap a int, uint_8, int_8, short .ext
-    Svar(int  i):Svar(create(i)){}
+    Svar(int  i);
 
     /// Wrap a double or float
-    Svar(double  d):Svar(create(d)){}
+    Svar(double  d);
 
     /// Wrap a string or const char*
     Svar(const std::string& str);
@@ -1067,6 +1067,20 @@ public:
 
     void process_extra(Svar extra);
 
+    Svar& overload(Svar func){
+        Svar* dest=&next;
+        while(dest->isFunction())
+        {
+            if(dest->as<SvarFunction>().signature()==func.as<SvarFunction>().signature())
+            {
+                throw SvarExeption("Overload "+func.as<SvarFunction>().signature()+" already exists.");
+            }
+            dest=&dest->as<SvarFunction>().next;
+        }
+        *dest=func;
+        return *dest;
+    }
+
     std::string signature()const;
 
     friend std::ostream& operator<<(std::ostream& sst,const SvarFunction& self){
@@ -1107,11 +1121,27 @@ public:
       Svar _fget,_fset;
       std::string _name,_doc;
     };
+    enum value_t : std::uint8_t
+    {
+        null,             ///< null value
+        object,           ///< object (unordered set of name/value pairs)
+        array,            ///< array (ordered collection of values)
+        string,           ///< string value
+        boolean,          ///< boolean value
+        number_integer,   ///< number value (signed integer)
+        number_float,     ///< number value (floating-point)
+        buffer,
+        others         ///< discarded by the the parser callback function
+    };
 
-    SvarClass(const std::string& name,std::type_index cpp_type,
-              std::vector<Svar> parents={})
-        : __name__(name),_cpptype(cpp_type),
-          _attr(Svar::object()),_parents(parents){}
+    struct dynamic_class_object
+    {
+        sv::Svar meta;
+    };
+
+    SvarClass(const std::string& name,
+              std::type_index cpp_type=typeid(dynamic_class_object),
+              std::vector<Svar> parents={});
 
     std::string name()const{return __name__;}
     void     setName(const std::string& nm){__name__=nm;}
@@ -1121,13 +1151,10 @@ public:
     {
         assert(function.isFunction());
         Svar* dest=&_attr[name];
-        while(dest->isFunction())
-        {
-            if(dest->as<SvarFunction>().signature()==function.as<SvarFunction>().signature())
-                return *this;
-            dest=&dest->as<SvarFunction>().next;
-        }
-        *dest=function;
+        if(dest->isFunction())
+            dest=&dest->as<SvarFunction>().overload(function);
+        else
+            *dest=function;
         dest->as<SvarFunction>().is_method=isMethod;
         dest->as<SvarFunction>().name=__name__+"."+name;
         for(Svar e:extra)
@@ -1136,6 +1163,8 @@ public:
         if(__init__.is<void>()&&name=="__init__") {
             __init__=function;
             dest->as<SvarFunction>().is_constructor=true;
+            if(_cpptype==typeid(dynamic_class_object))
+                make_constructor(*dest);
         }
         if(__str__.is<void>()&&name=="__str__") __str__=function;
         if(__getitem__.is<void>()&&name=="__getitem__") __getitem__=function;
@@ -1278,10 +1307,14 @@ public:
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
 
+    void make_constructor(sv::Svar fvar);
+
     std::string  __name__,__doc__;
     std::type_index _cpptype;
     Svar _attr,__init__,__str__,__getitem__,__setitem__;
     std::vector<Svar> _parents;
+    value_t _json_type;
+    bool    _is_cpp_class;
 };
 
 template <typename C>
@@ -1969,6 +2002,43 @@ inline void SvarFunction::process_extra(Svar extra)
         kwargs.push_back(extra);
 }
 
+inline SvarClass::SvarClass(const std::string& name,std::type_index cpp_type,
+          std::vector<Svar> parents)
+    : __name__(name),_cpptype(cpp_type),
+      _attr(Svar::object()),_parents(parents),_json_type(value_t::others){
+
+    if(cpp_type == typeid(std::string))
+        _json_type=value_t::string;
+    else if(cpp_type == typeid(int))
+        _json_type=value_t::number_integer;
+    else if(cpp_type == typeid(double))
+        _json_type=value_t::number_float;
+    else if(cpp_type == typeid(bool))
+        _json_type=value_t::boolean;
+    else if(cpp_type == typeid(SvarObject))
+        _json_type=value_t::object;
+    else if(cpp_type == typeid(SvarArray))
+        _json_type=value_t::array;
+    else if(cpp_type == typeid(SvarBuffer))
+        _json_type=value_t::buffer;
+    else if(cpp_type == typeid(nullptr))
+        _json_type=value_t::null;
+}
+
+void SvarClass::make_constructor(sv::Svar fvar){
+    SvarFunction& f=fvar.as<SvarFunction>();
+    auto func=f._func;
+    f._func=[this,func](std::vector<Svar>& args)->Svar{
+        sv::Svar self=sv::Svar::object();
+        self.as<SvarObject>()._class=this;
+        std::vector<Svar> args1={self};
+        args1.insert(args1.end(),args.begin(),args.end());
+        func(args1);
+        return self;
+    };
+    f.arg_types.erase(f.arg_types.begin()+1);
+}
+
 template <typename T>
 inline std::string Svar::toString(const T& def) {
   std::ostringstream sst;
@@ -2051,6 +2121,15 @@ inline Svar Svar::create(T && t)
 
 inline Svar::Svar(const std::string& m)
     :_obj(std::make_shared<SvarValue_<std::string>>(m)){}
+
+inline Svar::Svar(bool m)
+    :_obj(std::make_shared<SvarValue_<bool>>(m)){}
+
+inline Svar::Svar(int m)
+    :_obj(std::make_shared<SvarValue_<int>>(m)){}
+
+inline Svar::Svar(double m)
+    :_obj(std::make_shared<SvarValue_<double>>(m)){}
 
 template <typename T>
 Svar::Svar(std::unique_ptr<T>&& v)
@@ -2230,8 +2309,7 @@ inline const Svar&       Svar::classObject()const{
 inline SvarClass*   Svar::classPtr()const
 {
     auto clsObj=classObject();
-    if(clsObj.isClass()) return &clsObj.as<SvarClass>();
-    return nullptr;
+    return &clsObj.as<SvarClass>();
 }
 
 inline size_t            Svar::length() const{
@@ -3035,7 +3113,7 @@ public:
     };
 
     static Svar load(const std::string& in){
-        Json parser(in,COMMENTS);
+        Json parser(in,STANDARD);
         Svar result = parser.parse_json(0);
         // Check for any trailing garbage
         parser.consume_garbage();
@@ -3368,24 +3446,16 @@ private:
         if (failed)
             return Svar();
 
-        if (ch == '-' || (ch >= '0' && ch <= '9')) {
-            i--;
-            return parse_number();
-        }
-
-        if (ch == 't')
+        switch (ch) {
+        case 't':
             return expect("true", true);
-
-        if (ch == 'f')
+        case 'f':
             return expect("false", false);
-
-        if (ch == 'n')
+        case 'n':
             return expect("null", Svar::Null());
-
-        if (ch == '"')
+        case '"':
             return parse_string();
-
-        if (ch == '{') {
+        case '{':{
             std::unordered_map<std::string, Svar> data;
             ch = get_next_token();
             if (ch == '}')
@@ -3422,8 +3492,7 @@ private:
             }
             return data;
         }
-
-        if (ch == '[') {
+        case '[':{
             std::vector<Svar> data;
             ch = get_next_token();
             if (ch == ']')
@@ -3446,8 +3515,7 @@ private:
             }
             return data;
         }
-
-        if (ch == '<'){
+        case '<':{
             while (1) {
                 ch = get_next_token();
                 if (ch == '>')
@@ -3455,9 +3523,16 @@ private:
             }
             return Svar();
         }
-
-        if (namemask[ch]>=2){
-            return parse_name();
+        default:{
+            if (ch == '-' || (ch >= '0' && ch <= '9')) {
+                i--;
+                return parse_number();
+            }
+            if (namemask[ch]>=2){
+                return parse_name();
+            }
+            break;
+        }
         }
 
         return fail("expected value, got " + esc(ch));
