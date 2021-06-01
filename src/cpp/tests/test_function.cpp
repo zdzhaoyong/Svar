@@ -83,11 +83,6 @@ TEST(Function,Overload){
     EXPECT_EQ(kw_f(1,2,3),6);
 }
 
-TEST(Function,MemberFunction){
-    EXPECT_EQ(Svar(1).call("__str__"),"1");// Call as member methods
-    EXPECT_THROW(SvarClass::instance<int>().call("__str__",1),SvarExeption);// Call as static function
-}
-
 TEST(Function,KWARGS){
     Svar module;
     module.def("add",[](int a,int b){return a+b;},"a"_a,"b"_a=0,"Add two int");

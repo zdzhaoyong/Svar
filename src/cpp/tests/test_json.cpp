@@ -12,6 +12,7 @@ TEST(JSON,Basic){
     var.set("l",Svar::array({1,2,3}));
     var.set("m",Svar::object({{"a",1},{"b",false}}));
     std::string str=var.dump_json();
+    std::cout<<str<<std::endl;
     Svar varCopy=Svar::parse_json(str);
 
     Svar v1=Svar::parse_json("{a:1,b:true}");

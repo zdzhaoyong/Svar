@@ -368,7 +368,7 @@ public:
             return o;
         }
 
-        Svar func_buffer=var.classPtr()->_attr["__buffer__"];
+        Svar func_buffer=var.classObject()._attr["__buffer__"];
         if(func_buffer.isFunction()){
             dumpStream(o,func_buffer(var));
         }

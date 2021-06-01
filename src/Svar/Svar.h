@@ -46,7 +46,9 @@
 #include <assert.h>
 #include <string.h>
 #include <cstdlib>
+#include <cstdio> // snprintf
 #include <cctype>
+#include <cstring> // memcpy
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -380,7 +382,6 @@ The above operation is available because Svar builtin defined as following:
     .def("__init__",&SvarBuiltin::int_create)
     .def("__double__",[](int i){return (double)i;})
     .def("__bool__",[](int i){return (bool)i;})
-    .def("__str__",[](int i){return Svar::toString(i);})
     .def("__eq__",[](int self,int rh){return self==rh;})
     .def("__lt__",[](int self,int rh){return self<rh;})
     .def("__add__",[](int self,Svar rh)->Svar{
@@ -587,37 +588,57 @@ int main(int argc,char** argv){
 
  */
 
+enum value_t : std::uint8_t
+{
+    undefined_t,        ///< undefined value
+    null_t,             ///< null value
+    boolean_t,          ///< boolean value
+    integer_t,          ///< number value (signed integer)
+    float_t,            ///< number value (floating-point)
+    string_t,           ///< string value
+    array_t,            ///< array (ordered collection of values)
+    object_t,           ///< object (unordered set of name/value pairs)
+    dict_t,             ///< dict (unordered set of value/value pairs)
+    buffer_t,           ///< memory buffer with type, shape information
+    function_t,         ///< function expressions
+    svarclass_t,        ///< class expressions
+    others_t            ///< user defined types
+};
+
 class Svar{
 public:
-    // Basic buildin types
-    /// Default is Undefined
-    Svar():Svar(Undefined()){}
-
-    /// Construct from SvarValue pointer
-    Svar(SvarValue* v)
+    /// The bare value
+    Svar(const std::shared_ptr<SvarValue>& v)
         : _obj(v){}
 
-    /// Wrap any thing with template caster for user customize
-    template <typename T>
-    Svar(const T& var);
+    /// Undefined singleton
+    Svar():Svar(Undefined()){}
 
-    /// Wrap an pointer use unique_ptr
-    template <typename T>
-    Svar(std::unique_ptr<T>&& v);
-
-    /// Wrap bool (static instance may have problem so changed
+    /// Wrap boolean, not singleton
     Svar(bool b);
 
     /// Wrap a int, uint_8, int_8, short .ext
-    Svar(int  i);
+    Svar(int i);
 
     /// Wrap a double or float
     Svar(double  d);
 
     /// Wrap a string or const char*
     Svar(const std::string& str);
+    Svar(std::string&& str); // Fast construct with rvalue
 
-    /// Construct from initializer
+    /// Accelerate array with std::move
+    Svar(std::vector<Svar>&& rvec);
+
+    /// Wrap anything with template caster for user customize, including STLs
+    template <typename T>
+    Svar(const T& var);
+
+    /// Wrap an pointer use unique_ptr, should std::move since uncopyable
+    template <typename T>
+    Svar(std::unique_ptr<T>&& v);
+
+    /// Construct from initializer to construct array or objects
     Svar(const std::initializer_list<Svar>& init);
 
     /// Construct a cpp_function from a vanilla function pointer
@@ -638,10 +659,11 @@ public:
 
     /// Create any other c++ type instance, T need to be a copyable type
     template <class T>
-    static Svar create(const T & t);
+    static Svar create(const T& t);
 
+    /// Create with std::move, so T can be uncopyable
     template <class T>
-    static Svar create(T && t);
+    static Svar create(T&& t);
 
     /// Create an Object instance
     static Svar object(const std::map<std::string,Svar>& m={}){return Svar(m);}
@@ -658,12 +680,14 @@ public:
 
     /// Null is corrosponding to the c++ nullptr
     static const Svar& Null();
+
+    /// The global singleton inside sharedlibrary
     static Svar&       instance();
 
     /// Return the raw holder
     const std::shared_ptr<SvarValue>& value()const{return _obj;}
 
-    /// Deep copy a object, non-copyable things will become Undefined
+    /// Deep copy a object, non-copyable things may become Undefined
     Svar                    clone(int depth=0)const;
 
     /// Return the value typename
@@ -672,11 +696,11 @@ public:
     /// Return the value typeid
     std::type_index         cpptype()const;
 
-    /// Return the class singleton, return Undefined when failed.
-    const Svar&             classObject()const;
+    /// Return the json type for faster checking
+    value_t                 jsontype()const;
 
-    /// Return the class singleton pointer, return nullptr when failed.
-    SvarClass*              classPtr()const;
+    /// Return the class singleton, should always exists
+    SvarClass&              classObject()const;
 
     /// Return the item numbers when it is an array, object or dict.
     size_t                  length() const;
@@ -688,24 +712,29 @@ public:
     bool is(const std::type_index& typeId)const;
     bool is(const std::string& typeStr)const;
 
-    bool isUndefined()const{return is<void>();}
-    bool isNull()const;
-    bool isFunction() const{return is<SvarFunction>();}
-    bool isClass() const{return is<SvarClass>();}
+    bool isUndefined()const{return jsontype()==undefined_t;}
+    bool isNull()const{return jsontype()==null_t;}
+    bool isFunction() const{return jsontype()==function_t;}
+    bool isClass() const{return jsontype()==svarclass_t;}
     bool isException() const{return is<SvarExeption>();}
     bool isProperty() const;
     bool isObject() const;
     bool isArray()const;
     bool isDict()const;
 
-    /// Should always check type with "is<T>()" first
+    /// Return the reference as type T with checking.
     template <typename T>
     const T&   as()const;
 
-    /// Return the value as type T, TAKE CARE when using this.
-    /// The Svar should be hold during operations of the value.
     template <typename T>
     T& as();
+
+    /// Return the reference as type T, faster but not recommend!
+    template <typename T>
+    T& unsafe_as();
+
+    template <typename T>
+    const T& unsafe_as()const;
 
     /// No cast is performed, directly return the c++ pointer, throw SvarException when failed
     template <typename T>
@@ -796,7 +825,7 @@ public:
 
     /// Call function or class with name and arguments
     template <typename... Args>
-    Svar call(const std::string function, Args... args)const;
+    Svar call(const std::string function_t, Args... args)const;
 
     /// Call this as function or class
     template <typename... Args>
@@ -849,11 +878,12 @@ public:
     }
 
     /// Dump Json String
-    std::string dump_json()const{
-        std::stringstream sst;
-        sst<<*this;
-        return sst.str();
-    }
+    std::string dump_json(const int indent = -1)const;
+
+    template <typename T>
+    T& dump(T& ost,const int indent=-1,const int current_indent=0)const;
+
+    static int dtos(double value,char* buf);
 
     /// Parse the "main(int argc,char** argv)" arguments
     std::vector<std::string> parseMain(int argc, char** argv);
@@ -877,9 +907,6 @@ public:
     /// Format print strings as table
     static std::string printTable(
             std::vector<std::pair<int, std::string>> line);
-
-    template <typename T>
-    static std::string toString(const T& v);
 
     template <typename T>
     T Arg(const std::string& name, T def, const std::string& help){return arg<T>(name,def,help);}
@@ -1123,18 +1150,6 @@ public:
       Svar _fget,_fset;
       std::string _name,_doc;
     };
-    enum value_t : std::uint8_t
-    {
-        null,             ///< null value
-        object,           ///< object (unordered set of name/value pairs)
-        array,            ///< array (ordered collection of values)
-        string,           ///< string value
-        boolean,          ///< boolean value
-        number_integer,   ///< number value (signed integer)
-        number_float,     ///< number value (floating-point)
-        buffer,
-        others         ///< discarded by the the parser callback function
-    };
 
     struct dynamic_class_object
     {
@@ -1293,29 +1308,28 @@ public:
     }
 
     template <typename T>
-    static Svar& instance()
+    static SvarClass* instance()
     {
-        static Svar cl;
-        if(cl.isClass()) return cl;
-        cl=SvarClass(decodeName(typeid(T).name()),typeid(T));
-        return cl;
+        static std::shared_ptr<SvarClass> cl;
+        if(cl) return cl.get();
+        cl=std::make_shared<SvarClass>(decodeName(typeid(T).name()),typeid(T));
+        return cl.get();
     }
 
     template <typename T>
     static SvarClass& Class(){
-        Svar& inst=instance<T>();
-        return inst.as<SvarClass>();
+        return *instance<T>();
     }
 
     friend std::ostream& operator<<(std::ostream& ost,const SvarClass& rh);
 
     void make_constructor(sv::Svar fvar);
 
-    std::string     __name__,__doc__;
+    std::string  __name__,__doc__;
     std::type_index _cpptype;
-    Svar            _attr,__init__,__str__,__getitem__,__setitem__;
+    Svar _attr,__init__,__str__,__getitem__,__setitem__;
     std::vector<Svar> _parents;
-    value_t           _json_type;
+    value_t _json_type;
 };
 
 template <typename C>
@@ -1723,7 +1737,7 @@ public:
     virtual ~SvarValue(){}
     typedef std::type_index TypeID;
     virtual const void*     as(const TypeID& tp)const{if(tp==typeid(void)) return this;else return nullptr;}
-    virtual const Svar&     classObject()const;
+    virtual SvarClass*     classObject()const;
     virtual size_t          length() const {return 0;}
     virtual Svar            clone(int depth=0)const{return Svar();}
 };
@@ -1735,7 +1749,7 @@ public:
     explicit SvarValue_(T&& v):_var(std::move(v)){}
 
     virtual const void*     as(const TypeID& tp)const{if(tp==typeid(T)) return &_var;else return nullptr;}
-    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
     virtual Svar            clone(int depth=0)const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     T _var;
@@ -1754,7 +1768,7 @@ public:
     explicit SvarValue_(std::shared_ptr<T>&& v):_var(std::move(v)){}
 
     virtual TypeID          cpptype()const{return typeid(T);}
-    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
     virtual Svar            clone(int depth=0)const{return _var;}
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(T)) return _var.get();
@@ -1770,7 +1784,7 @@ class SvarValue_<std::unique_ptr<T>>: public SvarValue{
 public:
     explicit SvarValue_(std::unique_ptr<T>&& v):_var(std::move(v)){}
 
-    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(T)) return _var.get();
         else if(tp==typeid(std::unique_ptr<T>)) return &_var;
@@ -1785,7 +1799,7 @@ class SvarValue_<T*>: public SvarValue{
 public:
     explicit SvarValue_(T* v):_var(v){}
 
-    virtual const Svar&     classObject()const{return SvarClass::instance<T>();}
+    virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(T)) return _var;
         else if(tp==typeid(T*)) return &_var;
@@ -1817,8 +1831,8 @@ public:
     }
 
     virtual size_t          length() const {return _var.size();}
-    virtual const Svar&     classObject()const{
-        if(_class.isClass()) return _class;
+    virtual SvarClass*     classObject()const{
+        if(_class) return _class;
         return SvarClass::instance<SvarObject>();
     }
 
@@ -1851,25 +1865,8 @@ public:
         else it->second=value;
     }
 
-    friend std::ostream& operator<<(std::ostream& ost,const SvarObject& rh){
-        std::unique_lock<std::mutex> lock(rh._mutex);
-        if(rh._var.empty()) {
-            ost<<"{}";return ost;
-        }
-        ost<<"{\n";
-        std::stringstream context;
-        for(auto it=rh._var.begin();it!=rh._var.end();it++)
-        {
-            context<<(it==rh._var.begin()?"":",\n")<<Svar(it->first)<<" : "<<it->second;
-        }
-        std::string line;
-        while(std::getline(context,line)) ost<<"  "<<line<<std::endl;
-        ost<<"}";
-        return ost;
-    }
-
     mutable std::mutex _mutex;
-    Svar _class;
+    SvarClass* _class=nullptr;
 };
 
 class SvarArray : public SvarValue_<std::vector<Svar> >{
@@ -1877,7 +1874,10 @@ public:
     SvarArray(const std::vector<Svar>& v)
         :SvarValue_<std::vector<Svar>>(v){}
 
-    virtual const Svar&     classObject()const{return SvarClass::instance<SvarArray>();}
+    SvarArray(std::vector<Svar>&& v)
+        :SvarValue_<std::vector<Svar>>(std::move(v)){}
+
+    virtual SvarClass*     classObject()const{return SvarClass::instance<SvarArray>();}
     virtual size_t          length() const {return _var.size();}
 
     virtual const void*     as(const TypeID& tp)const{
@@ -1903,30 +1903,13 @@ public:
         return var;
     }
 
-    friend std::ostream& operator<<(std::ostream& ost,const SvarArray& rh){
-        std::unique_lock<std::mutex> lock(rh._mutex);
-        if(rh._var.empty()) {
-            ost<<"[]";return ost;
-        }
-        ost<<"[\n";
-        std::stringstream context;
-        for(size_t i=0;i<rh._var.size();++i)
-            context<<rh._var[i]<<(i+1==rh._var.size()?"\n":",\n");
-        std::string line;
-        while(std::getline(context,line)) ost<<"  "<<line<<std::endl;
-        ost<<"]";
-        return ost;
-    }
-
     mutable std::mutex _mutex;
 };
 
 class SvarDict : public SvarValue_<std::map<Svar,Svar> >{
 public:
     SvarDict(const std::map<Svar,Svar>& dict)
-        :SvarValue_<std::map<Svar,Svar> >(dict){
-
-    }
+        :SvarValue_<std::map<Svar,Svar> >(dict){}
 
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(SvarDict)) return this;
@@ -1934,7 +1917,7 @@ public:
         else return nullptr;
     }
 
-    virtual const Svar&     classObject()const{return SvarClass::instance<SvarDict>();}
+    virtual SvarClass*     classObject()const{return SvarClass::instance<SvarDict>();}
 
     virtual size_t          length() const {return _var.size();}
     virtual Svar operator[](const Svar& i) {
@@ -1950,7 +1933,7 @@ public:
     mutable std::mutex _mutex;
 };
 
-inline const Svar&     SvarValue::classObject()const{return SvarClass::instance<void>();}
+inline SvarClass*     SvarValue::classObject()const{return SvarClass::instance<void>();}
 
 /// Special internal constructor for functors, lambda functions, methods etc.
 template <typename Func, typename Return, typename... Args, typename... Extra>
@@ -2006,24 +1989,22 @@ inline void SvarFunction::process_extra(Svar extra)
 inline SvarClass::SvarClass(const std::string& name,std::type_index cpp_type,
           std::vector<Svar> parents)
     : __name__(name),_cpptype(cpp_type),
-      _attr(Svar::object()),_parents(parents),_json_type(value_t::others){
+      _attr(Svar::object()),_parents(parents),_json_type(value_t::others_t){
 
-    if(cpp_type == typeid(std::string))
-        _json_type=value_t::string;
-    else if(cpp_type == typeid(int))
-        _json_type=value_t::number_integer;
-    else if(cpp_type == typeid(double))
-        _json_type=value_t::number_float;
-    else if(cpp_type == typeid(bool))
-        _json_type=value_t::boolean;
-    else if(cpp_type == typeid(SvarObject))
-        _json_type=value_t::object;
-    else if(cpp_type == typeid(SvarArray))
-        _json_type=value_t::array;
-    else if(cpp_type == typeid(SvarBuffer))
-        _json_type=value_t::buffer;
-    else if(cpp_type == typeid(nullptr))
-        _json_type=value_t::null;
+    std::map<std::type_index,value_t> lut={{typeid(void),undefined_t},
+                                           {typeid(nullptr),null_t},
+                                           {typeid(bool),boolean_t},
+                                           {typeid(int),value_t::integer_t},
+                                           {typeid(double),value_t::float_t},
+                                           {typeid(std::string),value_t::string_t},
+                                           {typeid(SvarArray),value_t::array_t},
+                                           {typeid(SvarObject),value_t::object_t},
+                                           {typeid(SvarDict),value_t::dict_t},
+                                           {typeid(SvarBuffer),value_t::buffer_t},
+                                           {typeid(SvarFunction),value_t::function_t},
+                                           {typeid(SvarClass),value_t::svarclass_t}};
+    auto it=lut.find(cpp_type);
+    if(it!=lut.end()) _json_type=it->second;
 }
 
 inline void SvarClass::make_constructor(sv::Svar fvar){
@@ -2038,31 +2019,6 @@ inline void SvarClass::make_constructor(sv::Svar fvar){
         return self;
     };
     f.arg_types.erase(f.arg_types.begin()+1);
-}
-
-template <typename T>
-inline std::string Svar::toString(const T& def) {
-  std::ostringstream sst;
-  sst << def;
-  return sst.str();
-}
-
-template <>
-inline std::string Svar::toString(const std::string& def) {
-  return def;
-}
-
-template <>
-inline std::string Svar::toString(const double& def) {
-  using namespace std;
-  ostringstream ost;
-  ost << setprecision(12) << def;
-  return ost.str();
-}
-
-template <>
-inline std::string Svar::toString(const bool& def) {
-  return def ? "true" : "false";
 }
 
 inline Svar::Svar(const std::initializer_list<Svar>& init)
@@ -2110,18 +2066,21 @@ template <class T>
 inline Svar Svar::create(const T & t)
 {
     static_assert(!std::is_same<T,Svar>::value,"This should not happen.");
-    return (SvarValue*)new SvarValue_<T >(t);
+    return (std::shared_ptr<SvarValue>)std::make_shared<SvarValue_<T>>(t);
 }
 
 template <class T>
 inline Svar Svar::create(T && t)
 {
     static_assert(!std::is_same<T,Svar>::value,"This should not happen.");
-    return (SvarValue*)new SvarValue_<typename std::remove_reference<T>::type>(std::move(t));
+    return (std::shared_ptr<SvarValue>)std::make_shared<SvarValue_<typename std::remove_reference<T>::type>>(std::move(t));
 }
 
 inline Svar::Svar(const std::string& m)
     :_obj(std::make_shared<SvarValue_<std::string>>(m)){}
+
+inline Svar::Svar(std::string&& m)
+    :_obj(std::make_shared<SvarValue_<std::string>>(std::move(m))){}
 
 inline Svar::Svar(bool m)
     :_obj(std::make_shared<SvarValue_<bool>>(m)){}
@@ -2131,6 +2090,9 @@ inline Svar::Svar(int m)
 
 inline Svar::Svar(double m)
     :_obj(std::make_shared<SvarValue_<double>>(m)){}
+
+inline Svar::Svar(std::vector<Svar>&& rvec)
+    :_obj(std::make_shared<SvarArray>(rvec)){}
 
 template <typename T>
 Svar::Svar(std::unique_ptr<T>&& v)
@@ -2147,14 +2109,10 @@ inline Svar operator"" _svar(const char* str,size_t sz){
 template <typename T>
 inline bool Svar::is()const{return _obj->as(typeid(T))!=nullptr;}
 inline bool Svar::is(const std::type_index& typeId)const{return _obj->as(typeId)!=nullptr;}
-inline bool Svar::is(const std::string& typeStr)const{return classPtr()->name()==typeStr;}
+inline bool Svar::is(const std::string& typeStr)const{return classObject().name()==typeStr;}
 
 template <>
 inline bool Svar::is<Svar>()const{return true;}
-
-inline bool Svar::isNull()const{
-    return classPtr()->_cpptype==typeid(std::nullptr_t);
-}
 
 inline bool Svar::isProperty() const{
     return is<SvarClass::SvarProperty>();
@@ -2193,6 +2151,18 @@ T& Svar::as(){
     return *ptr;
 }
 
+template <typename T>
+T& Svar::unsafe_as()
+{
+    return ((SvarValue_<T>*)_obj.get())->_var;
+}
+
+template <typename T>
+const T& Svar::unsafe_as()const
+{
+    return ((SvarValue_<T>*)_obj.get())->_var;
+}
+
 template <>
 inline Svar& Svar::as<Svar>(){
     return *this;
@@ -2214,7 +2184,7 @@ public:
             }
         }
 
-        SvarClass& destClass=SvarClass::instance<T>().template as<SvarClass>();
+        SvarClass& destClass=*SvarClass::instance<T>();
         if(destClass.__init__.isFunction()){
             Svar ret=destClass.__init__(var);
             if(ret.is<T>()) return ret;
@@ -2296,21 +2266,20 @@ inline Svar Svar::castAs<Svar>()const{
 inline Svar Svar::clone(int depth)const{return _obj->clone(depth);}
 
 inline std::string Svar::typeName()const{
-    return classPtr()->name();
+    return classObject().name();
 }
 
 inline SvarValue::TypeID Svar::cpptype()const{
-    return classPtr()->_cpptype;
+    return classObject()._cpptype;
 }
 
-inline const Svar&       Svar::classObject()const{
-    return _obj->classObject();
-}
-
-inline SvarClass*   Svar::classPtr()const
+inline value_t           Svar::jsontype()const
 {
-    auto clsObj=classObject();
-    return &clsObj.as<SvarClass>();
+    return classObject()._json_type;
+}
+
+inline SvarClass&       Svar::classObject()const{
+    return *_obj->classObject();
 }
 
 inline size_t            Svar::length() const{
@@ -2318,7 +2287,7 @@ inline size_t            Svar::length() const{
 }
 
 inline Svar Svar::operator[](const Svar& i) const{
-    const SvarClass& cl=classObject().as<SvarClass>();
+    const SvarClass& cl=classObject();
     if(cl.__getitem__.isFunction()){
         return cl.__getitem__((*this),i);
     }
@@ -2374,7 +2343,7 @@ T Svar::get(const std::string& name,T def,bool parse_dot){
     else if(isUndefined())
         *this=object();// force to be an object
     else {
-        const SvarClass& cl=classObject().as<SvarClass>();
+        const SvarClass& cl=classObject();
         if(cl.__getitem__.isFunction()){
             Svar ret=cl.__getitem__((*this),name);
             return ret.as<T>();
@@ -2422,7 +2391,7 @@ inline void Svar::set(const std::string& name,const T& def,bool parse_dot){
             as<SvarObject>().set(name,def);
         return;
     }
-    const SvarClass& cl=classObject().as<SvarClass>();
+    const SvarClass& cl=classObject();
     if(cl.__setitem__.isFunction()){
         cl.__setitem__((*this),name,def);
         return;
@@ -2471,10 +2440,7 @@ Svar Svar::call(const std::string function, Args... args)const
 {
     // call as static methods without check
     if(isClass()) return as<SvarClass>().call(Svar(),function,args...);
-    // call as member methods with check
-    auto clsPtr=classPtr();
-    if(!clsPtr) throw SvarExeption("Unable to call "+typeName()+"."+function);
-    return clsPtr->call(*this,function,args...);
+    return classObject().call(*this,function,args...);
 }
 
 template <typename... Args>
@@ -2489,6 +2455,190 @@ Svar Svar::operator()(Args... args)const{
     }
     throw SvarExeption(typeName()+" can't be called as a function or constructor.");
     return Undefined();
+}
+
+struct pagedostream{
+    pagedostream():page_size(4096){
+        pages.push_back(std::string());
+        pages.back().reserve(page_size);
+    }
+
+    pagedostream& operator <<(char c){
+        if(pages.back().size()>=page_size) {
+            pages.push_back(std::string());
+            pages.back().reserve(page_size);
+        }
+        pages.back().push_back(c);
+        return *this;
+    }
+
+    pagedostream& operator <<(const std::string& c){
+        write(c.data(),c.size());
+        return *this;
+    }
+
+    pagedostream& write(const char* s,size_t length){
+        std::string& str=pages.back();
+        if(length+str.size()>page_size){
+            pages.push_back(std::string(s,length));
+            pages.back().reserve(page_size);
+            return *this;
+        }
+
+        str.append(s,s+length);
+        return *this;
+    }
+
+    std::string str(){
+        int size=0;
+        for(auto& it:pages)
+            size+=it.size();
+        std::string ret(size,0);
+        char* c=(char*)ret.data();
+        for(auto& it:pages)
+        {
+            memcpy(c,it.data(),it.size());
+            c+=it.size();
+        }
+        return ret;
+    }
+
+    int                    page_size;
+    bool         reverse;
+    std::list<std::string> pages;
+};
+
+template <typename T>
+T& Svar::dump(T& o,const int indent_step,const int current_indent)const
+{
+    static auto dump_str=[](const std::string& value)->std::string{
+        std::string out;
+        out.reserve(value.size()*2);
+        out+='"';
+        for (size_t i = 0; i < value.length(); i++) {
+            const char ch = value[i];
+            uint8_t uch=ch;
+            switch (uch) {
+            case '\\': out+= "\\\\";break;
+            case '"':  out+= "\\\"";break;
+            case '\b': out+= "\\b";break;
+            case '\f': out+= "\\f";break;
+            case '\n': out+= "\\n";break;
+            case '\r': out+= "\\r";break;
+            case '\t': out+= "\\t";break;
+            case 0xe2:
+                if (static_cast<uint8_t>(value[i+1]) == 0x80
+                        && static_cast<uint8_t>(value[i+2]) == 0xa8) {
+                    out+= "\\u2028";
+                    i += 2;
+                } else if (static_cast<uint8_t>(value[i+1]) == 0x80
+                           && static_cast<uint8_t>(value[i+2]) == 0xa9) {
+                    out+= "\\u2029";
+                    i += 2;
+                }else {
+                    out.push_back(ch);
+                }
+                break;
+            default:
+                if (uch <= 0x1f) {
+                    char buf[8];
+                    snprintf(buf, sizeof buf, "\\u%04x", ch);
+                    out.append(buf,buf+8);
+                } else
+                    out.push_back(ch);
+                break;
+            }
+        }
+        out+='"';
+        return out;
+    };
+    switch(classObject()._json_type)
+    {
+    case value_t::null_t:
+        return o<<"null";
+    case value_t::boolean_t:
+        return o<<(unsafe_as<bool>()? "true":"false");
+    case value_t::float_t:{
+        char buf[64];
+        return o.write(buf,dtos(unsafe_as<double>(),buf));
+    }
+    case value_t::integer_t:
+        return o<<std::to_string(unsafe_as<int>());
+    case value_t::string_t:
+        return o<<dump_str(unsafe_as<std::string>());
+    case value_t::array_t:
+    {
+        const std::vector<Svar>& vec=unsafe_as<std::vector<Svar>>();
+        const auto N = vec.size();
+        if(N==0)
+            return o<<"[]";
+        o<<'[';
+        std::string indent_front,ident_back("]");
+        int new_indent=current_indent+indent_step;
+        if(indent_step>=0){
+            indent_front = std::string(new_indent+1,' ');
+            indent_front[0]='\n';
+            ident_back = std::string(current_indent+2,' ');
+            ident_back[0]='\n'; ident_back.back()=']';
+        }
+        for (auto it=vec.begin();it != vec.end();++it)
+        {
+            if(indent_step>=0)
+                o << indent_front;
+            it->dump(o,indent_step,new_indent);
+            if(it==vec.end()-1)
+                o<<ident_back;
+            else
+                o<<',';
+        }
+        return o;
+    }
+    case value_t::object_t:
+    {
+        const auto& obj=unsafe_as<std::unordered_map<std::string,Svar>>();
+        const auto N = obj.size();
+        if(N==0) return o<<"{}";
+        o<<'{';
+        auto it=obj.begin();
+        int new_indent=current_indent+indent_step;
+        std::string indent_front,ident_back("}");
+        if(indent_step>=0){
+            indent_front = std::string(new_indent+1,' ');
+            indent_front[0]='\n';
+            ident_back = std::string(current_indent+2,' ');
+            ident_back[0]='\n';ident_back.back()='}';
+        }
+        for(size_t i=1;i<=N;++i,++it)
+        {
+            if(indent_step>=0)
+                o<<indent_front;
+            o<<dump_str(it->first);
+            o<<": ";
+            it->second.dump(o, indent_step, new_indent);
+            if(i==N)
+                o << ident_back;
+            else
+                o << ',';
+        }
+        return o;
+    }
+    default:
+    {
+        auto& cls=classObject();
+        if(cls.__str__.isFunction()){
+            Svar a = cls.__str__(*this);
+            return o<<a.as<std::string>();
+        }
+        return o<<"<"<<typeName()<<" at "<<std::to_string((long)value().get())<<">";
+    }
+    }
+}
+
+inline std::string Svar::dump_json(const int indent)const
+{
+    pagedostream sst;
+    dump(sst,indent);
+    return sst.str();
 }
 
 inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
@@ -2722,15 +2872,14 @@ inline std::string Svar::printTable(
 
 inline Svar Svar::operator -()const
 {
-    return classPtr()->call(*this,"__neg__");
+    return classObject().call(*this,"__neg__");
 }
 
 #define DEF_SVAR_OPERATOR_IMPL(SNAME)\
 {\
-    auto cls=classPtr();\
-    if(!cls) throw SvarExeption(typeName()+" has not class to operator "#SNAME".");\
-    Svar ret=cls->call(*this,#SNAME,rh);\
-    if(ret.isUndefined()) throw SvarExeption(cls->__name__+" operator "#SNAME" with rh: "+rh.typeName()+"returned Undefined.");\
+    auto& cls=classObject();\
+    Svar ret=cls.call(*this,#SNAME,rh);\
+    if(ret.isUndefined()) throw SvarExeption(cls.__name__+" operator "#SNAME" with rh: "+rh.typeName()+"returned Undefined.");\
     return ret;\
 }
 
@@ -2778,18 +2927,11 @@ inline bool Svar::operator <(const Svar& rh)const{
 
 inline std::ostream& operator <<(std::ostream& ost,const Svar& self)
 {
-    auto cls=self.classPtr();
-    if(cls&&cls->__str__.isFunction()){
-        Svar a = cls->__str__(self);
-        ost<<a.as<std::string>();
-        return ost;
-    }
-    ost<<"<"<<self.typeName()<<" at "<<self.value().get()<<">";
-    return ost;
+    return self.dump(ost,2);
 }
 
 inline const Svar& Svar::Undefined(){
-    static Svar v(new SvarValue());
+    static Svar v(std::make_shared<SvarValue>());
     return v;
 }
 
@@ -2943,7 +3085,7 @@ public:
     }
 
     static Svar to(const std::vector<T>& var){
-        return (SvarValue*)new SvarArray(std::vector<Svar>(var.begin(),var.end()));
+        return std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
     }
 };
 
@@ -2956,7 +3098,11 @@ public:
     }
 
     static Svar to(const std::vector<Svar>& var){
-        return (SvarValue*)new SvarArray(var);
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarArray>(var);
+    }
+
+    static Svar to(std::vector<Svar>&& var){
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarArray>(std::move(var));
     }
 };
 
@@ -2978,9 +3124,7 @@ public:
     }
 
     static Svar to(const std::list<T>& var){
-        SvarArray* obj=new SvarArray({});
-        obj->_var.insert(obj->_var.end(),var.begin(),var.end());
-        return Svar((SvarValue*)obj);
+        return std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
     }
 };
 
@@ -3002,7 +3146,7 @@ public:
     }
 
     static Svar to(const std::map<std::string,T>& var){
-        return (SvarValue*)new SvarObject(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarObject>(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
     }
 };
 
@@ -3024,7 +3168,7 @@ public:
     }
 
     static Svar to(const std::unordered_map<std::string,T>& var){
-        return (SvarValue*)new SvarObject(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarObject>(std::unordered_map<std::string,Svar>(var.begin(),var.end()));
     }
 };
 
@@ -3046,7 +3190,7 @@ public:
     }
 
     static Svar to(const std::map<K,T>& var){
-        return (SvarValue*)new SvarDict(std::map<Svar,Svar>(var.begin(),var.end()));
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarDict>(std::map<Svar,Svar>(var.begin(),var.end()));
     }
 };
 
@@ -3110,6 +3254,800 @@ inline std::istream& operator >>(std::istream& ist,Svar& self)
 
 #if !defined(__SVAR_NOBUILTIN__)
 
+/*!
+@brief implements the Grisu2 algorithm for binary to decimal floating-point
+conversion.
+*/
+namespace dtoa_impl
+{
+
+template <typename Target, typename Source>
+Target reinterpret_bits(const Source source)
+{
+    static_assert(sizeof(Target) == sizeof(Source), "size mismatch");
+
+    Target target;
+    std::memcpy(&target, &source, sizeof(Source));
+    return target;
+}
+
+struct diyfp // f * 2^e
+{
+    static constexpr int kPrecision = 64; // = q
+
+    std::uint64_t f = 0;
+    int e = 0;
+
+    constexpr diyfp(std::uint64_t f_, int e_) noexcept : f(f_), e(e_) {}
+
+    /*!
+    @brief returns x - y
+    @pre x.e == y.e and x.f >= y.f
+    */
+    static diyfp sub(const diyfp& x, const diyfp& y) noexcept
+    {
+        assert(x.e == y.e);
+        assert(x.f >= y.f);
+
+        return {x.f - y.f, x.e};
+    }
+
+    /*!
+    @brief returns x * y
+    @note The result is rounded. (Only the upper q bits are returned.)
+    */
+    static diyfp mul(const diyfp& x, const diyfp& y) noexcept
+    {
+        static_assert(kPrecision == 64, "internal error");
+
+        const std::uint64_t u_lo = x.f & 0xFFFFFFFFu;
+        const std::uint64_t u_hi = x.f >> 32u;
+        const std::uint64_t v_lo = y.f & 0xFFFFFFFFu;
+        const std::uint64_t v_hi = y.f >> 32u;
+
+        const std::uint64_t p0 = u_lo * v_lo;
+        const std::uint64_t p1 = u_lo * v_hi;
+        const std::uint64_t p2 = u_hi * v_lo;
+        const std::uint64_t p3 = u_hi * v_hi;
+
+        const std::uint64_t p0_hi = p0 >> 32u;
+        const std::uint64_t p1_lo = p1 & 0xFFFFFFFFu;
+        const std::uint64_t p1_hi = p1 >> 32u;
+        const std::uint64_t p2_lo = p2 & 0xFFFFFFFFu;
+        const std::uint64_t p2_hi = p2 >> 32u;
+
+        std::uint64_t Q = p0_hi + p1_lo + p2_lo;
+
+        Q += std::uint64_t{1} << (64u - 32u - 1u); // round, ties up
+
+        const std::uint64_t h = p3 + p2_hi + p1_hi + (Q >> 32u);
+
+        return {h, x.e + y.e + 64};
+    }
+
+    /*!
+    @brief normalize x such that the significand is >= 2^(q-1)
+    @pre x.f != 0
+    */
+    static diyfp normalize(diyfp x) noexcept
+    {
+        assert(x.f != 0);
+
+        while ((x.f >> 63u) == 0)
+        {
+            x.f <<= 1u;
+            x.e--;
+        }
+
+        return x;
+    }
+
+    /*!
+    @brief normalize x such that the result has the exponent E
+    @pre e >= x.e and the upper e - x.e bits of x.f must be zero.
+    */
+    static diyfp normalize_to(const diyfp& x, const int target_exponent) noexcept
+    {
+        const int delta = x.e - target_exponent;
+
+        assert(delta >= 0);
+        assert(((x.f << delta) >> delta) == x.f);
+
+        return {x.f << delta, target_exponent};
+    }
+};
+
+struct boundaries
+{
+    diyfp w;
+    diyfp minus;
+    diyfp plus;
+};
+
+/*!
+Compute the (normalized) diyfp representing the input number 'value' and its
+boundaries.
+
+@pre value must be finite and positive
+*/
+template <typename FloatType>
+boundaries compute_boundaries(FloatType value)
+{
+    assert(std::isfinite(value));
+    assert(value > 0);
+
+    static_assert(std::numeric_limits<FloatType>::is_iec559,
+                  "internal error: dtoa_short requires an IEEE-754 floating-point implementation");
+
+    constexpr int      kPrecision = std::numeric_limits<FloatType>::digits; // = p (includes the hidden bit)
+    constexpr int      kBias      = std::numeric_limits<FloatType>::max_exponent - 1 + (kPrecision - 1);
+    constexpr int      kMinExp    = 1 - kBias;
+    constexpr std::uint64_t kHiddenBit = std::uint64_t{1} << (kPrecision - 1); // = 2^(p-1)
+
+    using bits_type = typename std::conditional<kPrecision == 24, std::uint32_t, std::uint64_t >::type;
+
+    const std::uint64_t bits = reinterpret_bits<bits_type>(value);
+    const std::uint64_t E = bits >> (kPrecision - 1);
+    const std::uint64_t F = bits & (kHiddenBit - 1);
+
+    const bool is_denormal = E == 0;
+    const diyfp v = is_denormal
+                    ? diyfp(F, kMinExp)
+                    : diyfp(F + kHiddenBit, static_cast<int>(E) - kBias);
+
+    const bool lower_boundary_is_closer = F == 0 and E > 1;
+    const diyfp m_plus = diyfp(2 * v.f + 1, v.e - 1);
+    const diyfp m_minus = lower_boundary_is_closer
+                          ? diyfp(4 * v.f - 1, v.e - 2)  // (B)
+                          : diyfp(2 * v.f - 1, v.e - 1); // (A)
+
+    // Determine the normalized w+ = m+.
+    const diyfp w_plus = diyfp::normalize(m_plus);
+
+    // Determine w- = m- such that e_(w-) = e_(w+).
+    const diyfp w_minus = diyfp::normalize_to(m_minus, w_plus.e);
+
+    return {diyfp::normalize(v), w_minus, w_plus};
+}
+
+constexpr int kAlpha = -60;
+constexpr int kGamma = -32;
+
+struct cached_power // c = f * 2^e ~= 10^k
+{
+    std::uint64_t f;
+    int e;
+    int k;
+};
+
+/*!
+For a normalized diyfp w = f * 2^e, this function returns a (normalized) cached
+power-of-ten c = f_c * 2^e_c, such that the exponent of the product w * c
+satisfies (Definition 3.2 from [1])
+
+     alpha <= e_c + e + q <= gamma.
+*/
+inline cached_power get_cached_power_for_binary_exponent(int e)
+{
+    constexpr int kCachedPowersMinDecExp = -300;
+    constexpr int kCachedPowersDecStep = 8;
+
+    static constexpr std::array<cached_power, 79> kCachedPowers =
+    {
+        {
+            { 0xAB70FE17C79AC6CA, -1060, -300 },
+            { 0xFF77B1FCBEBCDC4F, -1034, -292 },
+            { 0xBE5691EF416BD60C, -1007, -284 },
+            { 0x8DD01FAD907FFC3C,  -980, -276 },
+            { 0xD3515C2831559A83,  -954, -268 },
+            { 0x9D71AC8FADA6C9B5,  -927, -260 },
+            { 0xEA9C227723EE8BCB,  -901, -252 },
+            { 0xAECC49914078536D,  -874, -244 },
+            { 0x823C12795DB6CE57,  -847, -236 },
+            { 0xC21094364DFB5637,  -821, -228 },
+            { 0x9096EA6F3848984F,  -794, -220 },
+            { 0xD77485CB25823AC7,  -768, -212 },
+            { 0xA086CFCD97BF97F4,  -741, -204 },
+            { 0xEF340A98172AACE5,  -715, -196 },
+            { 0xB23867FB2A35B28E,  -688, -188 },
+            { 0x84C8D4DFD2C63F3B,  -661, -180 },
+            { 0xC5DD44271AD3CDBA,  -635, -172 },
+            { 0x936B9FCEBB25C996,  -608, -164 },
+            { 0xDBAC6C247D62A584,  -582, -156 },
+            { 0xA3AB66580D5FDAF6,  -555, -148 },
+            { 0xF3E2F893DEC3F126,  -529, -140 },
+            { 0xB5B5ADA8AAFF80B8,  -502, -132 },
+            { 0x87625F056C7C4A8B,  -475, -124 },
+            { 0xC9BCFF6034C13053,  -449, -116 },
+            { 0x964E858C91BA2655,  -422, -108 },
+            { 0xDFF9772470297EBD,  -396, -100 },
+            { 0xA6DFBD9FB8E5B88F,  -369,  -92 },
+            { 0xF8A95FCF88747D94,  -343,  -84 },
+            { 0xB94470938FA89BCF,  -316,  -76 },
+            { 0x8A08F0F8BF0F156B,  -289,  -68 },
+            { 0xCDB02555653131B6,  -263,  -60 },
+            { 0x993FE2C6D07B7FAC,  -236,  -52 },
+            { 0xE45C10C42A2B3B06,  -210,  -44 },
+            { 0xAA242499697392D3,  -183,  -36 },
+            { 0xFD87B5F28300CA0E,  -157,  -28 },
+            { 0xBCE5086492111AEB,  -130,  -20 },
+            { 0x8CBCCC096F5088CC,  -103,  -12 },
+            { 0xD1B71758E219652C,   -77,   -4 },
+            { 0x9C40000000000000,   -50,    4 },
+            { 0xE8D4A51000000000,   -24,   12 },
+            { 0xAD78EBC5AC620000,     3,   20 },
+            { 0x813F3978F8940984,    30,   28 },
+            { 0xC097CE7BC90715B3,    56,   36 },
+            { 0x8F7E32CE7BEA5C70,    83,   44 },
+            { 0xD5D238A4ABE98068,   109,   52 },
+            { 0x9F4F2726179A2245,   136,   60 },
+            { 0xED63A231D4C4FB27,   162,   68 },
+            { 0xB0DE65388CC8ADA8,   189,   76 },
+            { 0x83C7088E1AAB65DB,   216,   84 },
+            { 0xC45D1DF942711D9A,   242,   92 },
+            { 0x924D692CA61BE758,   269,  100 },
+            { 0xDA01EE641A708DEA,   295,  108 },
+            { 0xA26DA3999AEF774A,   322,  116 },
+            { 0xF209787BB47D6B85,   348,  124 },
+            { 0xB454E4A179DD1877,   375,  132 },
+            { 0x865B86925B9BC5C2,   402,  140 },
+            { 0xC83553C5C8965D3D,   428,  148 },
+            { 0x952AB45CFA97A0B3,   455,  156 },
+            { 0xDE469FBD99A05FE3,   481,  164 },
+            { 0xA59BC234DB398C25,   508,  172 },
+            { 0xF6C69A72A3989F5C,   534,  180 },
+            { 0xB7DCBF5354E9BECE,   561,  188 },
+            { 0x88FCF317F22241E2,   588,  196 },
+            { 0xCC20CE9BD35C78A5,   614,  204 },
+            { 0x98165AF37B2153DF,   641,  212 },
+            { 0xE2A0B5DC971F303A,   667,  220 },
+            { 0xA8D9D1535CE3B396,   694,  228 },
+            { 0xFB9B7CD9A4A7443C,   720,  236 },
+            { 0xBB764C4CA7A44410,   747,  244 },
+            { 0x8BAB8EEFB6409C1A,   774,  252 },
+            { 0xD01FEF10A657842C,   800,  260 },
+            { 0x9B10A4E5E9913129,   827,  268 },
+            { 0xE7109BFBA19C0C9D,   853,  276 },
+            { 0xAC2820D9623BF429,   880,  284 },
+            { 0x80444B5E7AA7CF85,   907,  292 },
+            { 0xBF21E44003ACDD2D,   933,  300 },
+            { 0x8E679C2F5E44FF8F,   960,  308 },
+            { 0xD433179D9C8CB841,   986,  316 },
+            { 0x9E19DB92B4E31BA9,  1013,  324 },
+        }
+    };
+
+    // This computation gives exactly the same results for k as
+    //      k = ceil((kAlpha - e - 1) * 0.30102999566398114)
+    // for |e| <= 1500, but doesn't require floating-point operations.
+    // NB: log_10(2) ~= 78913 / 2^18
+    assert(e >= -1500);
+    assert(e <=  1500);
+    const int f = kAlpha - e - 1;
+    const int k = (f * 78913) / (1 << 18) + static_cast<int>(f > 0);
+
+    const int index = (-kCachedPowersMinDecExp + k + (kCachedPowersDecStep - 1)) / kCachedPowersDecStep;
+    assert(index >= 0);
+    assert(static_cast<std::size_t>(index) < kCachedPowers.size());
+
+    const cached_power cached = kCachedPowers[static_cast<std::size_t>(index)];
+    assert(kAlpha <= cached.e + e + 64);
+    assert(kGamma >= cached.e + e + 64);
+
+    return cached;
+}
+
+/*!
+For n != 0, returns k, such that pow10 := 10^(k-1) <= n < 10^k.
+For n == 0, returns 1 and sets pow10 := 1.
+*/
+inline int find_largest_pow10(const std::uint32_t n, std::uint32_t& pow10)
+{
+    // LCOV_EXCL_START
+    if (n >= 1000000000)
+    {
+        pow10 = 1000000000;
+        return 10;
+    }
+    // LCOV_EXCL_STOP
+    else if (n >= 100000000)
+    {
+        pow10 = 100000000;
+        return  9;
+    }
+    else if (n >= 10000000)
+    {
+        pow10 = 10000000;
+        return  8;
+    }
+    else if (n >= 1000000)
+    {
+        pow10 = 1000000;
+        return  7;
+    }
+    else if (n >= 100000)
+    {
+        pow10 = 100000;
+        return  6;
+    }
+    else if (n >= 10000)
+    {
+        pow10 = 10000;
+        return  5;
+    }
+    else if (n >= 1000)
+    {
+        pow10 = 1000;
+        return  4;
+    }
+    else if (n >= 100)
+    {
+        pow10 = 100;
+        return  3;
+    }
+    else if (n >= 10)
+    {
+        pow10 = 10;
+        return  2;
+    }
+    else
+    {
+        pow10 = 1;
+        return 1;
+    }
+}
+
+inline void grisu2_round(char* buf, int len, std::uint64_t dist, std::uint64_t delta,
+                         std::uint64_t rest, std::uint64_t ten_k)
+{
+    assert(len >= 1);
+    assert(dist <= delta);
+    assert(rest <= delta);
+    assert(ten_k > 0);
+
+    while (rest < dist
+            and delta - rest >= ten_k
+            and (rest + ten_k < dist or dist - rest > rest + ten_k - dist))
+    {
+        assert(buf[len - 1] != '0');
+        buf[len - 1]--;
+        rest += ten_k;
+    }
+}
+
+/*!
+Generates V = buffer * 10^decimal_exponent, such that M- <= V <= M+.
+M- and M+ must be normalized and share the same exponent -60 <= e <= -32.
+*/
+inline void grisu2_digit_gen(char* buffer, int& length, int& decimal_exponent,
+                             diyfp M_minus, diyfp w, diyfp M_plus)
+{
+    static_assert(kAlpha >= -60, "internal error");
+    static_assert(kGamma <= -32, "internal error");
+
+    assert(M_plus.e >= kAlpha);
+    assert(M_plus.e <= kGamma);
+
+    std::uint64_t delta = diyfp::sub(M_plus, M_minus).f; // (significand of (M+ - M-), implicit exponent is e)
+    std::uint64_t dist  = diyfp::sub(M_plus, w      ).f; // (significand of (M+ - w ), implicit exponent is e)
+
+    // Split M+ = f * 2^e into two parts p1 and p2 (note: e < 0):
+    //
+    //      M+ = f * 2^e
+    //         = ((f div 2^-e) * 2^-e + (f mod 2^-e)) * 2^e
+    //         = ((p1        ) * 2^-e + (p2        )) * 2^e
+    //         = p1 + p2 * 2^e
+
+    const diyfp one(std::uint64_t{1} << -M_plus.e, M_plus.e);
+
+    auto p1 = static_cast<std::uint32_t>(M_plus.f >> -one.e); // p1 = f div 2^-e (Since -e >= 32, p1 fits into a 32-bit int.)
+    std::uint64_t p2 = M_plus.f & (one.f - 1);                    // p2 = f mod 2^-e
+
+    // 1)
+    //
+    // Generate the digits of the integral part p1 = d[n-1]...d[1]d[0]
+
+    assert(p1 > 0);
+
+    std::uint32_t pow10;
+    const int k = find_largest_pow10(p1, pow10);
+
+    //      10^(k-1) <= p1 < 10^k, pow10 = 10^(k-1)
+    //
+    //      p1 = (p1 div 10^(k-1)) * 10^(k-1) + (p1 mod 10^(k-1))
+    //         = (d[k-1]         ) * 10^(k-1) + (p1 mod 10^(k-1))
+    //
+    //      M+ = p1                                             + p2 * 2^e
+    //         = d[k-1] * 10^(k-1) + (p1 mod 10^(k-1))          + p2 * 2^e
+    //         = d[k-1] * 10^(k-1) + ((p1 mod 10^(k-1)) * 2^-e + p2) * 2^e
+    //         = d[k-1] * 10^(k-1) + (                         rest) * 2^e
+    //
+    // Now generate the digits d[n] of p1 from left to right (n = k-1,...,0)
+    //
+    //      p1 = d[k-1]...d[n] * 10^n + d[n-1]...d[0]
+    //
+    // but stop as soon as
+    //
+    //      rest * 2^e = (d[n-1]...d[0] * 2^-e + p2) * 2^e <= delta * 2^e
+
+    int n = k;
+    while (n > 0)
+    {
+        // Invariants:
+        //      M+ = buffer * 10^n + (p1 + p2 * 2^e)    (buffer = 0 for n = k)
+        //      pow10 = 10^(n-1) <= p1 < 10^n
+        //
+        const std::uint32_t d = p1 / pow10;  // d = p1 div 10^(n-1)
+        const std::uint32_t r = p1 % pow10;  // r = p1 mod 10^(n-1)
+        //
+        //      M+ = buffer * 10^n + (d * 10^(n-1) + r) + p2 * 2^e
+        //         = (buffer * 10 + d) * 10^(n-1) + (r + p2 * 2^e)
+        //
+        assert(d <= 9);
+        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
+        //
+        //      M+ = buffer * 10^(n-1) + (r + p2 * 2^e)
+        //
+        p1 = r;
+        n--;
+        //
+        //      M+ = buffer * 10^n + (p1 + p2 * 2^e)
+        //      pow10 = 10^n
+        //
+
+        // Now check if enough digits have been generated.
+        // Compute
+        //
+        //      p1 + p2 * 2^e = (p1 * 2^-e + p2) * 2^e = rest * 2^e
+        //
+        // Note:
+        // Since rest and delta share the same exponent e, it suffices to
+        // compare the significands.
+        const std::uint64_t rest = (std::uint64_t{p1} << -one.e) + p2;
+        if (rest <= delta)
+        {
+            // V = buffer * 10^n, with M- <= V <= M+.
+
+            decimal_exponent += n;
+
+            // We may now just stop. But instead look if the buffer could be
+            // decremented to bring V closer to w.
+            //
+            // pow10 = 10^n is now 1 ulp in the decimal representation V.
+            // The rounding procedure works with diyfp's with an implicit
+            // exponent of e.
+            //
+            //      10^n = (10^n * 2^-e) * 2^e = ulp * 2^e
+            //
+            const std::uint64_t ten_n = std::uint64_t{pow10} << -one.e;
+            grisu2_round(buffer, length, dist, delta, rest, ten_n);
+
+            return;
+        }
+
+        pow10 /= 10;
+        //
+        //      pow10 = 10^(n-1) <= p1 < 10^n
+        // Invariants restored.
+    }
+
+    // 2)
+    //
+    // The digits of the integral part have been generated:
+    //
+    //      M+ = d[k-1]...d[1]d[0] + p2 * 2^e
+    //         = buffer            + p2 * 2^e
+    //
+    // Now generate the digits of the fractional part p2 * 2^e.
+    //
+    // Note:
+    // No decimal point is generated: the exponent is adjusted instead.
+    //
+    // p2 actually represents the fraction
+    //
+    //      p2 * 2^e
+    //          = p2 / 2^-e
+    //          = d[-1] / 10^1 + d[-2] / 10^2 + ...
+    //
+    // Now generate the digits d[-m] of p1 from left to right (m = 1,2,...)
+    //
+    //      p2 * 2^e = d[-1]d[-2]...d[-m] * 10^-m
+    //                      + 10^-m * (d[-m-1] / 10^1 + d[-m-2] / 10^2 + ...)
+    //
+    // using
+    //
+    //      10^m * p2 = ((10^m * p2) div 2^-e) * 2^-e + ((10^m * p2) mod 2^-e)
+    //                = (                   d) * 2^-e + (                   r)
+    //
+    // or
+    //      10^m * p2 * 2^e = d + r * 2^e
+    //
+    // i.e.
+    //
+    //      M+ = buffer + p2 * 2^e
+    //         = buffer + 10^-m * (d + r * 2^e)
+    //         = (buffer * 10^m + d) * 10^-m + 10^-m * r * 2^e
+    //
+    // and stop as soon as 10^-m * r * 2^e <= delta * 2^e
+
+    assert(p2 > delta);
+
+    int m = 0;
+    for (;;)
+    {
+        // Invariant:
+        //      M+ = buffer * 10^-m + 10^-m * (d[-m-1] / 10 + d[-m-2] / 10^2 + ...) * 2^e
+        //         = buffer * 10^-m + 10^-m * (p2                                 ) * 2^e
+        //         = buffer * 10^-m + 10^-m * (1/10 * (10 * p2)                   ) * 2^e
+        //         = buffer * 10^-m + 10^-m * (1/10 * ((10*p2 div 2^-e) * 2^-e + (10*p2 mod 2^-e)) * 2^e
+        //
+        assert(p2 <= (std::numeric_limits<std::uint64_t>::max)() / 10);
+        p2 *= 10;
+        const std::uint64_t d = p2 >> -one.e;     // d = (10 * p2) div 2^-e
+        const std::uint64_t r = p2 & (one.f - 1); // r = (10 * p2) mod 2^-e
+        //
+        //      M+ = buffer * 10^-m + 10^-m * (1/10 * (d * 2^-e + r) * 2^e
+        //         = buffer * 10^-m + 10^-m * (1/10 * (d + r * 2^e))
+        //         = (buffer * 10 + d) * 10^(-m-1) + 10^(-m-1) * r * 2^e
+        //
+        assert(d <= 9);
+        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
+        //
+        //      M+ = buffer * 10^(-m-1) + 10^(-m-1) * r * 2^e
+        //
+        p2 = r;
+        m++;
+        //
+        //      M+ = buffer * 10^-m + 10^-m * p2 * 2^e
+        // Invariant restored.
+
+        // Check if enough digits have been generated.
+        //
+        //      10^-m * p2 * 2^e <= delta * 2^e
+        //              p2 * 2^e <= 10^m * delta * 2^e
+        //                    p2 <= 10^m * delta
+        delta *= 10;
+        dist  *= 10;
+        if (p2 <= delta)
+        {
+            break;
+        }
+    }
+
+    // V = buffer * 10^-m, with M- <= V <= M+.
+
+    decimal_exponent -= m;
+
+    // 1 ulp in the decimal representation is now 10^-m.
+    // Since delta and dist are now scaled by 10^m, we need to do the
+    // same with ulp in order to keep the units in sync.
+    //
+    //      10^m * 10^-m = 1 = 2^-e * 2^e = ten_m * 2^e
+    //
+    const std::uint64_t ten_m = one.f;
+    grisu2_round(buffer, length, dist, delta, p2, ten_m);
+
+    // By construction this algorithm generates the shortest possible decimal
+    // number (Loitsch, Theorem 6.2) which rounds back to w.
+    // For an input number of precision p, at least
+    //
+    //      N = 1 + ceil(p * log_10(2))
+    //
+    // decimal digits are sufficient to identify all binary floating-point
+    // numbers (Matula, "In-and-Out conversions").
+    // This implies that the algorithm does not produce more than N decimal
+    // digits.
+    //
+    //      N = 17 for p = 53 (IEEE double precision)
+    //      N = 9  for p = 24 (IEEE single precision)
+}
+
+/*!
+v = buf * 10^decimal_exponent
+len is the length of the buffer (number of decimal digits)
+The buffer must be large enough, i.e. >= max_digits10.
+*/
+inline void grisu2(char* buf, int& len, int& decimal_exponent,
+                   diyfp m_minus, diyfp v, diyfp m_plus)
+{
+    assert(m_plus.e == m_minus.e);
+    assert(m_plus.e == v.e);
+
+    const cached_power cached = get_cached_power_for_binary_exponent(m_plus.e);
+
+    const diyfp c_minus_k(cached.f, cached.e); // = c ~= 10^-k
+
+    // The exponent of the products is = v.e + c_minus_k.e + q and is in the range [alpha,gamma]
+    const diyfp w       = diyfp::mul(v,       c_minus_k);
+    const diyfp w_minus = diyfp::mul(m_minus, c_minus_k);
+    const diyfp w_plus  = diyfp::mul(m_plus,  c_minus_k);
+    const diyfp M_minus(w_minus.f + 1, w_minus.e);
+    const diyfp M_plus (w_plus.f  - 1, w_plus.e );
+
+    decimal_exponent = -cached.k; // = -(-k) = k
+
+    grisu2_digit_gen(buf, len, decimal_exponent, M_minus, w, M_plus);
+}
+
+/*!
+v = buf * 10^decimal_exponent
+len is the length of the buffer (number of decimal digits)
+The buffer must be large enough, i.e. >= max_digits10.
+*/
+template <typename FloatType>
+void grisu2(char* buf, int& len, int& decimal_exponent, FloatType value)
+{
+    static_assert(diyfp::kPrecision >= std::numeric_limits<FloatType>::digits + 3,
+                  "internal error: not enough precision");
+
+    assert(std::isfinite(value));
+    assert(value > 0);
+#if 0
+    const boundaries w = compute_boundaries(static_cast<double>(value));
+#else
+    const boundaries w = compute_boundaries(value);
+#endif
+
+    grisu2(buf, len, decimal_exponent, w.minus, w.w, w.plus);
+}
+
+/*!
+@brief appends a decimal representation of e to buf
+@return a pointer to the element following the exponent.
+@pre -1000 < e < 1000
+*/
+inline char* append_exponent(char* buf, int e)
+{
+    assert(e > -1000);
+    assert(e <  1000);
+
+    if (e < 0)
+    {
+        e = -e;
+        *buf++ = '-';
+    }
+    else
+    {
+        *buf++ = '+';
+    }
+
+    auto k = static_cast<std::uint32_t>(e);
+    if (k < 10)
+    {
+        // Always print at least two digits in the exponent.
+        // This is for compatibility with printf("%g").
+        *buf++ = '0';
+        *buf++ = static_cast<char>('0' + k);
+    }
+    else if (k < 100)
+    {
+        *buf++ = static_cast<char>('0' + k / 10);
+        k %= 10;
+        *buf++ = static_cast<char>('0' + k);
+    }
+    else
+    {
+        *buf++ = static_cast<char>('0' + k / 100);
+        k %= 100;
+        *buf++ = static_cast<char>('0' + k / 10);
+        k %= 10;
+        *buf++ = static_cast<char>('0' + k);
+    }
+
+    return buf;
+}
+
+/*!
+@brief prettify v = buf * 10^decimal_exponent
+
+If v is in the range [10^min_exp, 10^max_exp) it will be printed in fixed-point
+notation. Otherwise it will be printed in exponential notation.
+
+@pre min_exp < 0
+@pre max_exp > 0
+*/
+inline char* format_buffer(char* buf, int len, int decimal_exponent,
+                           int min_exp, int max_exp)
+{
+    assert(min_exp < 0);
+    assert(max_exp > 0);
+
+    const int k = len;
+    const int n = len + decimal_exponent;
+
+    // v = buf * 10^(n-k)
+    // k is the length of the buffer (number of decimal digits)
+    // n is the position of the decimal point relative to the start of the buffer.
+
+    if (k <= n and n <= max_exp)
+    {
+        // digits[000]
+        // len <= max_exp + 2
+
+        std::memset(buf + k, '0', static_cast<size_t>(n - k));
+        // Make it look like a floating-point number (#362, #378)
+        buf[n + 0] = '.';
+        buf[n + 1] = '0';
+        return buf + (n + 2);
+    }
+
+    if (0 < n and n <= max_exp)
+    {
+        // dig.its
+        // len <= max_digits10 + 1
+
+        assert(k > n);
+
+        std::memmove(buf + (n + 1), buf + n, static_cast<size_t>(k - n));
+        buf[n] = '.';
+        return buf + (k + 1);
+    }
+
+    if (min_exp < n and n <= 0)
+    {
+        // 0.[000]digits
+        // len <= 2 + (-min_exp - 1) + max_digits10
+
+        std::memmove(buf + (2 + -n), buf, static_cast<size_t>(k));
+        buf[0] = '0';
+        buf[1] = '.';
+        std::memset(buf + 2, '0', static_cast<size_t>(-n));
+        return buf + (2 + (-n) + k);
+    }
+
+    if (k == 1)
+    {
+        // dE+123
+        // len <= 1 + 5
+
+        buf += 1;
+    }
+    else
+    {
+        // d.igitsE+123
+        // len <= max_digits10 + 1 + 5
+
+        std::memmove(buf + 2, buf + 1, static_cast<size_t>(k - 1));
+        buf[1] = '.';
+        buf += 1 + k;
+    }
+
+    *buf++ = 'e';
+    return append_exponent(buf, n - 1);
+}
+
+} // namespace dtoa_impl
+
+inline int Svar::dtos(double value,char* buf)
+{
+    auto first=buf;
+    assert(std::isfinite(value));
+
+    if (value == 0) {
+        *first++ = '0';
+        *first++ = '.';
+        *first++ = '0';
+        return first-buf;
+    };
+    if (std::signbit(value))
+    {
+        value = -value;
+        *first++ = '-';
+    }
+    int len = 0;
+    int decimal_exponent = 0;
+    dtoa_impl::grisu2(first, len, decimal_exponent, value);
+
+    assert(len <= std::numeric_limits<double>::max_digits10);
+
+    // Format the buffer like printf("%.*g", prec, value)
+    constexpr int kMinExp = -4;
+    // Use digits10 here to increase compatibility with version 2.
+    constexpr int kMaxExp = std::numeric_limits<double>::digits10;
+
+    return dtoa_impl::format_buffer(first, len, decimal_exponent, kMinExp, kMaxExp)-buf;
+}
+
 /// Json save and load class
 class Json final {
 public:
@@ -3129,12 +4067,6 @@ public:
             return parser.fail("unexpected trailing " + esc(in[parser.i]));
 
         return result;
-    }
-
-    static std::string dump(Svar var){
-        std::stringstream sst;
-        sst<<var;
-        return sst.str();
     }
 
 private:
@@ -3164,15 +4096,6 @@ private:
         return Svar();
     }
 
-    template <typename T>
-    T fail(std::string &&msg, const T err_ret) {
-        if (!failed)
-            err = std::move(msg);
-        failed = true;
-
-        return err_ret;
-    }
-
     /// Advance until the current character is non-whitespace.
     void consume_whitespace() {
         while (str[i] == ' ' || str[i] == '\r' || str[i] == '\n' || str[i] == '\t')
@@ -3185,7 +4108,7 @@ private:
       if (str[i] == '/') {
         i++;
         if (i == str.size())
-          return fail("unexpected end of input after start of comment", false);
+          fail("unexpected end of input after start of comment");
         if (str[i] == '/') { // inline comment
           i++;
           // advance until next line, or end of input
@@ -3197,19 +4120,18 @@ private:
         else if (str[i] == '*') { // multiline comment
           i++;
           if (i > str.size()-2)
-            return fail("unexpected end of input inside multi-line comment", false);
+            fail("unexpected end of input inside multi-line comment");
           // advance until closing tokens
           while (!(str[i] == '*' && str[i+1] == '/')) {
             i++;
             if (i > str.size()-2)
-              return fail(
-                "unexpected end of input inside multi-line comment", false);
+              fail("unexpected end of input inside multi-line comment");
           }
           i += 2;
           comment_found = true;
         }
         else
-          return fail("malformed comment", false);
+          fail("malformed comment");
       }
       return comment_found;
     }
@@ -3234,7 +4156,7 @@ private:
         consume_garbage();
         if (failed) return (char)0;
         if (i == str.size())
-            return fail("unexpected end of input", (char)0);
+            fail("unexpected end of input");
 
         return str[i++];
     }
@@ -3276,92 +4198,80 @@ private:
         return (x >= lower && x <= upper);
     }
 
+    inline void handle_escape(long& last_escaped_codepoint,std::string& out){
+        assert(i != str.size());
+
+        char ch = str[i++];
+
+        switch (ch) {
+        case 'b':
+            out += '\b';return;
+        case 'f':
+            out += '\f';return;
+        case 'r':
+            out += '\r';return;
+        case 'n':
+            out += '\n';return;
+        case 't':
+            out += '\t';return;
+        case '"':
+        case '\\':
+        case '/':
+            out += ch;return;
+        case 'u':
+        {
+            std::string esc = str.substr(i, 4);
+            if (esc.length() < 4) {
+                fail("bad \\u escape: " + esc);
+            }
+
+            long codepoint = strtol(esc.data(), nullptr, 16);
+
+            if (in_range(last_escaped_codepoint, 0xD800, 0xDBFF)
+                    && in_range(codepoint, 0xDC00, 0xDFFF)) {
+                // Reassemble the two surrogate pairs into one astral-plane character, per
+                // the UTF-16 algorithm.
+                encode_utf8((((last_escaped_codepoint - 0xD800) << 10)
+                             | (codepoint - 0xDC00)) + 0x10000, out);
+                last_escaped_codepoint = -1;
+            } else {
+                encode_utf8(last_escaped_codepoint, out);
+                last_escaped_codepoint = codepoint;
+            }
+
+            i += 4;
+        }
+            return;
+        default:
+            fail("invalid escape character " + esc(ch));
+            break;
+        }
+    }
+
     /// Parse a string, starting at the current position.
     std::string parse_string() {
         std::string out;
         long last_escaped_codepoint = -1;
         while (true) {
             if (i == str.size())
-                return fail("unexpected end of input in string", "");
+                fail("unexpected end of input in string");
 
             char ch = str[i++];
 
-            if (ch == '"') {
+            switch (ch) {
+            case '"':
                 encode_utf8(last_escaped_codepoint, out);
                 return out;
-            }
-
-            if (in_range(ch, 0, 0x1f))
-                return fail("unescaped " + esc(ch) + " in string", "");
-
-            // The usual case: non-escaped characters
-            if (ch != '\\') {
-                encode_utf8(last_escaped_codepoint, out);
-                last_escaped_codepoint = -1;
-                out += ch;
-                continue;
-            }
-
-            // Handle escapes
-            if (i == str.size())
-                return fail("unexpected end of input in string", "");
-
-            ch = str[i++];
-
-            if (ch == 'u') {
-                // Extract 4-byte escape sequence
-                std::string esc = str.substr(i, 4);
-                // Explicitly check length of the substring. The following loop
-                // relies on std::string returning the terminating NUL when
-                // accessing str[length]. Checking here reduces brittleness.
-                if (esc.length() < 4) {
-                    return fail("bad \\u escape: " + esc, "");
-                }
-                for (size_t j = 0; j < 4; j++) {
-                    if (!in_range(esc[j], 'a', 'f') && !in_range(esc[j], 'A', 'F')
-                            && !in_range(esc[j], '0', '9'))
-                        return fail("bad \\u escape: " + esc, "");
-                }
-
-                long codepoint = strtol(esc.data(), nullptr, 16);
-
-                // JSON specifies that characters outside the BMP shall be encoded as a pair
-                // of 4-hex-digit \u escapes encoding their surrogate pair components. Check
-                // whether we're in the middle of such a beast: the previous codepoint was an
-                // escaped lead (high) surrogate, and this is a trail (low) surrogate.
-                if (in_range(last_escaped_codepoint, 0xD800, 0xDBFF)
-                        && in_range(codepoint, 0xDC00, 0xDFFF)) {
-                    // Reassemble the two surrogate pairs into one astral-plane character, per
-                    // the UTF-16 algorithm.
-                    encode_utf8((((last_escaped_codepoint - 0xD800) << 10)
-                                 | (codepoint - 0xDC00)) + 0x10000, out);
-                    last_escaped_codepoint = -1;
-                } else {
+            case '\\':
+                handle_escape(last_escaped_codepoint,out);
+                break;
+            default:
+                if(last_escaped_codepoint>=0){
                     encode_utf8(last_escaped_codepoint, out);
-                    last_escaped_codepoint = codepoint;
+                    last_escaped_codepoint = -1;
                 }
-
-                i += 4;
-                continue;
-            }
-
-            encode_utf8(last_escaped_codepoint, out);
-            last_escaped_codepoint = -1;
-
-            if (ch == 'b') {
-                out += '\b';
-            } else if (ch == 'f') {
-                out += '\f';
-            } else if (ch == 'n') {
-                out += '\n';
-            } else if (ch == 'r') {
-                out += '\r';
-            } else if (ch == 't') {
-                out += '\t';
-            } else if (ch == '"' || ch == '\\' || ch == '/') {
                 out += ch;
-            } else {
-                return fail("invalid escape character " + esc(ch), "");
+                break;
             }
         }
     }
@@ -3907,14 +4817,13 @@ public:
         SvarClass::Class<void>()
                 .def("__str__",[](const Svar&){return "undefined";})
         .setName("void");
-        Svar::Null().classPtr()
-                ->def("__str__",[](const Svar&){return "null";});
+        Svar::Null().classObject()
+                .def("__str__",[](const Svar&){return "null";});
 
         SvarClass::Class<int>()
                 .def("__init__",&SvarBuiltin::int_create)
                 .def("__double__",[](int& i){return (double)i;})
                 .def("__bool__",[](int& i){return (bool)i;})
-                .def("__str__",[](int& i){return Svar::toString(i);})
                 .def("__eq__",[](int& self,int rh){return self==rh;})
                 .def("__lt__",[](int& self,int rh){return self<rh;})
                 .def("__add__",[](int& self,Svar& rh)->Svar{
@@ -3948,13 +4857,11 @@ public:
         SvarClass::Class<bool>()
                 .def("__int__",[](bool& b){return (int)b;})
                 .def("__double__",[](bool& b){return (double)b;})
-                .def("__str__",[](bool& b){return Svar::toString(b);})
                 .def("__eq__",[](bool& self,bool& rh){return self==rh;});
 
         SvarClass::Class<double>()
                 .def("__int__",[](double& d){return (int)d;})
                 .def("__bool__",[](double& d){return (bool)d;})
-                .def("__str__",[](double& d){return Svar::toString(d);})
                 .def("__eq__",[](double& self,double rh){return self==rh;})
                 .def("__lt__",[](double& self,double rh){return self<rh;})
                 .def("__neg__",[](double& self){return -self;})
@@ -3966,11 +4873,6 @@ public:
 
         SvarClass::Class<std::string>()
                 .def("__len__",[](const std::string& self){return self.size();})
-                .def("__str__",[](const std::string& self){
-            std::string out;
-            dump(self,out);
-            return out;
-        })
                 .def("__add__",[](const std::string& self,const std::string& rh){
             return self+rh;
         })
@@ -3990,7 +4892,6 @@ public:
             std::unique_lock<std::mutex> lock(self._mutex);
             self._var.erase(self._var.begin()+idx);
         })
-        .def("__str__",[](SvarArray& self){return Svar::toString(self);})
         .def("__add__",[](const SvarArray& self,const SvarArray& other){
             std::unique_lock<std::mutex> lock1(self._mutex);
             std::unique_lock<std::mutex> lock2(other._mutex);
@@ -4016,7 +4917,6 @@ public:
             std::unique_lock<std::mutex> lock(self._mutex);
             self._var.erase(id);
         })
-        .def("__str__",[](const SvarObject& self){return Svar::toString(self);})
                 .def("__add__",[](const SvarObject& self,const SvarObject& rh){
             if(&self==&rh)
             {
@@ -4037,15 +4937,17 @@ public:
         });
 
         SvarClass::Class<SvarFunction>()
-                .def("__doc__",[](SvarFunction& self){return Svar::toString(self);});
+                .def("__doc__",[](SvarFunction& self){
+            std::stringstream sst;
+            sst<<self;
+            return sst.str();
+        });
 
         SvarClass::Class<SvarClass>()
-                .def("__getitem__",[](SvarClass& self,const std::string& i)->Svar{return self[i];})
-                .def("doc",[](Svar self){return Svar::toString(self.as<SvarClass>());});
+                .def("__getitem__",[](SvarClass& self,const std::string& i)->Svar{return self[i];});
 
         SvarClass::Class<Json>()
-                .def_static("load",&Json::load)
-                .def_static("dump",&Json::dump);
+                .def_static("load",&Json::load);
 
         SvarClass::Class<SvarBuffer>()
                 .def("size",&SvarBuffer::size)
@@ -4086,43 +4988,6 @@ public:
         throw SvarExeption("Can't construct int from "+rh.typeName()+".");
         return Svar::Undefined();
     }
-    static void dump(const std::string &value, std::string &out) {
-        out += '"';
-        for (size_t i = 0; i < value.length(); i++) {
-            const char ch = value[i];
-            if (ch == '\\') {
-                out += "\\\\";
-            } else if (ch == '"') {
-                out += "\\\"";
-            } else if (ch == '\b') {
-                out += "\\b";
-            } else if (ch == '\f') {
-                out += "\\f";
-            } else if (ch == '\n') {
-                out += "\\n";
-            } else if (ch == '\r') {
-                out += "\\r";
-            } else if (ch == '\t') {
-                out += "\\t";
-            } else if (static_cast<uint8_t>(ch) <= 0x1f) {
-                char buf[8];
-                snprintf(buf, sizeof buf, "\\u%04x", ch);
-                out += buf;
-            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
-                       && static_cast<uint8_t>(value[i+2]) == 0xa8) {
-                out += "\\u2028";
-                i += 2;
-            } else if (static_cast<uint8_t>(ch) == 0xe2 && static_cast<uint8_t>(value[i+1]) == 0x80
-                       && static_cast<uint8_t>(value[i+2]) == 0xa9) {
-                out += "\\u2029";
-                i += 2;
-            } else {
-                out += ch;
-            }
-        }
-        out += '"';
-    }
-
 };
 
 static SvarBuiltin SvarBuiltinInitializerinstance;

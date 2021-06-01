@@ -125,8 +125,8 @@ struct SvarPy: public PyObject{
         if(src.is<PyObjectHolder>())
             return src.as<PyObjectHolder>();
 
-        SvarClass* cls=src.classPtr();
-        Svar func=(*cls)["getPy"];
+        SvarClass& cls=src.classObject();
+        Svar func=cls["getPy"];
         if(func.isFunction())
             return func.as<SvarFunction>().Call({src}).as<PyObjectHolder>();
 
@@ -199,7 +199,7 @@ struct SvarPy: public PyObject{
             return PyObjectHolder(obj,false);
         };
 
-        cls->def("getPy",convert);
+        cls.def("getPy",convert);
 
         return convert(src);
     }

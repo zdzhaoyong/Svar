@@ -19,7 +19,7 @@ public:
     static BaseClass create(int a){return BaseClass(a);}
     static BaseClass create1(){return BaseClass();}
 
-    virtual std::string intro()const{return "age:"+Svar::toString(age_);}
+    virtual std::string intro()const{return "age:"+std::to_string(age_);}
     virtual bool isBBase(){return false;}
 
     int age_;

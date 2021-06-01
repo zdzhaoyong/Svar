@@ -116,10 +116,8 @@ int sample_svarclass(){// users can also define a class without related c++ clas
     .def("printSelf",[](Svar self){
         std::cerr<<"printSelf:"<<self<<std::endl;
     })
-    .def("__init__",[helloClass](){
-        Svar ret={{"a",100}};
-        ret.as<SvarObject>()._class=helloClass;
-        return ret;
+    .def("__init__",[](Svar self){
+        self["a"]=1;
     });
 
     Svar cls(helloClass);
