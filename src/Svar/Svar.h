@@ -183,6 +183,1208 @@ const static bool value = true;
 };
 
 }
+namespace fast_double_parser {
+
+#define FASTFLOAT_SMALLEST_POWER -325
+#define FASTFLOAT_LARGEST_POWER 308
+
+#ifdef _MSC_VER
+#ifndef really_inline
+#define really_inline __forceinline
+#endif // really_inline
+#ifndef unlikely
+#define unlikely(x) x
+#endif // unlikely
+#else  // _MSC_VER
+#ifndef unlikely
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif // unlikely
+#ifndef really_inline
+#define really_inline __attribute__((always_inline)) inline
+#endif // really_inline
+#endif // _MSC_VER
+
+struct value128 {
+  uint64_t low;
+  uint64_t high;
+};
+
+// We need a backup on old systems.
+// credit: https://stackoverflow.com/questions/28868367/getting-the-high-part-of-64-bit-integer-multiplication
+really_inline uint64_t Emulate64x64to128(uint64_t& r_hi, const uint64_t x, const uint64_t y) {
+    const uint64_t x0 = (uint32_t)x, x1 = x >> 32;
+    const uint64_t y0 = (uint32_t)y, y1 = y >> 32;
+    const uint64_t p11 = x1 * y1, p01 = x0 * y1;
+    const uint64_t p10 = x1 * y0, p00 = x0 * y0;
+
+    // 64-bit product + two 32-bit values
+    const uint64_t middle = p10 + (p00 >> 32) + (uint32_t)p01;
+
+    // 64-bit product + two 32-bit values
+    r_hi = p11 + (middle >> 32) + (p01 >> 32);
+
+    // Add LOW PART and lower half of MIDDLE PART
+    return (middle << 32) | (uint32_t)p00;
+}
+
+really_inline value128 full_multiplication(uint64_t value1, uint64_t value2) {
+  value128 answer;
+#ifdef __SIZEOF_INT128__ // this is what we have on most 32-bit systems
+  __uint128_t r = ((__uint128_t)value1) * value2;
+  answer.low = uint64_t(r);
+  answer.high = uint64_t(r >> 64);
+#else
+  // fallback
+  answer.low = Emulate64x64to128(answer.high, value1,  value2);
+#endif
+  return answer;
+}
+
+/* result might be undefined when input_num is zero */
+inline int leading_zeroes(uint64_t input_num) {
+#ifdef _MSC_VER
+#if defined(_M_X64) || defined(_M_ARM64) || defined (_M_IA64)
+  unsigned long leading_zero = 0;
+  // Search the mask data from most significant bit (MSB)
+  // to least significant bit (LSB) for a set bit (1).
+  if (_BitScanReverse64(&leading_zero, input_num))
+    return (int)(63 - leading_zero);
+  else
+    return 64;
+#else
+  unsigned long x1 = (unsigned long)(x >> 32), top, bottom;
+  _BitScanReverse(&top, x1);
+  _BitScanReverse(&bottom, (unsigned long)x);
+  return x1 ? top + 32 : bottom;
+#endif // defined(_M_X64) || defined(_M_ARM64) || defined (_M_IA64)
+#else
+  return __builtin_clzll(input_num);
+#endif // _MSC_VER
+}
+
+static inline bool is_integer(char c) {
+  return (c >= '0' && c <= '9');
+  // this gets compiled to (uint8_t)(c - '0') <= 9 on all decent compilers
+}
+
+
+really_inline double compute_float_64(int64_t power, uint64_t i, bool negative,
+                                      bool *success) {
+
+  // Precomputed powers of ten from 10^0 to 10^22. These
+  // can be represented exactly using the double type.
+  static const double power_of_ten[] = {
+      1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,  1e10, 1e11,
+      1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
+
+  // The mantissas of powers of ten from -308 to 308, extended out to sixty four
+  // bits. The array contains the powers of ten approximated
+  // as a 64-bit mantissa. It goes from 10^FASTFLOAT_SMALLEST_POWER to
+  // 10^FASTFLOAT_LARGEST_POWER (inclusively).
+  // The mantissa is truncated, and
+  // never rounded up. Uses about 5KB.
+  static const uint64_t mantissa_64[] = {
+      0xa5ced43b7e3e9188, 0xcf42894a5dce35ea, 0x818995ce7aa0e1b2, 0xa1ebfb4219491a1f, 0xca66fa129f9b60a6, 0xfd00b897478238d0,
+      0x9e20735e8cb16382, 0xc5a890362fddbc62, 0xf712b443bbd52b7b, 0x9a6bb0aa55653b2d, 0xc1069cd4eabe89f8, 0xf148440a256e2c76,
+      0x96cd2a865764dbca, 0xbc807527ed3e12bc, 0xeba09271e88d976b, 0x93445b8731587ea3, 0xb8157268fdae9e4c, 0xe61acf033d1a45df,
+      0x8fd0c16206306bab, 0xb3c4f1ba87bc8696, 0xe0b62e2929aba83c, 0x8c71dcd9ba0b4925, 0xaf8e5410288e1b6f, 0xdb71e91432b1a24a,
+      0x892731ac9faf056e, 0xab70fe17c79ac6ca, 0xd64d3d9db981787d, 0x85f0468293f0eb4e, 0xa76c582338ed2621, 0xd1476e2c07286faa,
+      0x82cca4db847945ca, 0xa37fce126597973c, 0xcc5fc196fefd7d0c, 0xff77b1fcbebcdc4f, 0x9faacf3df73609b1, 0xc795830d75038c1d,
+      0xf97ae3d0d2446f25, 0x9becce62836ac577, 0xc2e801fb244576d5, 0xf3a20279ed56d48a, 0x9845418c345644d6, 0xbe5691ef416bd60c,
+      0xedec366b11c6cb8f, 0x94b3a202eb1c3f39, 0xb9e08a83a5e34f07, 0xe858ad248f5c22c9, 0x91376c36d99995be, 0xb58547448ffffb2d,
+      0xe2e69915b3fff9f9, 0x8dd01fad907ffc3b, 0xb1442798f49ffb4a, 0xdd95317f31c7fa1d, 0x8a7d3eef7f1cfc52, 0xad1c8eab5ee43b66,
+      0xd863b256369d4a40, 0x873e4f75e2224e68, 0xa90de3535aaae202, 0xd3515c2831559a83, 0x8412d9991ed58091, 0xa5178fff668ae0b6,
+      0xce5d73ff402d98e3, 0x80fa687f881c7f8e, 0xa139029f6a239f72, 0xc987434744ac874e, 0xfbe9141915d7a922, 0x9d71ac8fada6c9b5,
+      0xc4ce17b399107c22, 0xf6019da07f549b2b, 0x99c102844f94e0fb, 0xc0314325637a1939, 0xf03d93eebc589f88, 0x96267c7535b763b5,
+      0xbbb01b9283253ca2, 0xea9c227723ee8bcb, 0x92a1958a7675175f, 0xb749faed14125d36, 0xe51c79a85916f484, 0x8f31cc0937ae58d2,
+      0xb2fe3f0b8599ef07, 0xdfbdcece67006ac9, 0x8bd6a141006042bd, 0xaecc49914078536d, 0xda7f5bf590966848, 0x888f99797a5e012d,
+      0xaab37fd7d8f58178, 0xd5605fcdcf32e1d6, 0x855c3be0a17fcd26, 0xa6b34ad8c9dfc06f, 0xd0601d8efc57b08b, 0x823c12795db6ce57,
+      0xa2cb1717b52481ed, 0xcb7ddcdda26da268, 0xfe5d54150b090b02, 0x9efa548d26e5a6e1, 0xc6b8e9b0709f109a, 0xf867241c8cc6d4c0,
+      0x9b407691d7fc44f8, 0xc21094364dfb5636, 0xf294b943e17a2bc4, 0x979cf3ca6cec5b5a, 0xbd8430bd08277231, 0xece53cec4a314ebd,
+      0x940f4613ae5ed136, 0xb913179899f68584, 0xe757dd7ec07426e5, 0x9096ea6f3848984f, 0xb4bca50b065abe63, 0xe1ebce4dc7f16dfb,
+      0x8d3360f09cf6e4bd, 0xb080392cc4349dec, 0xdca04777f541c567, 0x89e42caaf9491b60, 0xac5d37d5b79b6239, 0xd77485cb25823ac7,
+      0x86a8d39ef77164bc, 0xa8530886b54dbdeb, 0xd267caa862a12d66, 0x8380dea93da4bc60, 0xa46116538d0deb78, 0xcd795be870516656,
+      0x806bd9714632dff6, 0xa086cfcd97bf97f3, 0xc8a883c0fdaf7df0, 0xfad2a4b13d1b5d6c, 0x9cc3a6eec6311a63, 0xc3f490aa77bd60fc,
+      0xf4f1b4d515acb93b, 0x991711052d8bf3c5, 0xbf5cd54678eef0b6, 0xef340a98172aace4, 0x9580869f0e7aac0e, 0xbae0a846d2195712,
+      0xe998d258869facd7, 0x91ff83775423cc06, 0xb67f6455292cbf08, 0xe41f3d6a7377eeca, 0x8e938662882af53e, 0xb23867fb2a35b28d,
+      0xdec681f9f4c31f31, 0x8b3c113c38f9f37e, 0xae0b158b4738705e, 0xd98ddaee19068c76, 0x87f8a8d4cfa417c9, 0xa9f6d30a038d1dbc,
+      0xd47487cc8470652b, 0x84c8d4dfd2c63f3b, 0xa5fb0a17c777cf09, 0xcf79cc9db955c2cc, 0x81ac1fe293d599bf, 0xa21727db38cb002f,
+      0xca9cf1d206fdc03b, 0xfd442e4688bd304a, 0x9e4a9cec15763e2e, 0xc5dd44271ad3cdba, 0xf7549530e188c128, 0x9a94dd3e8cf578b9,
+      0xc13a148e3032d6e7, 0xf18899b1bc3f8ca1, 0x96f5600f15a7b7e5, 0xbcb2b812db11a5de, 0xebdf661791d60f56, 0x936b9fcebb25c995,
+      0xb84687c269ef3bfb, 0xe65829b3046b0afa, 0x8ff71a0fe2c2e6dc, 0xb3f4e093db73a093, 0xe0f218b8d25088b8, 0x8c974f7383725573,
+      0xafbd2350644eeacf, 0xdbac6c247d62a583, 0x894bc396ce5da772, 0xab9eb47c81f5114f, 0xd686619ba27255a2, 0x8613fd0145877585,
+      0xa798fc4196e952e7, 0xd17f3b51fca3a7a0, 0x82ef85133de648c4, 0xa3ab66580d5fdaf5, 0xcc963fee10b7d1b3, 0xffbbcfe994e5c61f,
+      0x9fd561f1fd0f9bd3, 0xc7caba6e7c5382c8, 0xf9bd690a1b68637b, 0x9c1661a651213e2d, 0xc31bfa0fe5698db8, 0xf3e2f893dec3f126,
+      0x986ddb5c6b3a76b7, 0xbe89523386091465, 0xee2ba6c0678b597f, 0x94db483840b717ef, 0xba121a4650e4ddeb, 0xe896a0d7e51e1566,
+      0x915e2486ef32cd60, 0xb5b5ada8aaff80b8, 0xe3231912d5bf60e6, 0x8df5efabc5979c8f, 0xb1736b96b6fd83b3, 0xddd0467c64bce4a0,
+      0x8aa22c0dbef60ee4, 0xad4ab7112eb3929d, 0xd89d64d57a607744, 0x87625f056c7c4a8b, 0xa93af6c6c79b5d2d, 0xd389b47879823479,
+      0x843610cb4bf160cb, 0xa54394fe1eedb8fe, 0xce947a3da6a9273e, 0x811ccc668829b887, 0xa163ff802a3426a8, 0xc9bcff6034c13052,
+      0xfc2c3f3841f17c67, 0x9d9ba7832936edc0, 0xc5029163f384a931, 0xf64335bcf065d37d, 0x99ea0196163fa42e, 0xc06481fb9bcf8d39,
+      0xf07da27a82c37088, 0x964e858c91ba2655, 0xbbe226efb628afea, 0xeadab0aba3b2dbe5, 0x92c8ae6b464fc96f, 0xb77ada0617e3bbcb,
+      0xe55990879ddcaabd, 0x8f57fa54c2a9eab6, 0xb32df8e9f3546564, 0xdff9772470297ebd, 0x8bfbea76c619ef36, 0xaefae51477a06b03,
+      0xdab99e59958885c4, 0x88b402f7fd75539b, 0xaae103b5fcd2a881, 0xd59944a37c0752a2, 0x857fcae62d8493a5, 0xa6dfbd9fb8e5b88e,
+      0xd097ad07a71f26b2, 0x825ecc24c873782f, 0xa2f67f2dfa90563b, 0xcbb41ef979346bca, 0xfea126b7d78186bc, 0x9f24b832e6b0f436,
+      0xc6ede63fa05d3143, 0xf8a95fcf88747d94, 0x9b69dbe1b548ce7c, 0xc24452da229b021b, 0xf2d56790ab41c2a2, 0x97c560ba6b0919a5,
+      0xbdb6b8e905cb600f, 0xed246723473e3813, 0x9436c0760c86e30b, 0xb94470938fa89bce, 0xe7958cb87392c2c2, 0x90bd77f3483bb9b9,
+      0xb4ecd5f01a4aa828, 0xe2280b6c20dd5232, 0x8d590723948a535f, 0xb0af48ec79ace837, 0xdcdb1b2798182244, 0x8a08f0f8bf0f156b,
+      0xac8b2d36eed2dac5, 0xd7adf884aa879177, 0x86ccbb52ea94baea, 0xa87fea27a539e9a5, 0xd29fe4b18e88640e, 0x83a3eeeef9153e89,
+      0xa48ceaaab75a8e2b, 0xcdb02555653131b6, 0x808e17555f3ebf11, 0xa0b19d2ab70e6ed6, 0xc8de047564d20a8b, 0xfb158592be068d2e,
+      0x9ced737bb6c4183d, 0xc428d05aa4751e4c, 0xf53304714d9265df, 0x993fe2c6d07b7fab, 0xbf8fdb78849a5f96, 0xef73d256a5c0f77c,
+      0x95a8637627989aad, 0xbb127c53b17ec159, 0xe9d71b689dde71af, 0x9226712162ab070d, 0xb6b00d69bb55c8d1, 0xe45c10c42a2b3b05,
+      0x8eb98a7a9a5b04e3, 0xb267ed1940f1c61c, 0xdf01e85f912e37a3, 0x8b61313bbabce2c6, 0xae397d8aa96c1b77, 0xd9c7dced53c72255,
+      0x881cea14545c7575, 0xaa242499697392d2, 0xd4ad2dbfc3d07787, 0x84ec3c97da624ab4, 0xa6274bbdd0fadd61, 0xcfb11ead453994ba,
+      0x81ceb32c4b43fcf4, 0xa2425ff75e14fc31, 0xcad2f7f5359a3b3e, 0xfd87b5f28300ca0d, 0x9e74d1b791e07e48, 0xc612062576589dda,
+      0xf79687aed3eec551, 0x9abe14cd44753b52, 0xc16d9a0095928a27, 0xf1c90080baf72cb1, 0x971da05074da7bee, 0xbce5086492111aea,
+      0xec1e4a7db69561a5, 0x9392ee8e921d5d07, 0xb877aa3236a4b449, 0xe69594bec44de15b, 0x901d7cf73ab0acd9, 0xb424dc35095cd80f,
+      0xe12e13424bb40e13, 0x8cbccc096f5088cb, 0xafebff0bcb24aafe, 0xdbe6fecebdedd5be, 0x89705f4136b4a597, 0xabcc77118461cefc,
+      0xd6bf94d5e57a42bc, 0x8637bd05af6c69b5, 0xa7c5ac471b478423, 0xd1b71758e219652b, 0x83126e978d4fdf3b, 0xa3d70a3d70a3d70a,
+      0xcccccccccccccccc, 0x8000000000000000, 0xa000000000000000, 0xc800000000000000, 0xfa00000000000000, 0x9c40000000000000,
+      0xc350000000000000, 0xf424000000000000, 0x9896800000000000, 0xbebc200000000000, 0xee6b280000000000, 0x9502f90000000000,
+      0xba43b74000000000, 0xe8d4a51000000000, 0x9184e72a00000000, 0xb5e620f480000000, 0xe35fa931a0000000, 0x8e1bc9bf04000000,
+      0xb1a2bc2ec5000000, 0xde0b6b3a76400000, 0x8ac7230489e80000, 0xad78ebc5ac620000, 0xd8d726b7177a8000, 0x878678326eac9000,
+      0xa968163f0a57b400, 0xd3c21bcecceda100, 0x84595161401484a0, 0xa56fa5b99019a5c8, 0xcecb8f27f4200f3a, 0x813f3978f8940984,
+      0xa18f07d736b90be5, 0xc9f2c9cd04674ede, 0xfc6f7c4045812296, 0x9dc5ada82b70b59d, 0xc5371912364ce305, 0xf684df56c3e01bc6,
+      0x9a130b963a6c115c, 0xc097ce7bc90715b3, 0xf0bdc21abb48db20, 0x96769950b50d88f4, 0xbc143fa4e250eb31, 0xeb194f8e1ae525fd,
+      0x92efd1b8d0cf37be, 0xb7abc627050305ad, 0xe596b7b0c643c719, 0x8f7e32ce7bea5c6f, 0xb35dbf821ae4f38b, 0xe0352f62a19e306e,
+      0x8c213d9da502de45, 0xaf298d050e4395d6, 0xdaf3f04651d47b4c, 0x88d8762bf324cd0f, 0xab0e93b6efee0053, 0xd5d238a4abe98068,
+      0x85a36366eb71f041, 0xa70c3c40a64e6c51, 0xd0cf4b50cfe20765, 0x82818f1281ed449f, 0xa321f2d7226895c7, 0xcbea6f8ceb02bb39,
+      0xfee50b7025c36a08, 0x9f4f2726179a2245, 0xc722f0ef9d80aad6, 0xf8ebad2b84e0d58b, 0x9b934c3b330c8577, 0xc2781f49ffcfa6d5,
+      0xf316271c7fc3908a, 0x97edd871cfda3a56, 0xbde94e8e43d0c8ec, 0xed63a231d4c4fb27, 0x945e455f24fb1cf8, 0xb975d6b6ee39e436,
+      0xe7d34c64a9c85d44, 0x90e40fbeea1d3a4a, 0xb51d13aea4a488dd, 0xe264589a4dcdab14, 0x8d7eb76070a08aec, 0xb0de65388cc8ada8,
+      0xdd15fe86affad912, 0x8a2dbf142dfcc7ab, 0xacb92ed9397bf996, 0xd7e77a8f87daf7fb, 0x86f0ac99b4e8dafd, 0xa8acd7c0222311bc,
+      0xd2d80db02aabd62b, 0x83c7088e1aab65db, 0xa4b8cab1a1563f52, 0xcde6fd5e09abcf26, 0x80b05e5ac60b6178, 0xa0dc75f1778e39d6,
+      0xc913936dd571c84c, 0xfb5878494ace3a5f, 0x9d174b2dcec0e47b, 0xc45d1df942711d9a, 0xf5746577930d6500, 0x9968bf6abbe85f20,
+      0xbfc2ef456ae276e8, 0xefb3ab16c59b14a2, 0x95d04aee3b80ece5, 0xbb445da9ca61281f, 0xea1575143cf97226, 0x924d692ca61be758,
+      0xb6e0c377cfa2e12e, 0xe498f455c38b997a, 0x8edf98b59a373fec, 0xb2977ee300c50fe7, 0xdf3d5e9bc0f653e1, 0x8b865b215899f46c,
+      0xae67f1e9aec07187, 0xda01ee641a708de9, 0x884134fe908658b2, 0xaa51823e34a7eede, 0xd4e5e2cdc1d1ea96, 0x850fadc09923329e,
+      0xa6539930bf6bff45, 0xcfe87f7cef46ff16, 0x81f14fae158c5f6e, 0xa26da3999aef7749, 0xcb090c8001ab551c, 0xfdcb4fa002162a63,
+      0x9e9f11c4014dda7e, 0xc646d63501a1511d, 0xf7d88bc24209a565, 0x9ae757596946075f, 0xc1a12d2fc3978937, 0xf209787bb47d6b84,
+      0x9745eb4d50ce6332, 0xbd176620a501fbff, 0xec5d3fa8ce427aff, 0x93ba47c980e98cdf, 0xb8a8d9bbe123f017, 0xe6d3102ad96cec1d,
+      0x9043ea1ac7e41392, 0xb454e4a179dd1877, 0xe16a1dc9d8545e94, 0x8ce2529e2734bb1d, 0xb01ae745b101e9e4, 0xdc21a1171d42645d,
+      0x899504ae72497eba, 0xabfa45da0edbde69, 0xd6f8d7509292d603, 0x865b86925b9bc5c2, 0xa7f26836f282b732, 0xd1ef0244af2364ff,
+      0x8335616aed761f1f, 0xa402b9c5a8d3a6e7, 0xcd036837130890a1, 0x802221226be55a64, 0xa02aa96b06deb0fd, 0xc83553c5c8965d3d,
+      0xfa42a8b73abbf48c, 0x9c69a97284b578d7, 0xc38413cf25e2d70d, 0xf46518c2ef5b8cd1, 0x98bf2f79d5993802, 0xbeeefb584aff8603,
+      0xeeaaba2e5dbf6784, 0x952ab45cfa97a0b2, 0xba756174393d88df, 0xe912b9d1478ceb17, 0x91abb422ccb812ee, 0xb616a12b7fe617aa,
+      0xe39c49765fdf9d94, 0x8e41ade9fbebc27d, 0xb1d219647ae6b31c, 0xde469fbd99a05fe3, 0x8aec23d680043bee, 0xada72ccc20054ae9,
+      0xd910f7ff28069da4, 0x87aa9aff79042286, 0xa99541bf57452b28, 0xd3fa922f2d1675f2, 0x847c9b5d7c2e09b7, 0xa59bc234db398c25,
+      0xcf02b2c21207ef2e, 0x8161afb94b44f57d, 0xa1ba1ba79e1632dc, 0xca28a291859bbf93, 0xfcb2cb35e702af78, 0x9defbf01b061adab,
+      0xc56baec21c7a1916, 0xf6c69a72a3989f5b, 0x9a3c2087a63f6399, 0xc0cb28a98fcf3c7f, 0xf0fdf2d3f3c30b9f, 0x969eb7c47859e743,
+      0xbc4665b596706114, 0xeb57ff22fc0c7959, 0x9316ff75dd87cbd8, 0xb7dcbf5354e9bece, 0xe5d3ef282a242e81, 0x8fa475791a569d10,
+      0xb38d92d760ec4455, 0xe070f78d3927556a, 0x8c469ab843b89562, 0xaf58416654a6babb, 0xdb2e51bfe9d0696a, 0x88fcf317f22241e2,
+      0xab3c2fddeeaad25a, 0xd60b3bd56a5586f1, 0x85c7056562757456, 0xa738c6bebb12d16c, 0xd106f86e69d785c7, 0x82a45b450226b39c,
+      0xa34d721642b06084, 0xcc20ce9bd35c78a5, 0xff290242c83396ce, 0x9f79a169bd203e41, 0xc75809c42c684dd1, 0xf92e0c3537826145,
+      0x9bbcc7a142b17ccb, 0xc2abf989935ddbfe, 0xf356f7ebf83552fe, 0x98165af37b2153de, 0xbe1bf1b059e9a8d6, 0xeda2ee1c7064130c,
+      0x9485d4d1c63e8be7, 0xb9a74a0637ce2ee1, 0xe8111c87c5c1ba99, 0x910ab1d4db9914a0, 0xb54d5e4a127f59c8, 0xe2a0b5dc971f303a,
+      0x8da471a9de737e24, 0xb10d8e1456105dad, 0xdd50f1996b947518, 0x8a5296ffe33cc92f, 0xace73cbfdc0bfb7b, 0xd8210befd30efa5a,
+      0x8714a775e3e95c78, 0xa8d9d1535ce3b396, 0xd31045a8341ca07c, 0x83ea2b892091e44d, 0xa4e4b66b68b65d60, 0xce1de40642e3f4b9,
+      0x80d2ae83e9ce78f3, 0xa1075a24e4421730, 0xc94930ae1d529cfc, 0xfb9b7cd9a4a7443c, 0x9d412e0806e88aa5, 0xc491798a08a2ad4e,
+      0xf5b5d7ec8acb58a2, 0x9991a6f3d6bf1765, 0xbff610b0cc6edd3f, 0xeff394dcff8a948e, 0x95f83d0a1fb69cd9, 0xbb764c4ca7a4440f,
+      0xea53df5fd18d5513, 0x92746b9be2f8552c, 0xb7118682dbb66a77, 0xe4d5e82392a40515, 0x8f05b1163ba6832d, 0xb2c71d5bca9023f8,
+      0xdf78e4b2bd342cf6, 0x8bab8eefb6409c1a, 0xae9672aba3d0c320, 0xda3c0f568cc4f3e8, 0x8865899617fb1871, 0xaa7eebfb9df9de8d,
+      0xd51ea6fa85785631, 0x8533285c936b35de, 0xa67ff273b8460356, 0xd01fef10a657842c, 0x8213f56a67f6b29b, 0xa298f2c501f45f42,
+      0xcb3f2f7642717713, 0xfe0efb53d30dd4d7, 0x9ec95d1463e8a506, 0xc67bb4597ce2ce48, 0xf81aa16fdc1b81da, 0x9b10a4e5e9913128,
+      0xc1d4ce1f63f57d72, 0xf24a01a73cf2dccf, 0x976e41088617ca01, 0xbd49d14aa79dbc82, 0xec9c459d51852ba2, 0x93e1ab8252f33b45,
+      0xb8da1662e7b00a17, 0xe7109bfba19c0c9d, 0x906a617d450187e2, 0xb484f9dc9641e9da, 0xe1a63853bbd26451, 0x8d07e33455637eb2,
+      0xb049dc016abc5e5f, 0xdc5c5301c56b75f7, 0x89b9b3e11b6329ba, 0xac2820d9623bf429, 0xd732290fbacaf133, 0x867f59a9d4bed6c0,
+      0xa81f301449ee8c70, 0xd226fc195c6a2f8c, 0x83585d8fd9c25db7, 0xa42e74f3d032f525, 0xcd3a1230c43fb26f, 0x80444b5e7aa7cf85,
+      0xa0555e361951c366, 0xc86ab5c39fa63440, 0xfa856334878fc150, 0x9c935e00d4b9d8d2, 0xc3b8358109e84f07, 0xf4a642e14c6262c8,
+      0x98e7e9cccfbd7dbd, 0xbf21e44003acdd2c, 0xeeea5d5004981478, 0x95527a5202df0ccb, 0xbaa718e68396cffd, 0xe950df20247c83fd,
+      0x91d28b7416cdd27e, 0xb6472e511c81471d, 0xe3d8f9e563a198e5, 0x8e679c2f5e44ff8f};
+  // A complement to mantissa_64
+  // complete to a 128-bit mantissa.
+  // Uses about 5KB but is rarely accessed.
+  static const uint64_t mantissa_128[] = {
+      0x419ea3bd35385e2d, 0x52064cac828675b9, 0x7343efebd1940993, 0x1014ebe6c5f90bf8, 0xd41a26e077774ef6, 0x8920b098955522b4,
+      0x55b46e5f5d5535b0, 0xeb2189f734aa831d, 0xa5e9ec7501d523e4, 0x47b233c92125366e, 0x999ec0bb696e840a, 0xc00670ea43ca250d,
+      0x380406926a5e5728, 0xc605083704f5ecf2, 0xf7864a44c633682e, 0x7ab3ee6afbe0211d, 0x5960ea05bad82964, 0x6fb92487298e33bd,
+      0xa5d3b6d479f8e056, 0x8f48a4899877186c, 0x331acdabfe94de87, 0x9ff0c08b7f1d0b14, 0x7ecf0ae5ee44dd9, 0xc9e82cd9f69d6150,
+      0xbe311c083a225cd2, 0x6dbd630a48aaf406, 0x92cbbccdad5b108, 0x25bbf56008c58ea5, 0xaf2af2b80af6f24e, 0x1af5af660db4aee1,
+      0x50d98d9fc890ed4d, 0xe50ff107bab528a0, 0x1e53ed49a96272c8, 0x25e8e89c13bb0f7a, 0x77b191618c54e9ac, 0xd59df5b9ef6a2417,
+      0x4b0573286b44ad1d, 0x4ee367f9430aec32, 0x229c41f793cda73f, 0x6b43527578c1110f, 0x830a13896b78aaa9, 0x23cc986bc656d553,
+      0x2cbfbe86b7ec8aa8, 0x7bf7d71432f3d6a9, 0xdaf5ccd93fb0cc53, 0xd1b3400f8f9cff68, 0x23100809b9c21fa1, 0xabd40a0c2832a78a,
+      0x16c90c8f323f516c, 0xae3da7d97f6792e3, 0x99cd11cfdf41779c, 0x40405643d711d583, 0x482835ea666b2572, 0xda3243650005eecf,
+      0x90bed43e40076a82, 0x5a7744a6e804a291, 0x711515d0a205cb36, 0xd5a5b44ca873e03, 0xe858790afe9486c2, 0x626e974dbe39a872,
+      0xfb0a3d212dc8128f, 0x7ce66634bc9d0b99, 0x1c1fffc1ebc44e80, 0xa327ffb266b56220, 0x4bf1ff9f0062baa8, 0x6f773fc3603db4a9,
+      0xcb550fb4384d21d3, 0x7e2a53a146606a48, 0x2eda7444cbfc426d, 0xfa911155fefb5308, 0x793555ab7eba27ca, 0x4bc1558b2f3458de,
+      0x9eb1aaedfb016f16, 0x465e15a979c1cadc, 0xbfacd89ec191ec9, 0xcef980ec671f667b, 0x82b7e12780e7401a, 0xd1b2ecb8b0908810,
+      0x861fa7e6dcb4aa15, 0x67a791e093e1d49a, 0xe0c8bb2c5c6d24e0, 0x58fae9f773886e18, 0xaf39a475506a899e, 0x6d8406c952429603,
+      0xc8e5087ba6d33b83, 0xfb1e4a9a90880a64, 0x5cf2eea09a55067f, 0xf42faa48c0ea481e, 0xf13b94daf124da26, 0x76c53d08d6b70858,
+      0x54768c4b0c64ca6e, 0xa9942f5dcf7dfd09, 0xd3f93b35435d7c4c, 0xc47bc5014a1a6daf, 0x359ab6419ca1091b, 0xc30163d203c94b62,
+      0x79e0de63425dcf1d, 0x985915fc12f542e4, 0x3e6f5b7b17b2939d, 0xa705992ceecf9c42, 0x50c6ff782a838353, 0xa4f8bf5635246428,
+      0x871b7795e136be99, 0x28e2557b59846e3f, 0x331aeada2fe589cf, 0x3ff0d2c85def7621, 0xfed077a756b53a9, 0xd3e8495912c62894,
+      0x64712dd7abbbd95c, 0xbd8d794d96aacfb3, 0xecf0d7a0fc5583a0, 0xf41686c49db57244, 0x311c2875c522ced5, 0x7d633293366b828b,
+      0xae5dff9c02033197, 0xd9f57f830283fdfc, 0xd072df63c324fd7b, 0x4247cb9e59f71e6d, 0x52d9be85f074e608, 0x67902e276c921f8b,
+      0xba1cd8a3db53b6, 0x80e8a40eccd228a4, 0x6122cd128006b2cd, 0x796b805720085f81, 0xcbe3303674053bb0, 0xbedbfc4411068a9c,
+      0xee92fb5515482d44, 0x751bdd152d4d1c4a, 0xd262d45a78a0635d, 0x86fb897116c87c34, 0xd45d35e6ae3d4da0, 0x8974836059cca109,
+      0x2bd1a438703fc94b, 0x7b6306a34627ddcf, 0x1a3bc84c17b1d542, 0x20caba5f1d9e4a93, 0x547eb47b7282ee9c, 0xe99e619a4f23aa43,
+      0x6405fa00e2ec94d4, 0xde83bc408dd3dd04, 0x9624ab50b148d445, 0x3badd624dd9b0957, 0xe54ca5d70a80e5d6, 0x5e9fcf4ccd211f4c,
+      0x7647c3200069671f, 0x29ecd9f40041e073, 0xf468107100525890, 0x7182148d4066eeb4, 0xc6f14cd848405530, 0xb8ada00e5a506a7c,
+      0xa6d90811f0e4851c, 0x908f4a166d1da663, 0x9a598e4e043287fe, 0x40eff1e1853f29fd, 0xd12bee59e68ef47c, 0x82bb74f8301958ce,
+      0xe36a52363c1faf01, 0xdc44e6c3cb279ac1, 0x29ab103a5ef8c0b9, 0x7415d448f6b6f0e7, 0x111b495b3464ad21, 0xcab10dd900beec34,
+      0x3d5d514f40eea742, 0xcb4a5a3112a5112, 0x47f0e785eaba72ab, 0x59ed216765690f56, 0x306869c13ec3532c, 0x1e414218c73a13fb,
+      0xe5d1929ef90898fa, 0xdf45f746b74abf39, 0x6b8bba8c328eb783, 0x66ea92f3f326564, 0xc80a537b0efefebd, 0xbd06742ce95f5f36,
+      0x2c48113823b73704, 0xf75a15862ca504c5, 0x9a984d73dbe722fb, 0xc13e60d0d2e0ebba, 0x318df905079926a8, 0xfdf17746497f7052,
+      0xfeb6ea8bedefa633, 0xfe64a52ee96b8fc0, 0x3dfdce7aa3c673b0, 0x6bea10ca65c084e, 0x486e494fcff30a62, 0x5a89dba3c3efccfa,
+      0xf89629465a75e01c, 0xf6bbb397f1135823, 0x746aa07ded582e2c, 0xa8c2a44eb4571cdc, 0x92f34d62616ce413, 0x77b020baf9c81d17,
+      0xace1474dc1d122e, 0xd819992132456ba, 0x10e1fff697ed6c69, 0xca8d3ffa1ef463c1, 0xbd308ff8a6b17cb2, 0xac7cb3f6d05ddbde,
+      0x6bcdf07a423aa96b, 0x86c16c98d2c953c6, 0xe871c7bf077ba8b7, 0x11471cd764ad4972, 0xd598e40d3dd89bcf, 0x4aff1d108d4ec2c3,
+      0xcedf722a585139ba, 0xc2974eb4ee658828, 0x733d226229feea32, 0x806357d5a3f525f, 0xca07c2dcb0cf26f7, 0xfc89b393dd02f0b5,
+      0xbbac2078d443ace2, 0xd54b944b84aa4c0d, 0xa9e795e65d4df11, 0x4d4617b5ff4a16d5, 0x504bced1bf8e4e45, 0xe45ec2862f71e1d6,
+      0x5d767327bb4e5a4c, 0x3a6a07f8d510f86f, 0x890489f70a55368b, 0x2b45ac74ccea842e, 0x3b0b8bc90012929d, 0x9ce6ebb40173744,
+      0xcc420a6a101d0515, 0x9fa946824a12232d, 0x47939822dc96abf9, 0x59787e2b93bc56f7, 0x57eb4edb3c55b65a, 0xede622920b6b23f1,
+      0xe95fab368e45eced, 0x11dbcb0218ebb414, 0xd652bdc29f26a119, 0x4be76d3346f0495f, 0x6f70a4400c562ddb, 0xcb4ccd500f6bb952,
+      0x7e2000a41346a7a7, 0x8ed400668c0c28c8, 0x728900802f0f32fa, 0x4f2b40a03ad2ffb9, 0xe2f610c84987bfa8, 0xdd9ca7d2df4d7c9,
+      0x91503d1c79720dbb, 0x75a44c6397ce912a, 0xc986afbe3ee11aba, 0xfbe85badce996168, 0xfae27299423fb9c3, 0xdccd879fc967d41a,
+      0x5400e987bbc1c920, 0x290123e9aab23b68, 0xf9a0b6720aaf6521, 0xf808e40e8d5b3e69, 0xb60b1d1230b20e04, 0xb1c6f22b5e6f48c2,
+      0x1e38aeb6360b1af3, 0x25c6da63c38de1b0, 0x579c487e5a38ad0e, 0x2d835a9df0c6d851, 0xf8e431456cf88e65, 0x1b8e9ecb641b58ff,
+      0xe272467e3d222f3f, 0x5b0ed81dcc6abb0f, 0x98e947129fc2b4e9, 0x3f2398d747b36224, 0x8eec7f0d19a03aad, 0x1953cf68300424ac,
+      0x5fa8c3423c052dd7, 0x3792f412cb06794d, 0xe2bbd88bbee40bd0, 0x5b6aceaeae9d0ec4, 0xf245825a5a445275, 0xeed6e2f0f0d56712,
+      0x55464dd69685606b, 0xaa97e14c3c26b886, 0xd53dd99f4b3066a8, 0xe546a8038efe4029, 0xde98520472bdd033, 0x963e66858f6d4440,
+      0xdde7001379a44aa8, 0x5560c018580d5d52, 0xaab8f01e6e10b4a6, 0xcab3961304ca70e8, 0x3d607b97c5fd0d22, 0x8cb89a7db77c506a,
+      0x77f3608e92adb242, 0x55f038b237591ed3, 0x6b6c46dec52f6688, 0x2323ac4b3b3da015, 0xabec975e0a0d081a, 0x96e7bd358c904a21,
+      0x7e50d64177da2e54, 0xdde50bd1d5d0b9e9, 0x955e4ec64b44e864, 0xbd5af13bef0b113e, 0xecb1ad8aeacdd58e, 0x67de18eda5814af2,
+      0x80eacf948770ced7, 0xa1258379a94d028d, 0x96ee45813a04330, 0x8bca9d6e188853fc, 0x775ea264cf55347d, 0x95364afe032a819d,
+      0x3a83ddbd83f52204, 0xc4926a9672793542, 0x75b7053c0f178293, 0x5324c68b12dd6338, 0xd3f6fc16ebca5e03, 0x88f4bb1ca6bcf584,
+      0x2b31e9e3d06c32e5, 0x3aff322e62439fcf, 0x9befeb9fad487c2, 0x4c2ebe687989a9b3, 0xf9d37014bf60a10, 0x538484c19ef38c94,
+      0x2865a5f206b06fb9, 0xf93f87b7442e45d3, 0xf78f69a51539d748, 0xb573440e5a884d1b, 0x31680a88f8953030, 0xfdc20d2b36ba7c3d,
+      0x3d32907604691b4c, 0xa63f9a49c2c1b10f, 0xfcf80dc33721d53, 0xd3c36113404ea4a8, 0x645a1cac083126e9, 0x3d70a3d70a3d70a3,
+      0xcccccccccccccccc, 0x0, 0x0, 0x0, 0x0, 0x0,
+      0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+      0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+      0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+      0x0, 0x0, 0x0, 0x0, 0x0, 0x4000000000000000,
+      0x5000000000000000, 0xa400000000000000, 0x4d00000000000000, 0xf020000000000000, 0x6c28000000000000, 0xc732000000000000,
+      0x3c7f400000000000, 0x4b9f100000000000, 0x1e86d40000000000, 0x1314448000000000, 0x17d955a000000000, 0x5dcfab0800000000,
+      0x5aa1cae500000000, 0xf14a3d9e40000000, 0x6d9ccd05d0000000, 0xe4820023a2000000, 0xdda2802c8a800000, 0xd50b2037ad200000,
+      0x4526f422cc340000, 0x9670b12b7f410000, 0x3c0cdd765f114000, 0xa5880a69fb6ac800, 0x8eea0d047a457a00, 0x72a4904598d6d880,
+      0x47a6da2b7f864750, 0x999090b65f67d924, 0xfff4b4e3f741cf6d, 0xbff8f10e7a8921a4, 0xaff72d52192b6a0d, 0x9bf4f8a69f764490,
+      0x2f236d04753d5b4, 0x1d762422c946590, 0x424d3ad2b7b97ef5, 0xd2e0898765a7deb2, 0x63cc55f49f88eb2f, 0x3cbf6b71c76b25fb,
+      0x8bef464e3945ef7a, 0x97758bf0e3cbb5ac, 0x3d52eeed1cbea317, 0x4ca7aaa863ee4bdd, 0x8fe8caa93e74ef6a, 0xb3e2fd538e122b44,
+      0x60dbbca87196b616, 0xbc8955e946fe31cd, 0x6babab6398bdbe41, 0xc696963c7eed2dd1, 0xfc1e1de5cf543ca2, 0x3b25a55f43294bcb,
+      0x49ef0eb713f39ebe, 0x6e3569326c784337, 0x49c2c37f07965404, 0xdc33745ec97be906, 0x69a028bb3ded71a3, 0xc40832ea0d68ce0c,
+      0xf50a3fa490c30190, 0x792667c6da79e0fa, 0x577001b891185938, 0xed4c0226b55e6f86, 0x544f8158315b05b4, 0x696361ae3db1c721,
+      0x3bc3a19cd1e38e9, 0x4ab48a04065c723, 0x62eb0d64283f9c76, 0x3ba5d0bd324f8394, 0xca8f44ec7ee36479, 0x7e998b13cf4e1ecb,
+      0x9e3fedd8c321a67e, 0xc5cfe94ef3ea101e, 0xbba1f1d158724a12, 0x2a8a6e45ae8edc97, 0xf52d09d71a3293bd, 0x593c2626705f9c56,
+      0x6f8b2fb00c77836c, 0xb6dfb9c0f956447, 0x4724bd4189bd5eac, 0x58edec91ec2cb657, 0x2f2967b66737e3ed, 0xbd79e0d20082ee74,
+      0xecd8590680a3aa11, 0xe80e6f4820cc9495, 0x3109058d147fdcdd, 0xbd4b46f0599fd415, 0x6c9e18ac7007c91a, 0x3e2cf6bc604ddb0,
+      0x84db8346b786151c, 0xe612641865679a63, 0x4fcb7e8f3f60c07e, 0xe3be5e330f38f09d, 0x5cadf5bfd3072cc5, 0x73d9732fc7c8f7f6,
+      0x2867e7fddcdd9afa, 0xb281e1fd541501b8, 0x1f225a7ca91a4226, 0x3375788de9b06958, 0x52d6b1641c83ae, 0xc0678c5dbd23a49a,
+      0xf840b7ba963646e0, 0xb650e5a93bc3d898, 0xa3e51f138ab4cebe, 0xc66f336c36b10137, 0xb80b0047445d4184, 0xa60dc059157491e5,
+      0x87c89837ad68db2f, 0x29babe4598c311fb, 0xf4296dd6fef3d67a, 0x1899e4a65f58660c, 0x5ec05dcff72e7f8f, 0x76707543f4fa1f73,
+      0x6a06494a791c53a8, 0x487db9d17636892, 0x45a9d2845d3c42b6, 0xb8a2392ba45a9b2, 0x8e6cac7768d7141e, 0x3207d795430cd926,
+      0x7f44e6bd49e807b8, 0x5f16206c9c6209a6, 0x36dba887c37a8c0f, 0xc2494954da2c9789, 0xf2db9baa10b7bd6c, 0x6f92829494e5acc7,
+      0xcb772339ba1f17f9, 0xff2a760414536efb, 0xfef5138519684aba, 0x7eb258665fc25d69, 0xef2f773ffbd97a61, 0xaafb550ffacfd8fa,
+      0x95ba2a53f983cf38, 0xdd945a747bf26183, 0x94f971119aeef9e4, 0x7a37cd5601aab85d, 0xac62e055c10ab33a, 0x577b986b314d6009,
+      0xed5a7e85fda0b80b, 0x14588f13be847307, 0x596eb2d8ae258fc8, 0x6fca5f8ed9aef3bb, 0x25de7bb9480d5854, 0xaf561aa79a10ae6a,
+      0x1b2ba1518094da04, 0x90fb44d2f05d0842, 0x353a1607ac744a53, 0x42889b8997915ce8, 0x69956135febada11, 0x43fab9837e699095,
+      0x94f967e45e03f4bb, 0x1d1be0eebac278f5, 0x6462d92a69731732, 0x7d7b8f7503cfdcfe, 0x5cda735244c3d43e, 0x3a0888136afa64a7,
+      0x88aaa1845b8fdd0, 0x8aad549e57273d45, 0x36ac54e2f678864b, 0x84576a1bb416a7dd, 0x656d44a2a11c51d5, 0x9f644ae5a4b1b325,
+      0x873d5d9f0dde1fee, 0xa90cb506d155a7ea, 0x9a7f12442d588f2, 0xc11ed6d538aeb2f, 0x8f1668c8a86da5fa, 0xf96e017d694487bc,
+      0x37c981dcc395a9ac, 0x85bbe253f47b1417, 0x93956d7478ccec8e, 0x387ac8d1970027b2, 0x6997b05fcc0319e, 0x441fece3bdf81f03,
+      0xd527e81cad7626c3, 0x8a71e223d8d3b074, 0xf6872d5667844e49, 0xb428f8ac016561db, 0xe13336d701beba52, 0xecc0024661173473,
+      0x27f002d7f95d0190, 0x31ec038df7b441f4, 0x7e67047175a15271, 0xf0062c6e984d386, 0x52c07b78a3e60868, 0xa7709a56ccdf8a82,
+      0x88a66076400bb691, 0x6acff893d00ea435, 0x583f6b8c4124d43, 0xc3727a337a8b704a, 0x744f18c0592e4c5c, 0x1162def06f79df73,
+      0x8addcb5645ac2ba8, 0x6d953e2bd7173692, 0xc8fa8db6ccdd0437, 0x1d9c9892400a22a2, 0x2503beb6d00cab4b, 0x2e44ae64840fd61d,
+      0x5ceaecfed289e5d2, 0x7425a83e872c5f47, 0xd12f124e28f77719, 0x82bd6b70d99aaa6f, 0x636cc64d1001550b, 0x3c47f7e05401aa4e,
+      0x65acfaec34810a71, 0x7f1839a741a14d0d, 0x1ede48111209a050, 0x934aed0aab460432, 0xf81da84d5617853f, 0x36251260ab9d668e,
+      0xc1d72b7c6b426019, 0xb24cf65b8612f81f, 0xdee033f26797b627, 0x169840ef017da3b1, 0x8e1f289560ee864e, 0xf1a6f2bab92a27e2,
+      0xae10af696774b1db, 0xacca6da1e0a8ef29, 0x17fd090a58d32af3, 0xddfc4b4cef07f5b0, 0x4abdaf101564f98e, 0x9d6d1ad41abe37f1,
+      0x84c86189216dc5ed, 0x32fd3cf5b4e49bb4, 0x3fbc8c33221dc2a1, 0xfabaf3feaa5334a, 0x29cb4d87f2a7400e, 0x743e20e9ef511012,
+      0x914da9246b255416, 0x1ad089b6c2f7548e, 0xa184ac2473b529b1, 0xc9e5d72d90a2741e, 0x7e2fa67c7a658892, 0xddbb901b98feeab7,
+      0x552a74227f3ea565, 0xd53a88958f87275f, 0x8a892abaf368f137, 0x2d2b7569b0432d85, 0x9c3b29620e29fc73, 0x8349f3ba91b47b8f,
+      0x241c70a936219a73, 0xed238cd383aa0110, 0xf4363804324a40aa, 0xb143c6053edcd0d5, 0xdd94b7868e94050a, 0xca7cf2b4191c8326,
+      0xfd1c2f611f63a3f0, 0xbc633b39673c8cec, 0xd5be0503e085d813, 0x4b2d8644d8a74e18, 0xddf8e7d60ed1219e, 0xcabb90e5c942b503,
+      0x3d6a751f3b936243, 0xcc512670a783ad4, 0x27fb2b80668b24c5, 0xb1f9f660802dedf6, 0x5e7873f8a0396973, 0xdb0b487b6423e1e8,
+      0x91ce1a9a3d2cda62, 0x7641a140cc7810fb, 0xa9e904c87fcb0a9d, 0x546345fa9fbdcd44, 0xa97c177947ad4095, 0x49ed8eabcccc485d,
+      0x5c68f256bfff5a74, 0x73832eec6fff3111, 0xc831fd53c5ff7eab, 0xba3e7ca8b77f5e55, 0x28ce1bd2e55f35eb, 0x7980d163cf5b81b3,
+      0xd7e105bcc332621f, 0x8dd9472bf3fefaa7, 0xb14f98f6f0feb951, 0x6ed1bf9a569f33d3, 0xa862f80ec4700c8, 0xcd27bb612758c0fa,
+      0x8038d51cb897789c, 0xe0470a63e6bd56c3, 0x1858ccfce06cac74, 0xf37801e0c43ebc8, 0xd30560258f54e6ba, 0x47c6b82ef32a2069,
+      0x4cdc331d57fa5441, 0xe0133fe4adf8e952, 0x58180fddd97723a6, 0x570f09eaa7ea7648, };
+
+#if (FLT_EVAL_METHOD != 1) && (FLT_EVAL_METHOD != 0)
+  // we do not trust the divisor
+  if (0 <= power && power <= 22 && i <= 9007199254740991) {
+#else
+  if (-22 <= power && power <= 22 && i <= 9007199254740991) {
+#endif
+    // convert the integer into a double. This is lossless since
+    // 0 <= i <= 2^53 - 1.
+    double d = double(i);
+    if (power < 0) {
+      d = d / power_of_ten[-power];
+    } else {
+      d = d * power_of_ten[power];
+    }
+    if (negative) {
+      d = -d;
+    }
+    *success = true;
+    return d;
+  }
+  if(i == 0) {
+    return negative ? -0.0 : 0.0;
+  }
+  uint64_t factor_mantissa = mantissa_64[power - FASTFLOAT_SMALLEST_POWER];
+  int64_t exponent = (((152170 + 65536) * power) >> 16) + 1024 + 63;
+  // We want the most significant bit of i to be 1. Shift if needed.
+  int lz = leading_zeroes(i);
+  i <<= lz;
+  // We want the most significant 64 bits of the product. We know
+  // this will be non-zero because the most significant bit of i is
+  // 1.
+  value128 product = full_multiplication(i, factor_mantissa);
+  uint64_t lower = product.low;
+  uint64_t upper = product.high;
+  if (unlikely((upper & 0x1FF) == 0x1FF) && (lower + i < lower)) {
+    uint64_t factor_mantissa_low =
+        mantissa_128[power - FASTFLOAT_SMALLEST_POWER];
+    // next, we compute the 64-bit x 128-bit multiplication, getting a 192-bit
+    // result (three 64-bit values)
+    product = full_multiplication(i, factor_mantissa_low);
+    uint64_t product_low = product.low;
+    uint64_t product_middle2 = product.high;
+    uint64_t product_middle1 = lower;
+    uint64_t product_high = upper;
+    uint64_t product_middle = product_middle1 + product_middle2;
+    if (product_middle < product_middle1) {
+      product_high++; // overflow carry
+    }
+    // we want to check whether mantissa *i + i would affect our result
+    // This does happen, e.g. with 7.3177701707893310e+15
+    if (((product_middle + 1 == 0) && ((product_high & 0x1FF) == 0x1FF) &&
+         (product_low + i < product_low))) { // let us be prudent and bail out.
+      *success = false;
+      return 0;
+    }
+    upper = product_high;
+    lower = product_middle;
+  }
+  // The final mantissa should be 53 bits with a leading 1.
+  // We shift it so that it occupies 54 bits with a leading 1.
+  ///////
+  uint64_t upperbit = upper >> 63;
+  uint64_t mantissa = upper >> (upperbit + 9);
+  lz += int(1 ^ upperbit);
+  if (unlikely((lower == 0) && ((upper & 0x1FF) == 0) &&
+               ((mantissa & 3) == 1))) {
+      *success = false;
+      return 0;
+  }
+  mantissa += mantissa & 1;
+  mantissa >>= 1;
+  // Here we have mantissa < (1<<53), unless there was an overflow
+  if (mantissa >= (1ULL << 53)) {
+    //////////
+    // This will happen when parsing values such as 7.2057594037927933e+16
+    ////////
+    mantissa = (1ULL << 52);
+    lz--; // undo previous addition
+  }
+  mantissa &= ~(1ULL << 52);
+  uint64_t real_exponent = exponent - lz;
+  // we have to check that real_exponent is in range, otherwise we bail out
+  if (unlikely((real_exponent < 1) || (real_exponent > 2046))) {
+    *success = false;
+    return 0;
+  }
+  mantissa |= real_exponent << 52;
+  mantissa |= (((uint64_t)negative) << 63);
+  double d;
+  memcpy(&d, &mantissa, sizeof(d));
+  *success = true;
+  return d;
+}
+// Return the null pointer on error
+static const char * parse_float_strtod(const char *ptr, double *outDouble) {
+  char *endptr;
+#if defined(FAST_DOUBLE_PARSER_SOLARIS) || defined(FAST_DOUBLE_PARSER_CYGWIN)
+  // workround for cygwin, solaris
+  *outDouble = cygwin_strtod_l(ptr, &endptr);
+#elif defined(_WIN32)
+  static _locale_t c_locale = _create_locale(LC_ALL, "C");
+  *outDouble = _strtod_l(ptr, &endptr, c_locale);
+#else
+  static locale_t c_locale = newlocale(LC_ALL_MASK, "C", NULL);
+  *outDouble = strtod_l(ptr, &endptr, c_locale);
+#endif
+  if (!std::isfinite(*outDouble)) {
+    return nullptr;
+  }
+  return endptr;
+}
+
+really_inline const char * parse_number(const char *p, double *outDouble) {
+  const char *pinit = p;
+  bool found_minus = (*p == '-');
+  bool negative = false;
+  if (found_minus) {
+    ++p;
+    negative = true;
+    if (!is_integer(*p)) { // a negative sign must be followed by an integer
+      return nullptr;
+    }
+  }
+  const char *const start_digits = p;
+
+  uint64_t i;      // an unsigned int avoids signed overflows (which are bad)
+  if (*p == '0') { // 0 cannot be followed by an integer
+    ++p;
+    if (is_integer(*p)) {
+      return nullptr;
+    }
+    i = 0;
+  } else {
+    if (!(is_integer(*p))) { // must start with an integer
+      return nullptr;
+    }
+    unsigned char digit = *p - '0';
+    i = digit;
+    p++;
+    // the is_made_of_eight_digits_fast routine is unlikely to help here because
+    // we rarely see large integer parts like 123456789
+    while (is_integer(*p)) {
+      digit = *p - '0';
+      // a multiplication by 10 is cheaper than an arbitrary integer
+      // multiplication
+      i = 10 * i + digit; // might overflow, we will handle the overflow later
+      ++p;
+    }
+  }
+  int64_t exponent = 0;
+  const char *first_after_period = NULL;
+  if (*p == '.') {
+    ++p;
+    first_after_period = p;
+    if (is_integer(*p)) {
+      unsigned char digit = *p - '0';
+      ++p;
+      i = i * 10 + digit; // might overflow + multiplication by 10 is likely
+                          // cheaper than arbitrary mult.
+      // we will handle the overflow later
+    } else {
+      return nullptr;
+    }
+    while (is_integer(*p)) {
+      unsigned char digit = *p - '0';
+      ++p;
+      i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
+                          // because we have parse_highprecision_float later.
+    }
+    exponent = first_after_period - p;
+  }
+  int digit_count =
+      int(p - start_digits - 1); // used later to guard against overflows
+  if (('e' == *p) || ('E' == *p)) {
+    ++p;
+    bool neg_exp = false;
+    if ('-' == *p) {
+      neg_exp = true;
+      ++p;
+    } else if ('+' == *p) {
+      ++p;
+    }
+    if (!is_integer(*p)) {
+      return nullptr;
+    }
+    unsigned char digit = *p - '0';
+    int64_t exp_number = digit;
+    p++;
+    if (is_integer(*p)) {
+      digit = *p - '0';
+      exp_number = 10 * exp_number + digit;
+      ++p;
+    }
+    if (is_integer(*p)) {
+      digit = *p - '0';
+      exp_number = 10 * exp_number + digit;
+      ++p;
+    }
+    while (is_integer(*p)) {
+      digit = *p - '0';
+      if (exp_number < 0x100000000) { // we need to check for overflows
+        exp_number = 10 * exp_number + digit;
+      }
+      ++p;
+    }
+    exponent += (neg_exp ? -exp_number : exp_number);
+  }
+  // If we frequently had to deal with long strings of digits,
+  // we could extend our code by using a 128-bit integer instead
+  // of a 64-bit integer. However, this is uncommon.
+  if (unlikely((digit_count >= 19))) { // this is uncommon
+    // It is possible that the integer had an overflow.
+    // We have to handle the case where we have 0.0000somenumber.
+    const char *start = start_digits;
+    while (*start == '0' || (*start == '.')) {
+      start++;
+    }
+    // we over-decrement by one when there is a decimal separator
+    digit_count -= int(start - start_digits);
+    if (digit_count >= 19) {
+      // Chances are good that we had an overflow!
+      // We start anew.
+      // This will happen in the following examples:
+      // 10000000000000000000000000000000000000000000e+308
+      // 3.1415926535897932384626433832795028841971693993751
+      //
+      return parse_float_strtod(pinit, outDouble);
+    }
+  }
+  if (unlikely(exponent < FASTFLOAT_SMALLEST_POWER) ||
+      (exponent > FASTFLOAT_LARGEST_POWER)) {
+    // this is almost never going to get called!!!
+    // exponent could be as low as 325
+    return parse_float_strtod(pinit, outDouble);
+  }
+  // from this point forward, exponent >= FASTFLOAT_SMALLEST_POWER and
+  // exponent <= FASTFLOAT_LARGEST_POWER
+  bool success = true;
+  *outDouble = compute_float_64(exponent, i, negative, &success);
+  if (!success) {
+    // we are almost never going to get here.
+    return parse_float_strtod(pinit, outDouble);
+  }
+  return p;
+}
+
+}
+namespace dtoa_impl
+{
+/*!
+@brief implements the Grisu2 algorithm for binary to decimal floating-point
+conversion.
+*/
+template <typename Target, typename Source>
+Target reinterpret_bits(const Source source)
+{
+    static_assert(sizeof(Target) == sizeof(Source), "size mismatch");
+
+    Target target;
+    std::memcpy(&target, &source, sizeof(Source));
+    return target;
+}
+
+struct diyfp // f * 2^e
+{
+    static constexpr int kPrecision = 64; // = q
+
+    std::uint64_t f = 0;
+    int e = 0;
+
+    constexpr diyfp(std::uint64_t f_, int e_) noexcept : f(f_), e(e_) {}
+
+    /*!
+    @brief returns x - y
+    @pre x.e == y.e and x.f >= y.f
+    */
+    static diyfp sub(const diyfp& x, const diyfp& y) noexcept
+    {
+        assert(x.e == y.e);
+        assert(x.f >= y.f);
+
+        return {x.f - y.f, x.e};
+    }
+
+    /*!
+    @brief returns x * y
+    @note The result is rounded. (Only the upper q bits are returned.)
+    */
+    static diyfp mul(const diyfp& x, const diyfp& y) noexcept
+    {
+        static_assert(kPrecision == 64, "internal error");
+
+        const std::uint64_t u_lo = x.f & 0xFFFFFFFFu;
+        const std::uint64_t u_hi = x.f >> 32u;
+        const std::uint64_t v_lo = y.f & 0xFFFFFFFFu;
+        const std::uint64_t v_hi = y.f >> 32u;
+
+        const std::uint64_t p0 = u_lo * v_lo;
+        const std::uint64_t p1 = u_lo * v_hi;
+        const std::uint64_t p2 = u_hi * v_lo;
+        const std::uint64_t p3 = u_hi * v_hi;
+
+        const std::uint64_t p0_hi = p0 >> 32u;
+        const std::uint64_t p1_lo = p1 & 0xFFFFFFFFu;
+        const std::uint64_t p1_hi = p1 >> 32u;
+        const std::uint64_t p2_lo = p2 & 0xFFFFFFFFu;
+        const std::uint64_t p2_hi = p2 >> 32u;
+
+        std::uint64_t Q = p0_hi + p1_lo + p2_lo;
+
+        Q += std::uint64_t{1} << (64u - 32u - 1u); // round, ties up
+
+        const std::uint64_t h = p3 + p2_hi + p1_hi + (Q >> 32u);
+
+        return {h, x.e + y.e + 64};
+    }
+
+    /*!
+    @brief normalize x such that the significand is >= 2^(q-1)
+    @pre x.f != 0
+    */
+    static diyfp normalize(diyfp x) noexcept
+    {
+        assert(x.f != 0);
+
+        while ((x.f >> 63u) == 0)
+        {
+            x.f <<= 1u;
+            x.e--;
+        }
+
+        return x;
+    }
+
+    /*!
+    @brief normalize x such that the result has the exponent E
+    @pre e >= x.e and the upper e - x.e bits of x.f must be zero.
+    */
+    static diyfp normalize_to(const diyfp& x, const int target_exponent) noexcept
+    {
+        const int delta = x.e - target_exponent;
+
+        assert(delta >= 0);
+        assert(((x.f << delta) >> delta) == x.f);
+
+        return {x.f << delta, target_exponent};
+    }
+};
+
+struct boundaries
+{
+    diyfp w;
+    diyfp minus;
+    diyfp plus;
+};
+
+/*!
+Compute the (normalized) diyfp representing the input number 'value' and its
+boundaries.
+
+@pre value must be finite and positive
+*/
+template <typename FloatType>
+boundaries compute_boundaries(FloatType value)
+{
+    assert(std::isfinite(value));
+    assert(value > 0);
+
+    static_assert(std::numeric_limits<FloatType>::is_iec559,
+                  "internal error: dtoa_short requires an IEEE-754 floating-point implementation");
+
+    constexpr int      kPrecision = std::numeric_limits<FloatType>::digits; // = p (includes the hidden bit)
+    constexpr int      kBias      = std::numeric_limits<FloatType>::max_exponent - 1 + (kPrecision - 1);
+    constexpr int      kMinExp    = 1 - kBias;
+    constexpr std::uint64_t kHiddenBit = std::uint64_t{1} << (kPrecision - 1); // = 2^(p-1)
+
+    using bits_type = typename std::conditional<kPrecision == 24, std::uint32_t, std::uint64_t >::type;
+
+    const std::uint64_t bits = reinterpret_bits<bits_type>(value);
+    const std::uint64_t E = bits >> (kPrecision - 1);
+    const std::uint64_t F = bits & (kHiddenBit - 1);
+
+    const bool is_denormal = E == 0;
+    const diyfp v = is_denormal
+                    ? diyfp(F, kMinExp)
+                    : diyfp(F + kHiddenBit, static_cast<int>(E) - kBias);
+
+    const bool lower_boundary_is_closer = F == 0 and E > 1;
+    const diyfp m_plus = diyfp(2 * v.f + 1, v.e - 1);
+    const diyfp m_minus = lower_boundary_is_closer
+                          ? diyfp(4 * v.f - 1, v.e - 2)  // (B)
+                          : diyfp(2 * v.f - 1, v.e - 1); // (A)
+
+    // Determine the normalized w+ = m+.
+    const diyfp w_plus = diyfp::normalize(m_plus);
+
+    // Determine w- = m- such that e_(w-) = e_(w+).
+    const diyfp w_minus = diyfp::normalize_to(m_minus, w_plus.e);
+
+    return {diyfp::normalize(v), w_minus, w_plus};
+}
+
+constexpr int kAlpha = -60;
+constexpr int kGamma = -32;
+
+struct cached_power // c = f * 2^e ~= 10^k
+{
+    std::uint64_t f;
+    int e;
+    int k;
+};
+
+/*!
+For a normalized diyfp w = f * 2^e, this function returns a (normalized) cached
+power-of-ten c = f_c * 2^e_c, such that the exponent of the product w * c
+satisfies (Definition 3.2 from [1])
+
+     alpha <= e_c + e + q <= gamma.
+*/
+inline cached_power get_cached_power_for_binary_exponent(int e)
+{
+    constexpr int kCachedPowersMinDecExp = -300;
+    constexpr int kCachedPowersDecStep = 8;
+
+    static constexpr std::array<cached_power, 79> kCachedPowers =
+    {
+        {
+            { 0xAB70FE17C79AC6CA, -1060, -300 },
+            { 0xFF77B1FCBEBCDC4F, -1034, -292 },
+            { 0xBE5691EF416BD60C, -1007, -284 },
+            { 0x8DD01FAD907FFC3C,  -980, -276 },
+            { 0xD3515C2831559A83,  -954, -268 },
+            { 0x9D71AC8FADA6C9B5,  -927, -260 },
+            { 0xEA9C227723EE8BCB,  -901, -252 },
+            { 0xAECC49914078536D,  -874, -244 },
+            { 0x823C12795DB6CE57,  -847, -236 },
+            { 0xC21094364DFB5637,  -821, -228 },
+            { 0x9096EA6F3848984F,  -794, -220 },
+            { 0xD77485CB25823AC7,  -768, -212 },
+            { 0xA086CFCD97BF97F4,  -741, -204 },
+            { 0xEF340A98172AACE5,  -715, -196 },
+            { 0xB23867FB2A35B28E,  -688, -188 },
+            { 0x84C8D4DFD2C63F3B,  -661, -180 },
+            { 0xC5DD44271AD3CDBA,  -635, -172 },
+            { 0x936B9FCEBB25C996,  -608, -164 },
+            { 0xDBAC6C247D62A584,  -582, -156 },
+            { 0xA3AB66580D5FDAF6,  -555, -148 },
+            { 0xF3E2F893DEC3F126,  -529, -140 },
+            { 0xB5B5ADA8AAFF80B8,  -502, -132 },
+            { 0x87625F056C7C4A8B,  -475, -124 },
+            { 0xC9BCFF6034C13053,  -449, -116 },
+            { 0x964E858C91BA2655,  -422, -108 },
+            { 0xDFF9772470297EBD,  -396, -100 },
+            { 0xA6DFBD9FB8E5B88F,  -369,  -92 },
+            { 0xF8A95FCF88747D94,  -343,  -84 },
+            { 0xB94470938FA89BCF,  -316,  -76 },
+            { 0x8A08F0F8BF0F156B,  -289,  -68 },
+            { 0xCDB02555653131B6,  -263,  -60 },
+            { 0x993FE2C6D07B7FAC,  -236,  -52 },
+            { 0xE45C10C42A2B3B06,  -210,  -44 },
+            { 0xAA242499697392D3,  -183,  -36 },
+            { 0xFD87B5F28300CA0E,  -157,  -28 },
+            { 0xBCE5086492111AEB,  -130,  -20 },
+            { 0x8CBCCC096F5088CC,  -103,  -12 },
+            { 0xD1B71758E219652C,   -77,   -4 },
+            { 0x9C40000000000000,   -50,    4 },
+            { 0xE8D4A51000000000,   -24,   12 },
+            { 0xAD78EBC5AC620000,     3,   20 },
+            { 0x813F3978F8940984,    30,   28 },
+            { 0xC097CE7BC90715B3,    56,   36 },
+            { 0x8F7E32CE7BEA5C70,    83,   44 },
+            { 0xD5D238A4ABE98068,   109,   52 },
+            { 0x9F4F2726179A2245,   136,   60 },
+            { 0xED63A231D4C4FB27,   162,   68 },
+            { 0xB0DE65388CC8ADA8,   189,   76 },
+            { 0x83C7088E1AAB65DB,   216,   84 },
+            { 0xC45D1DF942711D9A,   242,   92 },
+            { 0x924D692CA61BE758,   269,  100 },
+            { 0xDA01EE641A708DEA,   295,  108 },
+            { 0xA26DA3999AEF774A,   322,  116 },
+            { 0xF209787BB47D6B85,   348,  124 },
+            { 0xB454E4A179DD1877,   375,  132 },
+            { 0x865B86925B9BC5C2,   402,  140 },
+            { 0xC83553C5C8965D3D,   428,  148 },
+            { 0x952AB45CFA97A0B3,   455,  156 },
+            { 0xDE469FBD99A05FE3,   481,  164 },
+            { 0xA59BC234DB398C25,   508,  172 },
+            { 0xF6C69A72A3989F5C,   534,  180 },
+            { 0xB7DCBF5354E9BECE,   561,  188 },
+            { 0x88FCF317F22241E2,   588,  196 },
+            { 0xCC20CE9BD35C78A5,   614,  204 },
+            { 0x98165AF37B2153DF,   641,  212 },
+            { 0xE2A0B5DC971F303A,   667,  220 },
+            { 0xA8D9D1535CE3B396,   694,  228 },
+            { 0xFB9B7CD9A4A7443C,   720,  236 },
+            { 0xBB764C4CA7A44410,   747,  244 },
+            { 0x8BAB8EEFB6409C1A,   774,  252 },
+            { 0xD01FEF10A657842C,   800,  260 },
+            { 0x9B10A4E5E9913129,   827,  268 },
+            { 0xE7109BFBA19C0C9D,   853,  276 },
+            { 0xAC2820D9623BF429,   880,  284 },
+            { 0x80444B5E7AA7CF85,   907,  292 },
+            { 0xBF21E44003ACDD2D,   933,  300 },
+            { 0x8E679C2F5E44FF8F,   960,  308 },
+            { 0xD433179D9C8CB841,   986,  316 },
+            { 0x9E19DB92B4E31BA9,  1013,  324 },
+        }
+    };
+
+    // This computation gives exactly the same results for k as
+    //      k = ceil((kAlpha - e - 1) * 0.30102999566398114)
+    // for |e| <= 1500, but doesn't require floating-point operations.
+    // NB: log_10(2) ~= 78913 / 2^18
+    assert(e >= -1500);
+    assert(e <=  1500);
+    const int f = kAlpha - e - 1;
+    const int k = (f * 78913) / (1 << 18) + static_cast<int>(f > 0);
+
+    const int index = (-kCachedPowersMinDecExp + k + (kCachedPowersDecStep - 1)) / kCachedPowersDecStep;
+    assert(index >= 0);
+    assert(static_cast<std::size_t>(index) < kCachedPowers.size());
+
+    const cached_power cached = kCachedPowers[static_cast<std::size_t>(index)];
+    assert(kAlpha <= cached.e + e + 64);
+    assert(kGamma >= cached.e + e + 64);
+
+    return cached;
+}
+
+/*!
+For n != 0, returns k, such that pow10 := 10^(k-1) <= n < 10^k.
+For n == 0, returns 1 and sets pow10 := 1.
+*/
+inline int find_largest_pow10(const std::uint32_t n, std::uint32_t& pow10)
+{
+    // LCOV_EXCL_START
+    if (n >= 1000000000)
+    {
+        pow10 = 1000000000;
+        return 10;
+    }
+    // LCOV_EXCL_STOP
+    else if (n >= 100000000)
+    {
+        pow10 = 100000000;
+        return  9;
+    }
+    else if (n >= 10000000)
+    {
+        pow10 = 10000000;
+        return  8;
+    }
+    else if (n >= 1000000)
+    {
+        pow10 = 1000000;
+        return  7;
+    }
+    else if (n >= 100000)
+    {
+        pow10 = 100000;
+        return  6;
+    }
+    else if (n >= 10000)
+    {
+        pow10 = 10000;
+        return  5;
+    }
+    else if (n >= 1000)
+    {
+        pow10 = 1000;
+        return  4;
+    }
+    else if (n >= 100)
+    {
+        pow10 = 100;
+        return  3;
+    }
+    else if (n >= 10)
+    {
+        pow10 = 10;
+        return  2;
+    }
+    else
+    {
+        pow10 = 1;
+        return 1;
+    }
+}
+
+inline void grisu2_round(char* buf, int len, std::uint64_t dist, std::uint64_t delta,
+                         std::uint64_t rest, std::uint64_t ten_k)
+{
+    assert(len >= 1);
+    assert(dist <= delta);
+    assert(rest <= delta);
+    assert(ten_k > 0);
+
+    while (rest < dist
+            and delta - rest >= ten_k
+            and (rest + ten_k < dist or dist - rest > rest + ten_k - dist))
+    {
+        assert(buf[len - 1] != '0');
+        buf[len - 1]--;
+        rest += ten_k;
+    }
+}
+
+/*!
+Generates V = buffer * 10^decimal_exponent, such that M- <= V <= M+.
+M- and M+ must be normalized and share the same exponent -60 <= e <= -32.
+*/
+inline void grisu2_digit_gen(char* buffer, int& length, int& decimal_exponent,
+                             diyfp M_minus, diyfp w, diyfp M_plus)
+{
+    static_assert(kAlpha >= -60, "internal error");
+    static_assert(kGamma <= -32, "internal error");
+
+    assert(M_plus.e >= kAlpha);
+    assert(M_plus.e <= kGamma);
+
+    std::uint64_t delta = diyfp::sub(M_plus, M_minus).f; // (significand of (M+ - M-), implicit exponent is e)
+    std::uint64_t dist  = diyfp::sub(M_plus, w      ).f; // (significand of (M+ - w ), implicit exponent is e)
+    const diyfp one(std::uint64_t{1} << -M_plus.e, M_plus.e);
+
+    auto p1 = static_cast<std::uint32_t>(M_plus.f >> -one.e); // p1 = f div 2^-e (Since -e >= 32, p1 fits into a 32-bit int.)
+    std::uint64_t p2 = M_plus.f & (one.f - 1);                    // p2 = f mod 2^-e
+
+    // 1)
+    //
+    // Generate the digits of the integral part p1 = d[n-1]...d[1]d[0]
+
+    assert(p1 > 0);
+
+    std::uint32_t pow10;
+    const int k = find_largest_pow10(p1, pow10);
+    int n = k;
+    while (n > 0)
+    {
+        // Invariants:
+        //      M+ = buffer * 10^n + (p1 + p2 * 2^e)    (buffer = 0 for n = k)
+        //      pow10 = 10^(n-1) <= p1 < 10^n
+        //
+        const std::uint32_t d = p1 / pow10;  // d = p1 div 10^(n-1)
+        const std::uint32_t r = p1 % pow10;  // r = p1 mod 10^(n-1)
+        //
+        //      M+ = buffer * 10^n + (d * 10^(n-1) + r) + p2 * 2^e
+        //         = (buffer * 10 + d) * 10^(n-1) + (r + p2 * 2^e)
+        //
+        assert(d <= 9);
+        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
+        //
+        //      M+ = buffer * 10^(n-1) + (r + p2 * 2^e)
+        //
+        p1 = r;
+        n--;
+        const std::uint64_t rest = (std::uint64_t{p1} << -one.e) + p2;
+        if (rest <= delta)
+        {
+            // V = buffer * 10^n, with M- <= V <= M+.
+
+            decimal_exponent += n;
+            const std::uint64_t ten_n = std::uint64_t{pow10} << -one.e;
+            grisu2_round(buffer, length, dist, delta, rest, ten_n);
+
+            return;
+        }
+
+        pow10 /= 10;
+        //
+        //      pow10 = 10^(n-1) <= p1 < 10^n
+        // Invariants restored.
+    }
+
+    assert(p2 > delta);
+
+    int m = 0;
+    for (;;)
+    {
+        assert(p2 <= (std::numeric_limits<std::uint64_t>::max)() / 10);
+        p2 *= 10;
+        const std::uint64_t d = p2 >> -one.e;     // d = (10 * p2) div 2^-e
+        const std::uint64_t r = p2 & (one.f - 1); // r = (10 * p2) mod 2^-e
+        //
+        //      M+ = buffer * 10^-m + 10^-m * (1/10 * (d * 2^-e + r) * 2^e
+        //         = buffer * 10^-m + 10^-m * (1/10 * (d + r * 2^e))
+        //         = (buffer * 10 + d) * 10^(-m-1) + 10^(-m-1) * r * 2^e
+        //
+        assert(d <= 9);
+        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
+        //
+        //      M+ = buffer * 10^(-m-1) + 10^(-m-1) * r * 2^e
+        //
+        p2 = r;
+        m++;
+        delta *= 10;
+        dist  *= 10;
+        if (p2 <= delta)
+        {
+            break;
+        }
+    }
+
+    // V = buffer * 10^-m, with M- <= V <= M+.
+
+    decimal_exponent -= m;
+    const std::uint64_t ten_m = one.f;
+    grisu2_round(buffer, length, dist, delta, p2, ten_m);
+}
+
+/*!
+v = buf * 10^decimal_exponent
+len is the length of the buffer (number of decimal digits)
+The buffer must be large enough, i.e. >= max_digits10.
+*/
+inline void grisu2(char* buf, int& len, int& decimal_exponent,
+                   diyfp m_minus, diyfp v, diyfp m_plus)
+{
+    assert(m_plus.e == m_minus.e);
+    assert(m_plus.e == v.e);
+
+    const cached_power cached = get_cached_power_for_binary_exponent(m_plus.e);
+
+    const diyfp c_minus_k(cached.f, cached.e); // = c ~= 10^-k
+
+    // The exponent of the products is = v.e + c_minus_k.e + q and is in the range [alpha,gamma]
+    const diyfp w       = diyfp::mul(v,       c_minus_k);
+    const diyfp w_minus = diyfp::mul(m_minus, c_minus_k);
+    const diyfp w_plus  = diyfp::mul(m_plus,  c_minus_k);
+    const diyfp M_minus(w_minus.f + 1, w_minus.e);
+    const diyfp M_plus (w_plus.f  - 1, w_plus.e );
+
+    decimal_exponent = -cached.k; // = -(-k) = k
+
+    grisu2_digit_gen(buf, len, decimal_exponent, M_minus, w, M_plus);
+}
+
+/*!
+v = buf * 10^decimal_exponent
+len is the length of the buffer (number of decimal digits)
+The buffer must be large enough, i.e. >= max_digits10.
+*/
+template <typename FloatType>
+void grisu2(char* buf, int& len, int& decimal_exponent, FloatType value)
+{
+    static_assert(diyfp::kPrecision >= std::numeric_limits<FloatType>::digits + 3,
+                  "internal error: not enough precision");
+
+    assert(std::isfinite(value));
+    assert(value > 0);
+#if 0
+    const boundaries w = compute_boundaries(static_cast<double>(value));
+#else
+    const boundaries w = compute_boundaries(value);
+#endif
+
+    grisu2(buf, len, decimal_exponent, w.minus, w.w, w.plus);
+}
+
+/*!
+@brief appends a decimal representation of e to buf
+@return a pointer to the element following the exponent.
+@pre -1000 < e < 1000
+*/
+inline char* append_exponent(char* buf, int e)
+{
+    assert(e > -1000);
+    assert(e <  1000);
+
+    if (e < 0)
+    {
+        e = -e;
+        *buf++ = '-';
+    }
+    else
+    {
+        *buf++ = '+';
+    }
+
+    auto k = static_cast<std::uint32_t>(e);
+    if (k < 10)
+    {
+        // Always print at least two digits in the exponent.
+        // This is for compatibility with printf("%g").
+        *buf++ = '0';
+        *buf++ = static_cast<char>('0' + k);
+    }
+    else if (k < 100)
+    {
+        *buf++ = static_cast<char>('0' + k / 10);
+        k %= 10;
+        *buf++ = static_cast<char>('0' + k);
+    }
+    else
+    {
+        *buf++ = static_cast<char>('0' + k / 100);
+        k %= 100;
+        *buf++ = static_cast<char>('0' + k / 10);
+        k %= 10;
+        *buf++ = static_cast<char>('0' + k);
+    }
+
+    return buf;
+}
+
+/*!
+@brief prettify v = buf * 10^decimal_exponent
+
+If v is in the range [10^min_exp, 10^max_exp) it will be printed in fixed-point
+notation. Otherwise it will be printed in exponential notation.
+
+@pre min_exp < 0
+@pre max_exp > 0
+*/
+inline char* format_buffer(char* buf, int len, int decimal_exponent,
+                           int min_exp, int max_exp)
+{
+    assert(min_exp < 0);
+    assert(max_exp > 0);
+
+    const int k = len;
+    const int n = len + decimal_exponent;
+
+    // v = buf * 10^(n-k)
+    // k is the length of the buffer (number of decimal digits)
+    // n is the position of the decimal point relative to the start of the buffer.
+
+    if (k <= n and n <= max_exp)
+    {
+        // digits[000]
+        // len <= max_exp + 2
+
+        std::memset(buf + k, '0', static_cast<size_t>(n - k));
+        // Make it look like a floating-point number (#362, #378)
+        buf[n + 0] = '.';
+        buf[n + 1] = '0';
+        return buf + (n + 2);
+    }
+
+    if (0 < n and n <= max_exp)
+    {
+        // dig.its
+        // len <= max_digits10 + 1
+
+        assert(k > n);
+
+        std::memmove(buf + (n + 1), buf + n, static_cast<size_t>(k - n));
+        buf[n] = '.';
+        return buf + (k + 1);
+    }
+
+    if (min_exp < n and n <= 0)
+    {
+        // 0.[000]digits
+        // len <= 2 + (-min_exp - 1) + max_digits10
+
+        std::memmove(buf + (2 + -n), buf, static_cast<size_t>(k));
+        buf[0] = '0';
+        buf[1] = '.';
+        std::memset(buf + 2, '0', static_cast<size_t>(-n));
+        return buf + (2 + (-n) + k);
+    }
+
+    if (k == 1)
+    {
+        // dE+123
+        // len <= 1 + 5
+
+        buf += 1;
+    }
+    else
+    {
+        // d.igitsE+123
+        // len <= max_digits10 + 1 + 5
+
+        std::memmove(buf + 2, buf + 1, static_cast<size_t>(k - 1));
+        buf[1] = '.';
+        buf += 1 + k;
+    }
+
+    *buf++ = 'e';
+    return append_exponent(buf, n - 1);
+}
+
+} // namespace dtoa_impl
 #endif
 
 class Svar;
@@ -196,397 +1398,6 @@ class SvarBuffer;
 class SvarExeption;
 template <typename T>
 class SvarValue_;
-
-/**
-@brief The Svar class, A Tiny Modern C++ Header Brings Unified Interface for Different Languages
-
-By Using Svar, your C++ library can be called easily with different languages like C++, Java, Python and Javascript.
-
-Svar brings the following features:
-
-- A dynamic link library that can be used as a module in languages such as C++, Python, and Node-JS;
-- Unified C++ library interface, which can be called as a plug-in module. The released library comes with documentation, making *.h header file interface description unnecessary;
-- Dynamic features. It wraps variables, functions, and classes into Svar while maintaining efficiency;
-- Built-in Json support, parameter configuration parsing, thread-safe reading and writing, data decoupling sharing between modules, etc.
-
-\section s_svar_json Use Svar like JSON
-
-Svar natually support JSON and here is some basic usage demo:
-\code
-    Svar null=nullptr;
-    Svar b=false;
-    Svar i=1;
-    Svar d=2.1;
-    Svar s="hello world";
-    Svar v={1,2,3};
-    Svar m={{"b",false},{"s","hello world"}};
-
-    Svar obj;
-    obj["m"]=m;
-    obj["pi"]=3.14159;
-
-    std::cout<<obj<<std::endl;
-
-    if(s.is<std::string>()) // use is to check type
-        std::cout<<"raw string is "<<s.as<std::string>()<<std::endl; // use as to cast, never throw
-
-    double db=i.castAs<double>();// use castAs, this may throw SvarException
-
-    for(auto it:v) std::cout<<it<<std::endl;
-
-    for(std::pair<std::string,Svar> it:m) std::cout<<it.first<<":"<<it.second<<std::endl;
-
-    std::string json=m.dump_json();
-    std::cout<<json<<std::endl;
-
-    m=Svar::parse_json(json);
-\endcode
-
-\section s_svar_arguments Use Svar for Argument Parsing
-
-Svar provides argument parsing functional with JSON configuration loading.
-Here is a small demo shows how to use Svar for argument parsing:
-
-@code
-
-int main(int argc,char** argv)
-{
-    svar.parseMain(argc,argv);
-
-    int  argInt=svar.arg<int>("i",0,"This is a demo int parameter");
-    bool bv=svar.arg("b.dump",false,"Svar supports tree item assign");
-    Svar m =svar.arg("obj",Svar(),"Svar support json parameter");
-
-    if(svar.get<bool>("help",false)){
-        svar.help();
-        return 0;
-    }
-    if(svar["b"]["dump"].as<bool>())
-        std::cerr<<svar;
-    return 0;
-}
-
-@endcode
-
-When you use "--help" or "-help", the terminal should show the below introduction:
-@code
--> sample_use --help
-Usage:
-sample_use [--help] [-conf configure_file] [-arg_name arg_value]...
-
-Using Svar supported argument parsing. The following table listed several argume
-nt introductions.
-
-Argument        Type(default->setted)           Introduction
---------------------------------------------------------------------------------
--i              int(0)                          This is a demo int parameter
--b.dump         bool(false)                     Svar supports tree item assign
--obj            svar(undefined)                 Svar support json parameter
--conf           str("Default.cfg")              The default configure file going
-                                                 to parse.
--help           bool(false->true)               Show the help information.
-@endcode
-"help" and "conf" is two default parameters and users can use "conf" to load JSON file for configuration loading.
-
-
-Svar supports the following parsing styles:
-- "-arg value": two '-' such as "--arg value" is the same
-- "-arg=value": two "--" such as "--arg=value" is the same
-- "arg=value"
-- "-arg" : this is the same with "arg=true", but the next argument should not be a value
-
-Svar supports to use brief Json instead of strict Json:
-@code
-sample_use -b.dump -obj '{a:1,b:false}'
-@endcode
-
-\section s_svar_cppelements Use Svar to Hold Other C++ Elements
-
-Svar can not only hold JSON types, but also any other c++ elements including functions, classes and objects.
-
-\subsection s_svar_cppelements_sample A tiny sample of Svar holding functions and classes.
-
-@code
-#include <Svar/Svar.h>
-
-int c_func(int a,int b){return a+b;}
-
-class DemoClass{
-public:
-    DemoClass(const std::string& name):_name(name){}
-    std::string getName()const{return _name;}
-    void setName(std::string name){_name=name}
-
-    static DemoClass create(std::string name){return DemoClass(name);}
-
-    std::string _name;
-};
-
-int main(int argc,char** argv)
-{
-    Svar add=c_func;// hold a function
-    int  c=add(a,b).castAs<int>();// use the function
-
-    Svar create(&DemoClass::create);// hold a static member function
-    DemoClass inst=create("hello svar").as<DemoClass>();// call a static member function
-
-    Svar(&DemoClass::setName)(&inst,"I changed name");// call a member function
-
-    Svar cls=SvarClass::instance<DemoClass>();
-    Class<DemoClass>()
-        .construct<const std::string&>()
-        .def("getName",&DemoClass::getName)
-        .def("setName",&DemoClass::setName)
-        .def_static("create",&DemoClass::create);
-
-    Svar inst2=cls("I am another instance");// construct a instance
-    std::string name=inst2.call("getName").as<std::string>();
-    inst2.call("setName","changed name with svar");
-}
-@endcode
-
-\subsection s_svar_class Define Class Members with Svar
-Svar does not do magic, so users need to bind functions mannually like boost or pybind11 did.
-Fortunately, Svar provided utils to bind those functions very conveniencely.
-
-As used in last section, there are three types of functions: constructor,
-member function and static member function.
-And Svar also support lambda expression of functions so that users able to extend functions more easily.
-@code
-    Class<DemoClass>("Demo")             // change the name to Demo
-        .construct<const std::string&>() // constructor
-        .def("getName",&DemoClass::getName) // const member function
-        .def("setName",&DemoClass::setName) // member function
-        .def_static("create",&DemoClass::create)// static function
-        .def("print",[](DemoClass& self){std::cerr<<self._name;})// lambda function
-        .def_static("none",[](){});// static lambda function
-@endcode
-
-@todo Svar does not support field now, maybe it's a future work.
-
-\subsection s_svar_operators Operators of Svar
-
-Svar supports to call functions with operators, such as for int,
-we got some math operators and we want to use it directly with Svar:
-@code
-    Svar a=4;
-    Svar b=5;
-    auto c=a+b;
-    EXPECT_TRUE(c.is<int>())
-    EXPECT_EQ(c,20)
-@endcode
-
-The above operation is available because Svar builtin defined as following:
-@code
-    SvarClass::Class<int>()
-    .def("__init__",&SvarBuiltin::int_create)
-    .def("__double__",[](int i){return (double)i;})
-    .def("__bool__",[](int i){return (bool)i;})
-    .def("__eq__",[](int self,int rh){return self==rh;})
-    .def("__lt__",[](int self,int rh){return self<rh;})
-    .def("__add__",[](int self,Svar rh)->Svar{
-        if(rh.is<int>()) return Svar(self+rh.as<int>());
-        if(rh.is<double>()) return Svar(self+rh.as<double>());
-        return Svar::Undefined();
-    })
-    .def("__sub__",[](int self,Svar rh)->Svar{
-        if(rh.is<int>()) return Svar(self-rh.as<int>());
-        if(rh.is<double>()) return Svar(self-rh.as<double>());
-        return Svar::Undefined();
-    })
-    .def("__mul__",[](int self,Svar rh)->Svar{
-        if(rh.is<int>()) return Svar(self*rh.as<int>());
-        if(rh.is<double>()) return Svar(self*rh.as<double>());
-        return Svar::Undefined();
-    })
-    .def("__div__",[](int self,Svar rh){
-        if(rh.is<int>()) return Svar(self/rh.as<int>());
-        if(rh.is<double>()) return Svar(self/rh.as<double>());
-        return Svar::Undefined();
-    })
-    .def("__mod__",[](int self,int rh){
-        return self%rh;
-    })
-    .def("__neg__",[](int self){return -self;})
-    .def("__xor__",[](int self,int rh){return self^rh;})
-    .def("__or__",[](int self,int rh){return self|rh;})
-    .def("__and__",[](int self,int rh){return self&rh;});
-@endcode
-
-If you want your own class support these operators, you need to define you own implementations.
-The following table listed some operators that often used.
-
-| Operator |  Function Name |
-|    --    |  --            |
-|    +     |  "__add__"     |
-|    -     |  "__sub__"     |
-|    *     |  "__mul__"     |
-|    /     |  "__div__"     |
-|    %     |  "__mod__"     |
-|    &     |  "__and__"     |
-|    \|    |  "__or__"      |
-|    ^     |  "__xor__"     |
-|    =     |  "__eq__"      |
-|    !=    |  "__nq__"      |
-|    <     |  "__lt__"      |
-|    >     |  "__gt__"      |
-|    <=    |  "__le__"      |
-|    >=    |  "__ge__"      |
-|    []    |  "__getitem__" |
-
-\subsection s_svar_inherit Inherit of Classes
-
-@code
-#include <Svar/Svar.h>
-
-using namespace sv;
-
-class BBase{
-public:
-    virtual bool isBBase(){return true;}
-};
-
-class BaseClass: public BBase{
-public:
-    BaseClass(int age):age_(age){}
-
-    int getAge()const{return age_;}
-    void setAge(int a){age_=a;}
-
-    virtual bool isBBase(){return false;}
-
-    int age_;
-};
-
-int main(int argc,char** argv)
-{
-    Class<BBase>()
-        .def("isBBase",&BBase::isBBase);
-
-    Class<BaseClass>()
-        .inherit<BBase,BaseClass>() // use this to inherit
-        .def_static("__init__",[](int age){return BaseClass(age);})// replace construct<int>()
-        .def("getAge",&BaseClass::getAge)
-        .def("setAge",&BaseClass::setAge);
-
-    Svar cls=SvarClass::instance<BaseClass>();
-    Svar obj=cls(10);// ten years old?
-    assert(!obj.call("isBBase).as<bool>());
-    return 0;
-}
-
-@endcode
-
-\section s_svar_plugin Export & Import Svar Module with C++ Shared Library
-
-One of the most important design target of Svar is to export a shared library that
-can be used by different languages.
-
-\subsection s_svar_export Export Svar Module
-
-The only thing needs to do is to put what you want to the singleton of Svar: Svar::instance(),
-which is defined as 'svar', and expose the symbol with macro EXPORT_SVAR_INSTANCE.
-
-@code
-#include "sv/Svar.h"
-
-using namespace sv;
-
-int add(int a,int b){
-    return a+b;
-}
-
-class ApplicationDemo{
-public:
-    ApplicationDemo(std::string name):_name(name){
-        std::cout<<"Application Created.";
-    }
-    std::string name()const{return _name;}
-    std::string gslam_version()const{return "3.2";}
-    std::string _name;
-};
-
-REGISTER_SVAR_MODULE(sample)// see, so easy, haha
-{
-    svar["__name__"]="sample_module";
-    svar["__doc__"]="This is a demo to show how to export a module using svar.";
-    svar["add"]=add;
-
-    Class<ApplicationDemo>()
-            .construct<std::string>()
-            .def("name",&ApplicationDemo::name)
-            .def("gslam_version",&ApplicationDemo::gslam_version);
-
-    svar["ApplicationDemo"]=SvarClass::instance<ApplicationDemo>();
-}
-
-EXPORT_SVAR_INSTANCE // export the symbol of Svar::instance
-@endcode
-
-Compile this file to a shared library "libsample.so" or "sample.dll", and we are going to access this module with Svar later.
-
-\subsection s_svar_doc Documentation of Svar Module
-A Svar module is designed to be self maintained, which means the module can be called without header or documentation.
-Since SvarFunction auto generated function signatures, so that users are able to know how to call Svar functions.
-
-One can use the 'svar' application from https://github.com/zdzhaoyong/Svar to access the context.
-
-@code
--> svar doc -plugin sample
-{
-  "ApplicationDemo" : <class at 0x15707d0>,
-  "__builtin__" : {
-    "Json" : <class at 0x156fd80>,
-    "version" : 256
-  },
-  "__doc__" : "This is a demo to show how to export a module using svar.",
-  "__name__" : "sample_module",
-  "add" : <function at 0x15706e0>
-}
--> svar doc -plugin sample -key ApplicationDemo
-class ApplicationDemo():
-|  ApplicationDemo.__init__(...)
-|      ApplicationDemo.__init__(str)->ApplicationDemo
-|
-|
-|  Methods defined here:
-|  ApplicationDemo.__init__(...)
-|      ApplicationDemo.__init__(str)->ApplicationDemo
-|
-|
-|  ApplicationDemo.gslam_version(...)
-|      ApplicationDemo.gslam_version(ApplicationDemo const*)->str
-|
-|
-|  ApplicationDemo.name(...)
-|      ApplicationDemo.name(ApplicationDemo const*)->str
-|
-|
-@endcode
-
-\subsection s_svar_usecpp Use Svar Module in C++
-We are able to load the Svar instance exported by marco with EXPORT_SVAR_INSTANCE
-using svar.import().
-
-@code
-#include "Svar/Svar.h"
-
-using namespace sv;
-
-int main(int argc,char** argv){
-    Svar sampleModule=svar.import("sample");
-
-    Svar ApplicationDemo=sampleModule["ApplicationDemo"];
-
-    Svar instance=ApplicationDemo("zhaoyong");
-    std::cout<<instance.call("gslam_version");
-
-    std::cout<<ApplicationDemo.as<SvarClass>();
-    return 0;
-}
-@endcode
-
- */
 
 enum value_t : std::uint8_t
 {
@@ -3254,770 +4065,6 @@ inline std::istream& operator >>(std::istream& ist,Svar& self)
 
 #if !defined(__SVAR_NOBUILTIN__)
 
-/*!
-@brief implements the Grisu2 algorithm for binary to decimal floating-point
-conversion.
-*/
-namespace dtoa_impl
-{
-
-template <typename Target, typename Source>
-Target reinterpret_bits(const Source source)
-{
-    static_assert(sizeof(Target) == sizeof(Source), "size mismatch");
-
-    Target target;
-    std::memcpy(&target, &source, sizeof(Source));
-    return target;
-}
-
-struct diyfp // f * 2^e
-{
-    static constexpr int kPrecision = 64; // = q
-
-    std::uint64_t f = 0;
-    int e = 0;
-
-    constexpr diyfp(std::uint64_t f_, int e_) noexcept : f(f_), e(e_) {}
-
-    /*!
-    @brief returns x - y
-    @pre x.e == y.e and x.f >= y.f
-    */
-    static diyfp sub(const diyfp& x, const diyfp& y) noexcept
-    {
-        assert(x.e == y.e);
-        assert(x.f >= y.f);
-
-        return {x.f - y.f, x.e};
-    }
-
-    /*!
-    @brief returns x * y
-    @note The result is rounded. (Only the upper q bits are returned.)
-    */
-    static diyfp mul(const diyfp& x, const diyfp& y) noexcept
-    {
-        static_assert(kPrecision == 64, "internal error");
-
-        const std::uint64_t u_lo = x.f & 0xFFFFFFFFu;
-        const std::uint64_t u_hi = x.f >> 32u;
-        const std::uint64_t v_lo = y.f & 0xFFFFFFFFu;
-        const std::uint64_t v_hi = y.f >> 32u;
-
-        const std::uint64_t p0 = u_lo * v_lo;
-        const std::uint64_t p1 = u_lo * v_hi;
-        const std::uint64_t p2 = u_hi * v_lo;
-        const std::uint64_t p3 = u_hi * v_hi;
-
-        const std::uint64_t p0_hi = p0 >> 32u;
-        const std::uint64_t p1_lo = p1 & 0xFFFFFFFFu;
-        const std::uint64_t p1_hi = p1 >> 32u;
-        const std::uint64_t p2_lo = p2 & 0xFFFFFFFFu;
-        const std::uint64_t p2_hi = p2 >> 32u;
-
-        std::uint64_t Q = p0_hi + p1_lo + p2_lo;
-
-        Q += std::uint64_t{1} << (64u - 32u - 1u); // round, ties up
-
-        const std::uint64_t h = p3 + p2_hi + p1_hi + (Q >> 32u);
-
-        return {h, x.e + y.e + 64};
-    }
-
-    /*!
-    @brief normalize x such that the significand is >= 2^(q-1)
-    @pre x.f != 0
-    */
-    static diyfp normalize(diyfp x) noexcept
-    {
-        assert(x.f != 0);
-
-        while ((x.f >> 63u) == 0)
-        {
-            x.f <<= 1u;
-            x.e--;
-        }
-
-        return x;
-    }
-
-    /*!
-    @brief normalize x such that the result has the exponent E
-    @pre e >= x.e and the upper e - x.e bits of x.f must be zero.
-    */
-    static diyfp normalize_to(const diyfp& x, const int target_exponent) noexcept
-    {
-        const int delta = x.e - target_exponent;
-
-        assert(delta >= 0);
-        assert(((x.f << delta) >> delta) == x.f);
-
-        return {x.f << delta, target_exponent};
-    }
-};
-
-struct boundaries
-{
-    diyfp w;
-    diyfp minus;
-    diyfp plus;
-};
-
-/*!
-Compute the (normalized) diyfp representing the input number 'value' and its
-boundaries.
-
-@pre value must be finite and positive
-*/
-template <typename FloatType>
-boundaries compute_boundaries(FloatType value)
-{
-    assert(std::isfinite(value));
-    assert(value > 0);
-
-    static_assert(std::numeric_limits<FloatType>::is_iec559,
-                  "internal error: dtoa_short requires an IEEE-754 floating-point implementation");
-
-    constexpr int      kPrecision = std::numeric_limits<FloatType>::digits; // = p (includes the hidden bit)
-    constexpr int      kBias      = std::numeric_limits<FloatType>::max_exponent - 1 + (kPrecision - 1);
-    constexpr int      kMinExp    = 1 - kBias;
-    constexpr std::uint64_t kHiddenBit = std::uint64_t{1} << (kPrecision - 1); // = 2^(p-1)
-
-    using bits_type = typename std::conditional<kPrecision == 24, std::uint32_t, std::uint64_t >::type;
-
-    const std::uint64_t bits = reinterpret_bits<bits_type>(value);
-    const std::uint64_t E = bits >> (kPrecision - 1);
-    const std::uint64_t F = bits & (kHiddenBit - 1);
-
-    const bool is_denormal = E == 0;
-    const diyfp v = is_denormal
-                    ? diyfp(F, kMinExp)
-                    : diyfp(F + kHiddenBit, static_cast<int>(E) - kBias);
-
-    const bool lower_boundary_is_closer = F == 0 and E > 1;
-    const diyfp m_plus = diyfp(2 * v.f + 1, v.e - 1);
-    const diyfp m_minus = lower_boundary_is_closer
-                          ? diyfp(4 * v.f - 1, v.e - 2)  // (B)
-                          : diyfp(2 * v.f - 1, v.e - 1); // (A)
-
-    // Determine the normalized w+ = m+.
-    const diyfp w_plus = diyfp::normalize(m_plus);
-
-    // Determine w- = m- such that e_(w-) = e_(w+).
-    const diyfp w_minus = diyfp::normalize_to(m_minus, w_plus.e);
-
-    return {diyfp::normalize(v), w_minus, w_plus};
-}
-
-constexpr int kAlpha = -60;
-constexpr int kGamma = -32;
-
-struct cached_power // c = f * 2^e ~= 10^k
-{
-    std::uint64_t f;
-    int e;
-    int k;
-};
-
-/*!
-For a normalized diyfp w = f * 2^e, this function returns a (normalized) cached
-power-of-ten c = f_c * 2^e_c, such that the exponent of the product w * c
-satisfies (Definition 3.2 from [1])
-
-     alpha <= e_c + e + q <= gamma.
-*/
-inline cached_power get_cached_power_for_binary_exponent(int e)
-{
-    constexpr int kCachedPowersMinDecExp = -300;
-    constexpr int kCachedPowersDecStep = 8;
-
-    static constexpr std::array<cached_power, 79> kCachedPowers =
-    {
-        {
-            { 0xAB70FE17C79AC6CA, -1060, -300 },
-            { 0xFF77B1FCBEBCDC4F, -1034, -292 },
-            { 0xBE5691EF416BD60C, -1007, -284 },
-            { 0x8DD01FAD907FFC3C,  -980, -276 },
-            { 0xD3515C2831559A83,  -954, -268 },
-            { 0x9D71AC8FADA6C9B5,  -927, -260 },
-            { 0xEA9C227723EE8BCB,  -901, -252 },
-            { 0xAECC49914078536D,  -874, -244 },
-            { 0x823C12795DB6CE57,  -847, -236 },
-            { 0xC21094364DFB5637,  -821, -228 },
-            { 0x9096EA6F3848984F,  -794, -220 },
-            { 0xD77485CB25823AC7,  -768, -212 },
-            { 0xA086CFCD97BF97F4,  -741, -204 },
-            { 0xEF340A98172AACE5,  -715, -196 },
-            { 0xB23867FB2A35B28E,  -688, -188 },
-            { 0x84C8D4DFD2C63F3B,  -661, -180 },
-            { 0xC5DD44271AD3CDBA,  -635, -172 },
-            { 0x936B9FCEBB25C996,  -608, -164 },
-            { 0xDBAC6C247D62A584,  -582, -156 },
-            { 0xA3AB66580D5FDAF6,  -555, -148 },
-            { 0xF3E2F893DEC3F126,  -529, -140 },
-            { 0xB5B5ADA8AAFF80B8,  -502, -132 },
-            { 0x87625F056C7C4A8B,  -475, -124 },
-            { 0xC9BCFF6034C13053,  -449, -116 },
-            { 0x964E858C91BA2655,  -422, -108 },
-            { 0xDFF9772470297EBD,  -396, -100 },
-            { 0xA6DFBD9FB8E5B88F,  -369,  -92 },
-            { 0xF8A95FCF88747D94,  -343,  -84 },
-            { 0xB94470938FA89BCF,  -316,  -76 },
-            { 0x8A08F0F8BF0F156B,  -289,  -68 },
-            { 0xCDB02555653131B6,  -263,  -60 },
-            { 0x993FE2C6D07B7FAC,  -236,  -52 },
-            { 0xE45C10C42A2B3B06,  -210,  -44 },
-            { 0xAA242499697392D3,  -183,  -36 },
-            { 0xFD87B5F28300CA0E,  -157,  -28 },
-            { 0xBCE5086492111AEB,  -130,  -20 },
-            { 0x8CBCCC096F5088CC,  -103,  -12 },
-            { 0xD1B71758E219652C,   -77,   -4 },
-            { 0x9C40000000000000,   -50,    4 },
-            { 0xE8D4A51000000000,   -24,   12 },
-            { 0xAD78EBC5AC620000,     3,   20 },
-            { 0x813F3978F8940984,    30,   28 },
-            { 0xC097CE7BC90715B3,    56,   36 },
-            { 0x8F7E32CE7BEA5C70,    83,   44 },
-            { 0xD5D238A4ABE98068,   109,   52 },
-            { 0x9F4F2726179A2245,   136,   60 },
-            { 0xED63A231D4C4FB27,   162,   68 },
-            { 0xB0DE65388CC8ADA8,   189,   76 },
-            { 0x83C7088E1AAB65DB,   216,   84 },
-            { 0xC45D1DF942711D9A,   242,   92 },
-            { 0x924D692CA61BE758,   269,  100 },
-            { 0xDA01EE641A708DEA,   295,  108 },
-            { 0xA26DA3999AEF774A,   322,  116 },
-            { 0xF209787BB47D6B85,   348,  124 },
-            { 0xB454E4A179DD1877,   375,  132 },
-            { 0x865B86925B9BC5C2,   402,  140 },
-            { 0xC83553C5C8965D3D,   428,  148 },
-            { 0x952AB45CFA97A0B3,   455,  156 },
-            { 0xDE469FBD99A05FE3,   481,  164 },
-            { 0xA59BC234DB398C25,   508,  172 },
-            { 0xF6C69A72A3989F5C,   534,  180 },
-            { 0xB7DCBF5354E9BECE,   561,  188 },
-            { 0x88FCF317F22241E2,   588,  196 },
-            { 0xCC20CE9BD35C78A5,   614,  204 },
-            { 0x98165AF37B2153DF,   641,  212 },
-            { 0xE2A0B5DC971F303A,   667,  220 },
-            { 0xA8D9D1535CE3B396,   694,  228 },
-            { 0xFB9B7CD9A4A7443C,   720,  236 },
-            { 0xBB764C4CA7A44410,   747,  244 },
-            { 0x8BAB8EEFB6409C1A,   774,  252 },
-            { 0xD01FEF10A657842C,   800,  260 },
-            { 0x9B10A4E5E9913129,   827,  268 },
-            { 0xE7109BFBA19C0C9D,   853,  276 },
-            { 0xAC2820D9623BF429,   880,  284 },
-            { 0x80444B5E7AA7CF85,   907,  292 },
-            { 0xBF21E44003ACDD2D,   933,  300 },
-            { 0x8E679C2F5E44FF8F,   960,  308 },
-            { 0xD433179D9C8CB841,   986,  316 },
-            { 0x9E19DB92B4E31BA9,  1013,  324 },
-        }
-    };
-
-    // This computation gives exactly the same results for k as
-    //      k = ceil((kAlpha - e - 1) * 0.30102999566398114)
-    // for |e| <= 1500, but doesn't require floating-point operations.
-    // NB: log_10(2) ~= 78913 / 2^18
-    assert(e >= -1500);
-    assert(e <=  1500);
-    const int f = kAlpha - e - 1;
-    const int k = (f * 78913) / (1 << 18) + static_cast<int>(f > 0);
-
-    const int index = (-kCachedPowersMinDecExp + k + (kCachedPowersDecStep - 1)) / kCachedPowersDecStep;
-    assert(index >= 0);
-    assert(static_cast<std::size_t>(index) < kCachedPowers.size());
-
-    const cached_power cached = kCachedPowers[static_cast<std::size_t>(index)];
-    assert(kAlpha <= cached.e + e + 64);
-    assert(kGamma >= cached.e + e + 64);
-
-    return cached;
-}
-
-/*!
-For n != 0, returns k, such that pow10 := 10^(k-1) <= n < 10^k.
-For n == 0, returns 1 and sets pow10 := 1.
-*/
-inline int find_largest_pow10(const std::uint32_t n, std::uint32_t& pow10)
-{
-    // LCOV_EXCL_START
-    if (n >= 1000000000)
-    {
-        pow10 = 1000000000;
-        return 10;
-    }
-    // LCOV_EXCL_STOP
-    else if (n >= 100000000)
-    {
-        pow10 = 100000000;
-        return  9;
-    }
-    else if (n >= 10000000)
-    {
-        pow10 = 10000000;
-        return  8;
-    }
-    else if (n >= 1000000)
-    {
-        pow10 = 1000000;
-        return  7;
-    }
-    else if (n >= 100000)
-    {
-        pow10 = 100000;
-        return  6;
-    }
-    else if (n >= 10000)
-    {
-        pow10 = 10000;
-        return  5;
-    }
-    else if (n >= 1000)
-    {
-        pow10 = 1000;
-        return  4;
-    }
-    else if (n >= 100)
-    {
-        pow10 = 100;
-        return  3;
-    }
-    else if (n >= 10)
-    {
-        pow10 = 10;
-        return  2;
-    }
-    else
-    {
-        pow10 = 1;
-        return 1;
-    }
-}
-
-inline void grisu2_round(char* buf, int len, std::uint64_t dist, std::uint64_t delta,
-                         std::uint64_t rest, std::uint64_t ten_k)
-{
-    assert(len >= 1);
-    assert(dist <= delta);
-    assert(rest <= delta);
-    assert(ten_k > 0);
-
-    while (rest < dist
-            and delta - rest >= ten_k
-            and (rest + ten_k < dist or dist - rest > rest + ten_k - dist))
-    {
-        assert(buf[len - 1] != '0');
-        buf[len - 1]--;
-        rest += ten_k;
-    }
-}
-
-/*!
-Generates V = buffer * 10^decimal_exponent, such that M- <= V <= M+.
-M- and M+ must be normalized and share the same exponent -60 <= e <= -32.
-*/
-inline void grisu2_digit_gen(char* buffer, int& length, int& decimal_exponent,
-                             diyfp M_minus, diyfp w, diyfp M_plus)
-{
-    static_assert(kAlpha >= -60, "internal error");
-    static_assert(kGamma <= -32, "internal error");
-
-    assert(M_plus.e >= kAlpha);
-    assert(M_plus.e <= kGamma);
-
-    std::uint64_t delta = diyfp::sub(M_plus, M_minus).f; // (significand of (M+ - M-), implicit exponent is e)
-    std::uint64_t dist  = diyfp::sub(M_plus, w      ).f; // (significand of (M+ - w ), implicit exponent is e)
-
-    // Split M+ = f * 2^e into two parts p1 and p2 (note: e < 0):
-    //
-    //      M+ = f * 2^e
-    //         = ((f div 2^-e) * 2^-e + (f mod 2^-e)) * 2^e
-    //         = ((p1        ) * 2^-e + (p2        )) * 2^e
-    //         = p1 + p2 * 2^e
-
-    const diyfp one(std::uint64_t{1} << -M_plus.e, M_plus.e);
-
-    auto p1 = static_cast<std::uint32_t>(M_plus.f >> -one.e); // p1 = f div 2^-e (Since -e >= 32, p1 fits into a 32-bit int.)
-    std::uint64_t p2 = M_plus.f & (one.f - 1);                    // p2 = f mod 2^-e
-
-    // 1)
-    //
-    // Generate the digits of the integral part p1 = d[n-1]...d[1]d[0]
-
-    assert(p1 > 0);
-
-    std::uint32_t pow10;
-    const int k = find_largest_pow10(p1, pow10);
-
-    //      10^(k-1) <= p1 < 10^k, pow10 = 10^(k-1)
-    //
-    //      p1 = (p1 div 10^(k-1)) * 10^(k-1) + (p1 mod 10^(k-1))
-    //         = (d[k-1]         ) * 10^(k-1) + (p1 mod 10^(k-1))
-    //
-    //      M+ = p1                                             + p2 * 2^e
-    //         = d[k-1] * 10^(k-1) + (p1 mod 10^(k-1))          + p2 * 2^e
-    //         = d[k-1] * 10^(k-1) + ((p1 mod 10^(k-1)) * 2^-e + p2) * 2^e
-    //         = d[k-1] * 10^(k-1) + (                         rest) * 2^e
-    //
-    // Now generate the digits d[n] of p1 from left to right (n = k-1,...,0)
-    //
-    //      p1 = d[k-1]...d[n] * 10^n + d[n-1]...d[0]
-    //
-    // but stop as soon as
-    //
-    //      rest * 2^e = (d[n-1]...d[0] * 2^-e + p2) * 2^e <= delta * 2^e
-
-    int n = k;
-    while (n > 0)
-    {
-        // Invariants:
-        //      M+ = buffer * 10^n + (p1 + p2 * 2^e)    (buffer = 0 for n = k)
-        //      pow10 = 10^(n-1) <= p1 < 10^n
-        //
-        const std::uint32_t d = p1 / pow10;  // d = p1 div 10^(n-1)
-        const std::uint32_t r = p1 % pow10;  // r = p1 mod 10^(n-1)
-        //
-        //      M+ = buffer * 10^n + (d * 10^(n-1) + r) + p2 * 2^e
-        //         = (buffer * 10 + d) * 10^(n-1) + (r + p2 * 2^e)
-        //
-        assert(d <= 9);
-        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
-        //
-        //      M+ = buffer * 10^(n-1) + (r + p2 * 2^e)
-        //
-        p1 = r;
-        n--;
-        //
-        //      M+ = buffer * 10^n + (p1 + p2 * 2^e)
-        //      pow10 = 10^n
-        //
-
-        // Now check if enough digits have been generated.
-        // Compute
-        //
-        //      p1 + p2 * 2^e = (p1 * 2^-e + p2) * 2^e = rest * 2^e
-        //
-        // Note:
-        // Since rest and delta share the same exponent e, it suffices to
-        // compare the significands.
-        const std::uint64_t rest = (std::uint64_t{p1} << -one.e) + p2;
-        if (rest <= delta)
-        {
-            // V = buffer * 10^n, with M- <= V <= M+.
-
-            decimal_exponent += n;
-
-            // We may now just stop. But instead look if the buffer could be
-            // decremented to bring V closer to w.
-            //
-            // pow10 = 10^n is now 1 ulp in the decimal representation V.
-            // The rounding procedure works with diyfp's with an implicit
-            // exponent of e.
-            //
-            //      10^n = (10^n * 2^-e) * 2^e = ulp * 2^e
-            //
-            const std::uint64_t ten_n = std::uint64_t{pow10} << -one.e;
-            grisu2_round(buffer, length, dist, delta, rest, ten_n);
-
-            return;
-        }
-
-        pow10 /= 10;
-        //
-        //      pow10 = 10^(n-1) <= p1 < 10^n
-        // Invariants restored.
-    }
-
-    // 2)
-    //
-    // The digits of the integral part have been generated:
-    //
-    //      M+ = d[k-1]...d[1]d[0] + p2 * 2^e
-    //         = buffer            + p2 * 2^e
-    //
-    // Now generate the digits of the fractional part p2 * 2^e.
-    //
-    // Note:
-    // No decimal point is generated: the exponent is adjusted instead.
-    //
-    // p2 actually represents the fraction
-    //
-    //      p2 * 2^e
-    //          = p2 / 2^-e
-    //          = d[-1] / 10^1 + d[-2] / 10^2 + ...
-    //
-    // Now generate the digits d[-m] of p1 from left to right (m = 1,2,...)
-    //
-    //      p2 * 2^e = d[-1]d[-2]...d[-m] * 10^-m
-    //                      + 10^-m * (d[-m-1] / 10^1 + d[-m-2] / 10^2 + ...)
-    //
-    // using
-    //
-    //      10^m * p2 = ((10^m * p2) div 2^-e) * 2^-e + ((10^m * p2) mod 2^-e)
-    //                = (                   d) * 2^-e + (                   r)
-    //
-    // or
-    //      10^m * p2 * 2^e = d + r * 2^e
-    //
-    // i.e.
-    //
-    //      M+ = buffer + p2 * 2^e
-    //         = buffer + 10^-m * (d + r * 2^e)
-    //         = (buffer * 10^m + d) * 10^-m + 10^-m * r * 2^e
-    //
-    // and stop as soon as 10^-m * r * 2^e <= delta * 2^e
-
-    assert(p2 > delta);
-
-    int m = 0;
-    for (;;)
-    {
-        // Invariant:
-        //      M+ = buffer * 10^-m + 10^-m * (d[-m-1] / 10 + d[-m-2] / 10^2 + ...) * 2^e
-        //         = buffer * 10^-m + 10^-m * (p2                                 ) * 2^e
-        //         = buffer * 10^-m + 10^-m * (1/10 * (10 * p2)                   ) * 2^e
-        //         = buffer * 10^-m + 10^-m * (1/10 * ((10*p2 div 2^-e) * 2^-e + (10*p2 mod 2^-e)) * 2^e
-        //
-        assert(p2 <= (std::numeric_limits<std::uint64_t>::max)() / 10);
-        p2 *= 10;
-        const std::uint64_t d = p2 >> -one.e;     // d = (10 * p2) div 2^-e
-        const std::uint64_t r = p2 & (one.f - 1); // r = (10 * p2) mod 2^-e
-        //
-        //      M+ = buffer * 10^-m + 10^-m * (1/10 * (d * 2^-e + r) * 2^e
-        //         = buffer * 10^-m + 10^-m * (1/10 * (d + r * 2^e))
-        //         = (buffer * 10 + d) * 10^(-m-1) + 10^(-m-1) * r * 2^e
-        //
-        assert(d <= 9);
-        buffer[length++] = static_cast<char>('0' + d); // buffer := buffer * 10 + d
-        //
-        //      M+ = buffer * 10^(-m-1) + 10^(-m-1) * r * 2^e
-        //
-        p2 = r;
-        m++;
-        //
-        //      M+ = buffer * 10^-m + 10^-m * p2 * 2^e
-        // Invariant restored.
-
-        // Check if enough digits have been generated.
-        //
-        //      10^-m * p2 * 2^e <= delta * 2^e
-        //              p2 * 2^e <= 10^m * delta * 2^e
-        //                    p2 <= 10^m * delta
-        delta *= 10;
-        dist  *= 10;
-        if (p2 <= delta)
-        {
-            break;
-        }
-    }
-
-    // V = buffer * 10^-m, with M- <= V <= M+.
-
-    decimal_exponent -= m;
-
-    // 1 ulp in the decimal representation is now 10^-m.
-    // Since delta and dist are now scaled by 10^m, we need to do the
-    // same with ulp in order to keep the units in sync.
-    //
-    //      10^m * 10^-m = 1 = 2^-e * 2^e = ten_m * 2^e
-    //
-    const std::uint64_t ten_m = one.f;
-    grisu2_round(buffer, length, dist, delta, p2, ten_m);
-
-    // By construction this algorithm generates the shortest possible decimal
-    // number (Loitsch, Theorem 6.2) which rounds back to w.
-    // For an input number of precision p, at least
-    //
-    //      N = 1 + ceil(p * log_10(2))
-    //
-    // decimal digits are sufficient to identify all binary floating-point
-    // numbers (Matula, "In-and-Out conversions").
-    // This implies that the algorithm does not produce more than N decimal
-    // digits.
-    //
-    //      N = 17 for p = 53 (IEEE double precision)
-    //      N = 9  for p = 24 (IEEE single precision)
-}
-
-/*!
-v = buf * 10^decimal_exponent
-len is the length of the buffer (number of decimal digits)
-The buffer must be large enough, i.e. >= max_digits10.
-*/
-inline void grisu2(char* buf, int& len, int& decimal_exponent,
-                   diyfp m_minus, diyfp v, diyfp m_plus)
-{
-    assert(m_plus.e == m_minus.e);
-    assert(m_plus.e == v.e);
-
-    const cached_power cached = get_cached_power_for_binary_exponent(m_plus.e);
-
-    const diyfp c_minus_k(cached.f, cached.e); // = c ~= 10^-k
-
-    // The exponent of the products is = v.e + c_minus_k.e + q and is in the range [alpha,gamma]
-    const diyfp w       = diyfp::mul(v,       c_minus_k);
-    const diyfp w_minus = diyfp::mul(m_minus, c_minus_k);
-    const diyfp w_plus  = diyfp::mul(m_plus,  c_minus_k);
-    const diyfp M_minus(w_minus.f + 1, w_minus.e);
-    const diyfp M_plus (w_plus.f  - 1, w_plus.e );
-
-    decimal_exponent = -cached.k; // = -(-k) = k
-
-    grisu2_digit_gen(buf, len, decimal_exponent, M_minus, w, M_plus);
-}
-
-/*!
-v = buf * 10^decimal_exponent
-len is the length of the buffer (number of decimal digits)
-The buffer must be large enough, i.e. >= max_digits10.
-*/
-template <typename FloatType>
-void grisu2(char* buf, int& len, int& decimal_exponent, FloatType value)
-{
-    static_assert(diyfp::kPrecision >= std::numeric_limits<FloatType>::digits + 3,
-                  "internal error: not enough precision");
-
-    assert(std::isfinite(value));
-    assert(value > 0);
-#if 0
-    const boundaries w = compute_boundaries(static_cast<double>(value));
-#else
-    const boundaries w = compute_boundaries(value);
-#endif
-
-    grisu2(buf, len, decimal_exponent, w.minus, w.w, w.plus);
-}
-
-/*!
-@brief appends a decimal representation of e to buf
-@return a pointer to the element following the exponent.
-@pre -1000 < e < 1000
-*/
-inline char* append_exponent(char* buf, int e)
-{
-    assert(e > -1000);
-    assert(e <  1000);
-
-    if (e < 0)
-    {
-        e = -e;
-        *buf++ = '-';
-    }
-    else
-    {
-        *buf++ = '+';
-    }
-
-    auto k = static_cast<std::uint32_t>(e);
-    if (k < 10)
-    {
-        // Always print at least two digits in the exponent.
-        // This is for compatibility with printf("%g").
-        *buf++ = '0';
-        *buf++ = static_cast<char>('0' + k);
-    }
-    else if (k < 100)
-    {
-        *buf++ = static_cast<char>('0' + k / 10);
-        k %= 10;
-        *buf++ = static_cast<char>('0' + k);
-    }
-    else
-    {
-        *buf++ = static_cast<char>('0' + k / 100);
-        k %= 100;
-        *buf++ = static_cast<char>('0' + k / 10);
-        k %= 10;
-        *buf++ = static_cast<char>('0' + k);
-    }
-
-    return buf;
-}
-
-/*!
-@brief prettify v = buf * 10^decimal_exponent
-
-If v is in the range [10^min_exp, 10^max_exp) it will be printed in fixed-point
-notation. Otherwise it will be printed in exponential notation.
-
-@pre min_exp < 0
-@pre max_exp > 0
-*/
-inline char* format_buffer(char* buf, int len, int decimal_exponent,
-                           int min_exp, int max_exp)
-{
-    assert(min_exp < 0);
-    assert(max_exp > 0);
-
-    const int k = len;
-    const int n = len + decimal_exponent;
-
-    // v = buf * 10^(n-k)
-    // k is the length of the buffer (number of decimal digits)
-    // n is the position of the decimal point relative to the start of the buffer.
-
-    if (k <= n and n <= max_exp)
-    {
-        // digits[000]
-        // len <= max_exp + 2
-
-        std::memset(buf + k, '0', static_cast<size_t>(n - k));
-        // Make it look like a floating-point number (#362, #378)
-        buf[n + 0] = '.';
-        buf[n + 1] = '0';
-        return buf + (n + 2);
-    }
-
-    if (0 < n and n <= max_exp)
-    {
-        // dig.its
-        // len <= max_digits10 + 1
-
-        assert(k > n);
-
-        std::memmove(buf + (n + 1), buf + n, static_cast<size_t>(k - n));
-        buf[n] = '.';
-        return buf + (k + 1);
-    }
-
-    if (min_exp < n and n <= 0)
-    {
-        // 0.[000]digits
-        // len <= 2 + (-min_exp - 1) + max_digits10
-
-        std::memmove(buf + (2 + -n), buf, static_cast<size_t>(k));
-        buf[0] = '0';
-        buf[1] = '.';
-        std::memset(buf + 2, '0', static_cast<size_t>(-n));
-        return buf + (2 + (-n) + k);
-    }
-
-    if (k == 1)
-    {
-        // dE+123
-        // len <= 1 + 5
-
-        buf += 1;
-    }
-    else
-    {
-        // d.igitsE+123
-        // len <= max_digits10 + 1 + 5
-
-        std::memmove(buf + 2, buf + 1, static_cast<size_t>(k - 1));
-        buf[1] = '.';
-        buf += 1 + k;
-    }
-
-    *buf++ = 'e';
-    return append_exponent(buf, n - 1);
-}
-
-} // namespace dtoa_impl
-
 inline int Svar::dtos(double value,char* buf)
 {
     auto first=buf;
@@ -4301,31 +4348,34 @@ private:
             return std::atoi(str.c_str() + start_pos);
         }
 
-        // Decimal part
-        if (str[i] == '.') {
-            i++;
-            if (!in_range(str[i], '0', '9'))
-                return fail("at least one digit required in fractional part");
+//        // Decimal part
+//        if (str[i] == '.') {
+//            i++;
+//            if (!in_range(str[i], '0', '9'))
+//                return fail("at least one digit required in fractional part");
 
-            while (in_range(str[i], '0', '9'))
-                i++;
-        }
+//            while (in_range(str[i], '0', '9'))
+//                i++;
+//        }
 
-        // Exponent part
-        if (str[i] == 'e' || str[i] == 'E') {
-            i++;
+//        // Exponent part
+//        if (str[i] == 'e' || str[i] == 'E') {
+//            i++;
 
-            if (str[i] == '+' || str[i] == '-')
-                i++;
+//            if (str[i] == '+' || str[i] == '-')
+//                i++;
 
-            if (!in_range(str[i], '0', '9'))
-                return fail("at least one digit required in exponent");
+//            if (!in_range(str[i], '0', '9'))
+//                return fail("at least one digit required in exponent");
 
-            while (in_range(str[i], '0', '9'))
-                i++;
-        }
+//            while (in_range(str[i], '0', '9'))
+//                i++;
+//        }
 
-        return std::strtod(str.c_str() + start_pos, nullptr);
+        double d;
+        i=fast_double_parser::parse_number(str.c_str()+start_pos,&d)-str.c_str();
+        return d;
+//        return std::strtod(str.c_str() + start_pos, nullptr);
     }
 
     std::string parse_name(){
@@ -4337,7 +4387,7 @@ private:
 
     /// Expect that 'str' starts at the character that was just read. If it does, advance
     /// the input and return res. If not, flag an error.
-    Svar expect(const std::string &expected, Svar res) {
+    Svar expect(const std::string &expected, const Svar& res) {
         assert(i != 0);
         i--;
         if (str.compare(i, expected.length(), expected) == 0) {
