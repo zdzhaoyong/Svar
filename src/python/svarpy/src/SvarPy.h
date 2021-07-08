@@ -416,98 +416,70 @@ struct SvarPy: public PyObject{
         if(!obj)
           return Svar();
 
-        PyTypeObject *type = Py_TYPE(obj);
-
-        if(PyObject_HasAttrString((PyObject*)type,"svar_class"))// this is a c++ object
-        {
-            SvarPy* o=(SvarPy*)obj;
-            if(!o->var)
-            {
-               return Svar(PyObjectHolder(obj));
-            }
-            return *o->var;
-        }
-
-        if(Py_None == obj){
-            return sv::Svar::Null();
-        }
-
-        if(PyNumber_Check(obj))
-        {
-            if(PyFloat_Check(obj))
-                return PyFloat_AsDouble(obj);
-            else return (int)PyLong_AsLong(obj);
-        }
-
-        if(PyList_Check(obj)){
-            if(abortComplex) return PyObjectHolder(obj);
-            std::vector<Svar> array(PyList_Size(obj));
-            for(Py_ssize_t i=0;i<array.size();++i)
-                array[i]=fromPy(PyList_GetItem(obj,i));
-            return Svar(array);
-        }
-
-        if (PyUnicode_Check(obj)) {
-            PyObject* buf=PyUnicode_AsUTF8String(obj);
-            char *buffer=nullptr;
-            ssize_t length=0;
-
-            if (SVAR_BYTES_AS_STRING_AND_SIZE(buf, &buffer, &length))
-                LOG(ERROR)<<("Unable to extract string contents! (invalid type)");
-            return std::string(buffer, (size_t) length);
-        }
-
 #if PY_MAJOR_VERSION < 3
         if (PyString_Check(obj)){
           return std::string(PyString_AsString(obj));
         }
 #endif
 
-        if(PyTuple_Check(obj)){
-            if(abortComplex) return PyObjectHolder(obj);
-            std::vector<Svar> array(PyTuple_Size(obj));
-            for(Py_ssize_t i=0;i<array.size();++i)
-                array[i]=fromPy(PyTuple_GetItem(obj,i));
-            return Svar(array);
-        }
+        static std::unordered_map<PyTypeObject*,std::function<Svar(PyObject*)>> lut;
+        if(lut.empty()){
+            lut[&_PyNone_Type] =[](PyObject* o)->Svar{return Svar::Null();};
+            lut[&PyBool_Type] =[](PyObject* o)->Svar{return (bool)PyLong_AsLong(o);};
+            lut[&PyFloat_Type]=[](PyObject* o)->Svar{return PyFloat_AsDouble(o);};
+            lut[&PyLong_Type] =[](PyObject* o)->Svar{return (int)PyLong_AsLong(o);};
 
-        if(PyDict_Check(obj)){
-            if(abortComplex) return PyObjectHolder(obj);
-            std::map<std::string,Svar> dict;
-            PyObject *key, *value;
-            Py_ssize_t pos = 0;
+            lut[&PyUnicode_Type] =[](PyObject* obj)->Svar{
+                PyObject* buf=PyUnicode_AsUTF8String(obj);
+                char *buffer=nullptr;
+                ssize_t length=0;
 
-            while (PyDict_Next(obj, &pos, &key, &value)) {
-                dict.insert(make_pair(fromPy(key).castAs<std::string>(),
-                                      fromPy(value)));
-            }
-            return dict;
-        }
+                if (SVAR_BYTES_AS_STRING_AND_SIZE(buf, &buffer, &length))
+                    LOG(ERROR)<<("Unable to extract string contents! (invalid type)");
+                return std::string(buffer, (size_t) length);
+            };
 
-        if(PyFunction_Check(obj)){
-          SvarFunction func;
+            lut[&PyList_Type] =[](PyObject* obj)->Svar{
+                std::vector<Svar> array(PyList_Size(obj));
+                for(Py_ssize_t i=0;i<array.size();++i)
+                    array[i]=fromPy(PyList_GetItem(obj,i));
+                return Svar(array);
+            };
 
-          Svar holder=PyObjectHolder(incref(obj));
-          func._func=[holder](std::vector<Svar>& args)->Svar{
-              PyThreadStateLock PyThreadLock;
-              PyObjectHolder py_args=SvarPy::getPy(args);
-              return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, py_args.obj, nullptr));
-          };
-          func.do_argcheck=false;
-          func.doc="PyFunction";
-          return func;
-        }
+            lut[&PyTuple_Type] =[](PyObject* obj)->Svar{
+                std::vector<Svar> array(PyTuple_Size(obj));
+                for(Py_ssize_t i=0;i<array.size();++i)
+                    array[i]=fromPy(PyTuple_GetItem(obj,i));
+                return Svar(array);
+            };
 
-        if(PyCFunction_Check(obj)){
-            // FIXME: why svarpy need thread import with enable this
-//            PyObject*  capsule=PyCFunction_GetSelf(obj);
-//            void* svar_func=PyCapsule_GetPointer(capsule,"svar_function");
-//            if(capsule&&svar_func){
-//                return *(Svar*)svar_func;
-//            }
-//            else
-            {
-//                if(capsule) incref(capsule);
+            lut[&PyDict_Type] =[](PyObject* obj)->Svar{
+                Svar dict;
+                PyObject *key, *value;
+                Py_ssize_t pos = 0;
+
+                while (PyDict_Next(obj, &pos, &key, &value)) {
+                    dict[fromPy(key).castAs<std::string>()] = fromPy(value);
+                }
+                return dict;
+            };
+
+            lut[&PyFunction_Type] =[](PyObject* obj)->Svar{
+                SvarFunction func;
+
+                Svar holder=PyObjectHolder(incref(obj));
+                func._func=[holder](std::vector<Svar>& args)->Svar{
+                    PyThreadStateLock PyThreadLock;
+                    PyObjectHolder py_args=SvarPy::getPy(args);
+                    return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, py_args.obj, nullptr));
+                };
+                func.do_argcheck=false;
+                func.doc="PyFunction";
+                return func;
+            };
+
+            lut[&PyCFunction_Type] =[](PyObject* obj)->Svar{
+                //                if(capsule) incref(capsule);
                 SvarFunction func;
                 Svar holder=PyObjectHolder(obj);
                 func._func=[holder](std::vector<Svar>& args)->Svar{
@@ -518,47 +490,67 @@ struct SvarPy: public PyObject{
                 func.do_argcheck=false;
                 func.doc="PyCFunction";
                 return func;
-            }
+            };
 
-        }
+            lut[&PyModule_Type] =[](PyObject* obj)->Svar{
+                obj=PyModule_GetDict(obj);
+                incref(obj);
+                std::map<std::string,Svar> dict;
+                PyObject *key, *value;
+                Py_ssize_t pos = 0;
 
-        if(PyModule_Check(obj)){
-            if(abortComplex) return PyObjectHolder(obj);
-          obj=PyModule_GetDict(obj);
-          incref(obj);
-          std::map<std::string,Svar> dict;
-          PyObject *key, *value;
-          Py_ssize_t pos = 0;
-
-          while (PyDict_Next(obj, &pos, &key, &value)) {
-              std::string keyStr=fromPy(key).castAs<std::string>();
-              if(keyStr.find_first_of("_")==0) continue;
-              if(PyModule_Check(value)) continue;
-              dict.insert(make_pair(keyStr,
-                                    fromPy(value)));
-          }
-          return dict;
-        }
-
-        if(PyMemoryView_Check(obj)){
-          PyMemoryViewObject* view_obj=(PyMemoryViewObject*)obj;
-          Py_buffer& view=view_obj->view;
-          return SvarBuffer(view.buf, view.itemsize, view.format, std::vector<ssize_t>(view.shape,view.shape+view.ndim)
-                            , std::vector<ssize_t>(view.strides,view.strides+view.ndim), PyObjectHolder(obj));
-        }
-
-        if(PyType_Check(obj)){// this is class
-
-            if(PyObject_HasAttrString((PyObject*)obj,"svar_class"))// this is a c++ class
-            {
-                PyObject *capsule=PyObject_GetAttrString((PyObject*)obj,"svar_class");
-                Svar* o=(Svar*)PyCapsule_GetPointer(capsule,nullptr);
-                if(!o)
-                {
-                    return Svar();
+                while (PyDict_Next(obj, &pos, &key, &value)) {
+                    std::string keyStr=fromPy(key).castAs<std::string>();
+                    if(keyStr.find_first_of("_")==0) continue;
+                    if(PyModule_Check(value)) continue;
+                    dict.insert(make_pair(keyStr,
+                                          fromPy(value)));
                 }
-                return *o;
+                return dict;
+            };
+
+            lut[&PyMemoryView_Type] = [](PyObject* obj)->Svar{
+                PyMemoryViewObject* view_obj=(PyMemoryViewObject*)obj;
+                Py_buffer& view=view_obj->view;
+                return SvarBuffer(view.buf, view.itemsize, view.format,
+                                  std::vector<ssize_t>(view.shape,view.shape+view.ndim),
+                                  std::vector<ssize_t>(view.strides,view.strides+view.ndim),
+                                  PyObjectHolder(obj));
+            };
+
+
+
+            lut[&PyType_Type] = [](PyObject* obj)->Svar{
+                if(PyObject_HasAttrString((PyObject*)obj,"svar_class"))// this is a c++ class
+                {
+                    PyObject *capsule=PyObject_GetAttrString((PyObject*)obj,"svar_class");
+                    Svar* o=(Svar*)PyCapsule_GetPointer(capsule,nullptr);
+                    if(!o)
+                    {
+                        return Svar();
+                    }
+                    return *o;
+                }
+                return sv::Svar();
+            };
+
+        }
+
+        PyTypeObject *type = Py_TYPE(obj);
+
+        auto it=lut.find(type);
+        if(it!=lut.end()){
+            return it->second(obj);
+        }
+
+        if(PyObject_HasAttrString((PyObject*)type,"svar_class"))// this is a c++ object
+        {
+            SvarPy* o=(SvarPy*)obj;
+            if(!o->var)
+            {
+               return Svar(PyObjectHolder(obj));
             }
+            return *o->var;
         }
 
         return Svar(PyObjectHolder(obj));
