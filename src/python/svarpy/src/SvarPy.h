@@ -548,12 +548,12 @@ struct SvarPy: public PyObject{
             SvarPy* o=(SvarPy*)obj;
             if(!o->var)
             {
-               return Svar(PyObjectHolder(obj));
+               return Svar();
             }
             return *o->var;
         }
 
-        return Svar(PyObjectHolder(obj));
+        return Svar();// FIXME: Svar(PyObjectHolder(obj)) may lead to segment fault?
     }
 
 
