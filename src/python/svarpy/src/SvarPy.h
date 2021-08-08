@@ -518,7 +518,9 @@ struct SvarPy: public PyObject{
                                   PyObjectHolder(obj));
             };
 
-
+            lut[&PyBytes_Type]=[](PyObject* obj)->Svar{
+                return SvarBuffer(PyBytes_AsString(obj),PyBytes_Size(obj));
+            };
 
             lut[&PyType_Type] = [](PyObject* obj)->Svar{
                 if(PyObject_HasAttrString((PyObject*)obj,"svar_class"))// this is a c++ class
