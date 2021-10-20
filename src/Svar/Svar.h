@@ -3441,7 +3441,9 @@ T& Svar::dump(T& o,const int indent_step,const int current_indent)const
             Svar a = cls.__str__(*this);
             return o<<a.as<std::string>();
         }
-        return o<<"<"<<typeName()<<" at "<<std::to_string((long)value().get())<<">";
+        std::stringstream sst;
+        sst<<value().get();
+        return o<<"<"<<typeName()<<" at "<<sst.str()<<">";
     }
     }
 }
@@ -4875,6 +4877,7 @@ public:
                 .def("__init__",&SvarBuiltin::int_create)
                 .def("__double__",[](int& i){return (double)i;})
                 .def("__bool__",[](int& i){return (bool)i;})
+                .def("__str__",[](int& i){return std::to_string(i);})
                 .def("__eq__",[](int& self,int rh){return self==rh;})
                 .def("__lt__",[](int& self,int rh){return self<rh;})
                 .def("__add__",[](int& self,Svar& rh)->Svar{
@@ -4908,11 +4911,13 @@ public:
         SvarClass::Class<bool>()
                 .def("__int__",[](bool& b){return (int)b;})
                 .def("__double__",[](bool& b){return (double)b;})
+                .def("__str__",[](bool& b){return std::to_string(b);})
                 .def("__eq__",[](bool& self,bool& rh){return self==rh;});
 
         SvarClass::Class<double>()
                 .def("__int__",[](double& d){return (int)d;})
                 .def("__bool__",[](double& d){return (bool)d;})
+                .def("__str__",[](double& d){return std::to_string(d);})
                 .def("__eq__",[](double& self,double rh){return self==rh;})
                 .def("__lt__",[](double& self,double rh){return self<rh;})
                 .def("__neg__",[](double& self){return -self;})

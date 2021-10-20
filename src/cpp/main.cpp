@@ -24,7 +24,7 @@ int main(int argc,char** argv){
         std::stringstream sst;
         sst<<"svar [app_name] [-option value] [-help]\n"
           <<"The following apps can be used:\n";
-        var["__usage__"]=sst.str()+description.dump_json();
+        var["__usage__"]=sst.str()+description.dump_json(2);
         return var.help();
     }
 
@@ -38,5 +38,12 @@ int main(int argc,char** argv){
         LOG(ERROR)<<unParsed.front()<<" is not a valid app";
     }
 
-    return app(var).as<int>();
+    try{
+        return app(var).as<int>();
+    }
+    catch(std::exception& e){
+        for(int i=0;i<argc;i++)
+            LOG(INFO)<<argv[i];
+        LOG(FATAL)<<e.what();
+    }
 }
