@@ -49,6 +49,7 @@
 #include <cstdio> // snprintf
 #include <cctype>
 #include <cstring> // memcpy
+#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
