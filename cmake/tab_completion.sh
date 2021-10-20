@@ -1,13 +1,3 @@
-#. ~/.bashrc // why source not usable?
-while read line
-do
-  if [[ $line == "SVAR_COMPLETION_ENABLED=ON" ]];then
-    SVAR_COMPLETION_ENABLED=ON
-  fi
-done < ~/.bashrc
-
-
-if [ -z "$SVAR_COMPLETION_ENABLED" ];then
 echo '
 # svar tab completion support
 function_svar_complete()
@@ -26,9 +16,4 @@ function_svar_complete()
 
 complete -F function_svar_complete "svar"
 SVAR_COMPLETION_ENABLED=ON
-'>> ~/.bashrc
-else
-  echo "svar tab completion has already supported."
-fi
-
-
+'> /etc/bash_completion.d/svar
