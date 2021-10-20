@@ -1,5 +1,5 @@
 #include <napi.h>
-#include "../../Svar/Registry.h"
+#include "Registry.h"
 
 using namespace sv;
 

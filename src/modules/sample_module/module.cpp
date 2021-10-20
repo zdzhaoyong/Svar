@@ -13,6 +13,10 @@ public:
         all_person()[name]=_age;
     }
 
+    ~Person(){
+        all_person().erase(_name);
+    }
+
     virtual std::string intro()const{
         return Svar({{"Person",{_age,_name}}}).dump_json();
     }
@@ -22,6 +26,10 @@ public:
     static Svar& all_person(){
         static Svar all;
         return all;
+    }
+
+    static Svar create(int age,std::string name){
+        return std::unique_ptr<Person>(new Person(age,name));
     }
 
     int _age;
@@ -87,6 +95,7 @@ REGISTER_SVAR_MODULE(sample)// see, so easy, haha
             .construct<int,std::string>()
             .def("intro",&Person::intro)
             .def_static("all",&Person::all_person)
+            .def_static("create",&Person::create)
             .def("age",&Person::age)
             .def_readonly("name",&Person::_name,"The name of a person");
 

@@ -53,6 +53,7 @@
 #include <sstream>
 #include <vector>
 #include <list>
+#include <set>
 #include <map>
 #include <unordered_map>
 #include <algorithm>
@@ -61,15 +62,30 @@
 #include <thread>
 #include <typeindex>
 #include <functional>
+
+#if (defined(_WIN32) || defined(_WIN64)) && !defined(__CYGWIN__)// Windows
+#include <windows.h>
+#include <io.h>
+#else // Linux
+#include <unistd.h>
+#include <dlfcn.h>
+#if defined(__CYGWIN__) && !defined(RTLD_LOCAL)
+#define RTLD_LOCAL 0
+#endif
+#endif
+
 #ifdef __GNUC__
 #include <cxxabi.h>
 #else
 #define _GLIBCXX_USE_NOEXCEPT
 #endif
-
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
 
 #define svar sv::Svar::instance()
-#define SVAR_VERSION 0x000201
+#define SVAR_VERSION 0x000202
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
@@ -113,50 +129,55 @@ using function_signature_t = conditional_t<
     >::type
 >;
 
-#  if __cplusplus >= 201402L
-using std::index_sequence;
-using std::make_index_sequence;
-#else
 template<size_t ...> struct index_sequence  { };
 template<size_t N, size_t ...S> struct make_index_sequence_impl : make_index_sequence_impl <N - 1, N - 1, S...> { };
 template<size_t ...S> struct make_index_sequence_impl <0, S...> { typedef index_sequence<S...> type; };
 template<size_t N> using make_index_sequence = typename make_index_sequence_impl<N>::type;
-#endif
 
-typedef char yes;
-typedef char (&no)[2];
+template<class T>
+struct sfinae_true : public std::true_type{
+  typedef T type;
 
-struct anyx {
-  template <class T>
-  anyx(const T&);
 };
 
-no operator<<(const anyx&, const anyx&);
-no operator>>(const anyx&, const anyx&);
-
-template <class T>
-yes check(T const&);
-no check(no);
-
-template <typename StreamType, typename T>
-struct has_loading_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream >> x)) == sizeof(yes);
+template<class T>
+struct sfinae_false : public std::false_type{
+  typedef T type;
 };
 
-template <typename StreamType, typename T>
-struct has_saving_support {
-  static StreamType& stream;
-  static T& x;
-  static const bool value = sizeof(check(stream << x)) == sizeof(yes);
+template<class T>
+static auto test_call_op(int)
+  ->sfinae_true < decltype(&T::operator()) >;
+template<class T>
+static auto test_call_op(long)->sfinae_false < T >;
+
+template<class T, class T2 =decltype( test_call_op<T>(0) )>
+struct has_call_op_ : public T2  {
+
 };
 
-template <typename StreamType, typename T>
-struct has_stream_operators {
-  static const bool can_load = has_loading_support<StreamType, T>::value;
-  static const bool can_save = has_saving_support<StreamType, T>::value;
-  static const bool value = can_load && can_save;
+template<class T>
+struct has_call_op : public std::is_member_function_pointer < typename has_call_op_<T>::type > {
+
+};
+
+template<typename T>
+struct is_callable :public has_call_op<T>
+{
+};
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)>{
+const static bool value = true;
+};
+
+template<typename TClass, typename TRet, typename... TArgs>
+struct is_callable<TRet(TClass::*)(TArgs...)const>{
+const static bool value = true;
+};
+
+template<typename TRet, typename... TArgs>
+struct is_callable<TRet(*)(TArgs...)>{
+const static bool value = true;
 };
 
 }
@@ -544,16 +565,15 @@ class ApplicationDemo():
 
 \subsection s_svar_usecpp Use Svar Module in C++
 We are able to load the Svar instance exported by marco with EXPORT_SVAR_INSTANCE
-using Registry::load().
+using svar.import().
 
 @code
 #include "Svar/Svar.h"
-#include "Svar/Registry.h"
 
 using namespace sv;
 
 int main(int argc,char** argv){
-    Svar sampleModule=Registry::load("sample");
+    Svar sampleModule=svar.import("sample");
 
     Svar ApplicationDemo=sampleModule["ApplicationDemo"];
 
@@ -563,7 +583,6 @@ int main(int argc,char** argv){
     std::cout<<ApplicationDemo.as<SvarClass>();
     return 0;
 }
-
 @endcode
 
  */
@@ -606,6 +625,7 @@ public:
     Svar(Return (*f)(Args...), const Extra&... extra);
 
     /// Construct a cpp_function from a lambda function (possibly with internal state)
+    /// Deprecated, please direct use Svar(func) now
     template <typename Func, typename... Extra>
     static Svar lambda(Func &&f, const Extra&... extra);
 
@@ -769,6 +789,11 @@ public:
     /// Call this as function or class
     template <typename... Args>
     Svar operator()(Args... args)const;
+
+    /// Import a svar module
+    Svar import(std::string module_name){
+        return (*this)["__builtin__"]["import"](module_name);
+    }
 
     Svar operator -()const;              //__neg__
     Svar operator +(const Svar& rh)const;//__add__
@@ -1251,7 +1276,21 @@ public:
     template <typename... Args>
     Class& construct(){
         return def("__init__",[](Args... args){
-            return C(args...);
+            return std::unique_ptr<C>(new C(args...));
+        });
+    }
+
+    template <typename... Args>
+    Class& unique_construct(){
+        return def("__init__",[](Args... args){
+            return std::unique_ptr<C>(new C(args...));
+        });
+    }
+
+    template <typename... Args>
+    Class& shared_construct(){
+        return def("__init__",[](Args... args){
+            return std::make_shared<C>(args...);
         });
     }
 
@@ -1317,7 +1356,8 @@ public:
     _ptr = _holder.as<std::vector<char>>().data();
   }
 
-    void*           ptr() const {return _ptr;}
+    template<typename T=char>
+    T*              ptr() const {return (T*)_ptr;}
     size_t          size() const {return _size;}
     size_t          length() const{return _size;}
 
@@ -1497,7 +1537,7 @@ public:
             unsigned int b=btemp;
             unsigned int c=ctemp;
             unsigned int d=dtemp;
-            for(uint8_t i;i<64;i++){
+            for(uint8_t i=0;i<64;i++){
                 f=funcs[i>>4](b,c,d);
                 g=func_g[i>>4](i);
                 unsigned int tmp=d;
@@ -1527,7 +1567,7 @@ public:
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
         std::vector<uint32_t> vec(total_ints,0);
-        for(ssize_t i = 0; i < _size; i++)
+        for(size_t i = 0; i < _size; i++)
             vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
         uint64_t size = _size*8;
@@ -2017,7 +2057,14 @@ public:
         return Svar::Undefined();
     }
 
-    static Svar to(const T& var){
+    template <typename T1>
+    static detail::enable_if_t<detail::is_callable<T1>::value,Svar> to(const T1& func)
+    {
+        return SvarFunction(func);
+    }
+
+    template <typename T1>
+    static detail::enable_if_t<!detail::is_callable<T1>::value,Svar> to(const T1& var){
         return Svar::create(var);
     }
 };
@@ -3322,6 +3369,344 @@ private:
     }
 };
 
+/// SharedLibrary is used to load shared libraries
+class SharedLibrary
+{
+    enum Flags
+    {
+        SHLIB_GLOBAL_IMPL = 1,
+        SHLIB_LOCAL_IMPL  = 2
+    };
+public:
+    typedef std::mutex MutexRW;
+    typedef std::unique_lock<std::mutex> WriteMutex;
+
+    SharedLibrary():_handle(NULL){}
+
+    SharedLibrary(const std::string& path):_handle(NULL)
+    {
+        load(path);
+    }
+
+    ~SharedLibrary(){unload();}
+
+    bool load(const std::string& path,int flags=0)
+    {
+        WriteMutex lock(_mutex);
+
+        if (_handle)
+            return false;
+
+#if (defined(_WIN32) || defined(_WIN64)) && !defined(__CYGWIN__)// Windows
+
+        flags |= LOAD_WITH_ALTERED_SEARCH_PATH;
+        _handle = LoadLibraryExA(path.c_str(), 0, flags);
+        if (!_handle) return false;
+#else
+        int realFlags = RTLD_LAZY;
+        if (flags & SHLIB_LOCAL_IMPL)
+            realFlags |= RTLD_LOCAL;
+        else
+            realFlags |= RTLD_GLOBAL;
+        _handle = dlopen(path.c_str(), realFlags);
+        if (!_handle)
+        {
+            const char* err = dlerror();
+            std::cerr<<"Can't open file "<<path<<" since "<<err<<std::endl;
+            return false;
+        }
+
+#endif
+        _path = path;
+        return true;
+    }
+
+    void unload()
+    {
+        WriteMutex lock(_mutex);
+
+        if (_handle)
+        {
+#if (defined(_WIN32) || defined(_WIN64)) && !defined(__CYGWIN__)// Windows
+            FreeLibrary((HMODULE) _handle);
+#else
+            dlclose(_handle);
+#endif
+            _handle = 0;
+            _path.clear();
+        }
+    }
+
+    bool isLoaded() const
+    {
+        return _handle!=0;
+    }
+
+    bool hasSymbol(const std::string& name)
+    {
+        return getSymbol(name)!=0;
+    }
+
+    void* getSymbol(const std::string& name)
+    {
+        WriteMutex lock(_mutex);
+
+        void* result = 0;
+        if (_handle)
+        {
+#if (defined(_WIN32) || defined(_WIN64)) && !defined(__CYGWIN__)// Windows
+            return (void*) GetProcAddress((HMODULE) _handle, name.c_str());
+#else
+            result = dlsym(_handle, name.c_str());
+#endif
+        }
+        return result;
+    }
+
+    const std::string& getPath() const
+    {
+        return _path;
+    }
+        /// Returns the path of the library, as
+        /// specified in a call to load() or the
+        /// constructor.
+
+    static std::string suffix()
+    {
+#if defined(__APPLE__)
+        return ".dylib";
+#elif defined(hpux) || defined(_hpux)
+        return ".sl";
+#elif defined(WIN32) || defined(WIN64)
+        return ".dll";
+#else
+        return ".so";
+#endif
+    }
+
+private:
+    SharedLibrary(const SharedLibrary&);
+    SharedLibrary& operator = (const SharedLibrary&);
+    MutexRW     _mutex;
+    std::string _path;
+    void*       _handle;
+};
+typedef std::shared_ptr<SharedLibrary> SharedLibraryPtr;
+
+/// Registry is used to cache shared libraries
+class Registry
+{
+public:
+    typedef std::set<std::string> FilePathList;
+    Registry(){
+        updatePaths();
+    }
+
+    static Svar load(std::string pluginName){
+        SharedLibraryPtr plugin=get(pluginName);
+        if(!plugin)
+        {
+            std::cerr<<"Unable to load plugin "<<pluginName<<std::endl;
+            std::cerr<<"PATH=";
+            for(std::string p:instance()._libraryFilePath)
+                std::cerr<<p<<":";
+            std::cerr<<std::endl;
+            return Svar();
+        }
+        if(!plugin->hasSymbol("svarInstance"))
+        {
+            std::cerr<<"Unable to find symbol svarInstance."<<std::endl;
+            return Svar();
+        }
+
+        sv::Svar* (*getInst)()=(sv::Svar* (*)())plugin->getSymbol("svarInstance");
+        if(!getInst){
+            std::cerr<<"No svarInstance found in "<<pluginName<<std::endl;
+            return Svar();
+        }
+        sv::Svar* inst=getInst();
+        if(!inst){
+            std::cerr<<"svarInstance returned null.\n";
+            return Svar();
+        }
+
+        return *inst;
+    }
+
+    static Registry& instance()
+    {
+        static std::shared_ptr<Registry> reg(new Registry);
+        return *reg;
+    }
+
+    static SharedLibraryPtr get(std::string pluginName)
+    {
+        if(pluginName.empty()) return SharedLibraryPtr();
+        Registry& inst=instance();
+        pluginName=inst.getPluginName(pluginName);
+
+        if(inst._registedLibs[pluginName].is<SharedLibraryPtr>())
+            return inst._registedLibs.Get<SharedLibraryPtr>(pluginName);
+
+        // find out and load the SharedLibrary
+        for(std::string dir:inst._libraryFilePath)
+        {
+            std::string pluginPath=dir+"/"+pluginName;
+            if(!fileExists(pluginPath)) continue;
+            SharedLibraryPtr lib(new SharedLibrary(pluginPath));
+            if(lib->isLoaded())
+            {
+                inst._registedLibs.set(pluginName,lib);
+                return lib;
+            }
+        }
+
+        // find out and load the SharedLibrary
+        for(std::string dir:inst._libraryFilePath)
+        {
+            std::string pluginPath=dir+"/lib"+pluginName;
+            if(!fileExists(pluginPath)) continue;
+            SharedLibraryPtr lib(new SharedLibrary(pluginPath));
+            if(lib->isLoaded())
+            {
+                inst._registedLibs.set(pluginName,lib);
+                return lib;
+            }
+        }
+        // failed to find the library
+        return SharedLibraryPtr();
+    }
+
+    static bool erase(std::string pluginName)
+    {
+        if(pluginName.empty()) return false;
+        Registry& inst=instance();
+        pluginName=inst.getPluginName(pluginName);
+        inst._registedLibs.set(pluginName,Svar());
+        return true;
+    }
+protected:
+    static bool fileExists(const std::string& filename)
+    {
+        return access( filename.c_str(), 0 ) == 0;
+    }
+
+    static void convertStringPathIntoFilePathList(const std::string& paths,FilePathList& filepath)
+    {
+    #if defined(WIN32) && !defined(__CYGWIN__)
+        char delimitor = ';';
+        if(paths.find(delimitor)==std::string::npos) delimitor=':';
+    #else
+        char delimitor = ':';
+        if(paths.find(delimitor)==std::string::npos) delimitor=';';
+    #endif
+
+        if (!paths.empty())
+        {
+            std::string::size_type start = 0;
+            std::string::size_type end;
+            while ((end = paths.find_first_of(delimitor,start))!=std::string::npos)
+            {
+                filepath.insert(std::string(paths,start,end-start));
+                start = end+1;
+            }
+
+            std::string lastPath(paths,start,std::string::npos);
+            if (!lastPath.empty())
+                filepath.insert(lastPath);
+        }
+
+    }
+
+    std::string getPluginName(std::string pluginName)
+    {
+        std::string suffix;
+        size_t idx=pluginName.find_last_of('.');
+        if(idx!=std::string::npos)
+        suffix=pluginName.substr(idx);
+        if(suffix!=SharedLibrary::suffix())
+        {
+            pluginName+=SharedLibrary::suffix();
+        }
+
+        std::string folder=getFolderPath(pluginName);
+        pluginName=getFileName(pluginName);
+        if(folder.size()){
+            _libraryFilePath.insert(folder);
+        }
+        return pluginName;
+    }
+
+    void updatePaths()
+    {
+        _libraryFilePath.clear();
+
+        char** argv=sv::Svar::instance().get<char**>("argv",nullptr);
+        if(argv)
+        {
+            _libraryFilePath.insert(getFolderPath(argv[0]));//application folder
+        }
+        _libraryFilePath.insert(".");
+
+        FilePathList envs={"GSLAM_LIBRARY_PATH","GSLAM_LD_LIBRARY_PATH"};
+        FilePathList paths;
+#ifdef __linux
+
+#if defined(__ia64__) || defined(__x86_64__)
+        paths.insert("/usr/lib/:/usr/lib64/:/usr/local/lib/:/usr/local/lib64/");
+#else
+        paths.insert("/usr/lib/:/usr/local/lib/");
+#endif
+        envs.insert("LD_LIBRARY_PATH");
+#elif defined(__CYGWIN__)
+        envs.insert("PATH");
+        paths.insert("/usr/bin/:/usr/local/bin/");
+#elif defined(WIN32)
+        envs.insert("PATH");
+#endif
+        for(std::string env:envs)
+        {
+            char *ptr = std::getenv(env.c_str());
+            if (ptr)
+                convertStringPathIntoFilePathList(std::string(ptr),_libraryFilePath);
+        }
+        for(std::string ptr:paths)
+            convertStringPathIntoFilePathList(ptr,_libraryFilePath);
+    }
+
+    inline std::string getFolderPath(const std::string& path) {
+      auto idx = std::string::npos;
+      if ((idx = path.find_last_of('/')) == std::string::npos)
+        idx = path.find_last_of('\\');
+      if (idx != std::string::npos)
+        return path.substr(0, idx);
+      else
+        return "";
+    }
+
+    inline std::string getBaseName(const std::string& path) {
+      std::string filename = getFileName(path);
+      auto idx = filename.find_last_of('.');
+      if (idx == std::string::npos)
+        return filename;
+      else
+        return filename.substr(0, idx);
+    }
+
+    inline std::string getFileName(const std::string& path) {
+      auto idx = std::string::npos;
+      if ((idx = path.find_last_of('/')) == std::string::npos)
+        idx = path.find_last_of('\\');
+      if (idx != std::string::npos)
+        return path.substr(idx + 1);
+      else
+        return path;
+    }
+
+    std::set<std::string>               _libraryFilePath;// where to search?
+    Svar                                _registedLibs;   // already loaded
+};
+
 class SvarBuiltin{
 public:
     SvarBuiltin(){
@@ -3514,6 +3899,7 @@ public:
 #ifdef BUILD_VERSION
         builtin["tag"]=std::string(BUILD_VERSION);
 #endif
+        builtin["import"]=&Registry::load;
     }
 
     static Svar int_create(const Svar& rh){
@@ -3568,8 +3954,10 @@ static SvarBuiltin SvarBuiltinInitializerinstance;
 #endif
 #endif
 
-
-
 }
 
+
+namespace GSLAM{
+typedef sv::Svar Jvar;
+}
 #endif

@@ -1,4 +1,3 @@
-#include <Svar/Registry.h>
 #include "SvarPy.h"
 
 using namespace sv;
@@ -26,7 +25,7 @@ std::string getBaseName(const std::string& path) {
 
 
 PyObject* load(std::string pluginPath){
-    return SvarPy::getModule(Registry::load(pluginPath),getBaseName(pluginPath).c_str());
+    return SvarPy::getModule(svar.import(pluginPath),getBaseName(pluginPath).c_str());
 }
 
 void set(std::string name, Svar value){

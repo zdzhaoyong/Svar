@@ -1,3 +1,5 @@
 *.user
 build
 doc/html
+dist
+svar.egg-info

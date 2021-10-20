@@ -1,5 +1,4 @@
 #include "Svar.h"
-#include "Registry.h"
 #include "Timer.h"
 #include "Glog.h"
 

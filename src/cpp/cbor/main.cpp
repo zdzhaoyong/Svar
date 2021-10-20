@@ -1,5 +1,4 @@
 #include  <Svar.h>
-#include  <Registry.h>
 #include  <Glog.h>
 
 using namespace sv;
@@ -12,7 +11,7 @@ int cbor(Svar config){
 
     if(config.get("help",false)) return config.help();
 
-    Svar CBOR=Registry::load("svar_cbor");
+    Svar CBOR=svar.import("svar_cbor");
     if(CBOR.isUndefined()){
         return -1;
     }

@@ -19,7 +19,7 @@ TEST(Svar,Function)
     EXPECT_TRUE(refArg.call(1).as<bool>());
 
     // pointer
-    Svar::lambda([](int* ref){*ref=10;})(&intV);
+    Svar([](int* ref){*ref=10;})(&intV);
     Svar::lambda([](int* ref){*ref=10;})(intSvar);
     EXPECT_EQ(intV,10);
     EXPECT_EQ(intSvar,10);

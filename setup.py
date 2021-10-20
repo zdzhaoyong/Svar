@@ -59,11 +59,18 @@ class CMakeBuild(build_ext):
 
 setup(
     name='svar',
-    version='0.2.0',
-    author='Chen Lin',
-    author_email='npuchenlin@foxmail.com',
+    version='0.2.2',
+    author='Yong Zhao',
+    author_email='zdzhaoyong@mail.nwpu.edu.cn',
     description='The Python interface for Svar plugins',
-    long_description='',
+    url='https://github.com/zdzhaoyong/Svar',
+    package_data = {
+        # If any package contains *.txt or *.rst files, include them:
+        '': ['src',"cmake","*.txt"],
+    },
+    include_package_data = True,
+    license='BSD',
+    long_description='The Python interface for Svar plugins',
     ext_modules=[CMakeExtension('svar')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,

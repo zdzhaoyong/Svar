@@ -273,8 +273,9 @@ struct SvarPy: public PyObject{
 
     static PyObject* getPyProperty(Svar src){
       SvarClass::SvarProperty& property=src.as<SvarClass::SvarProperty>();
+      auto py_args=getPy({property._fget,property._fset,property._doc});
       PyObject *result = PyObject_Call((PyObject*)&PyProperty_Type,
-                                       getPy({property._fget,property._fset,property._doc}),nullptr);
+                                       py_args.obj,nullptr);
       if (!result){
         struct error_scope {
           PyObject *type, *value, *trace;
@@ -498,6 +499,14 @@ struct SvarPy: public PyObject{
             return *o->var;
         }
 
+        if(Py_None == obj){
+            return sv::Svar::Null();
+        }
+
+        if(PyBool_Check(obj)){
+            return PyObject_IsTrue(obj);
+        }
+
         if(PyNumber_Check(obj))
         {
             if(PyFloat_Check(obj))
@@ -556,7 +565,8 @@ struct SvarPy: public PyObject{
           Svar holder=PyObjectHolder(incref(obj));
           func._func=[holder](std::vector<Svar>& args)->Svar{
               PyThreadStateLock PyThreadLock;
-            return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, SvarPy::getPy(args),nullptr));
+              PyObjectHolder py_args=SvarPy::getPy(args);
+              return SvarPy::fromPy(PyObject_Call(holder.as<PyObjectHolder>().obj, py_args.obj, nullptr));
           };
           func.do_argcheck=false;
           func.sign="PyFunction";
@@ -577,7 +587,8 @@ struct SvarPy: public PyObject{
                 Svar holder=PyObjectHolder(obj);
                 func._func=[holder](std::vector<Svar>& args)->Svar{
                     PyThreadStateLock PyThreadLock;
-                    return SvarPy::fromPy(PyCFunction_Call(holder.as<PyObjectHolder>().obj, SvarPy::getPy(args),nullptr));
+                    PyObjectHolder py_args=SvarPy::getPy(args);
+                    return SvarPy::fromPy(PyCFunction_Call(holder.as<PyObjectHolder>().obj, py_args.obj,nullptr));
                 };
                 func.do_argcheck=false;
                 func.sign="PyCFunction";
@@ -639,7 +650,7 @@ struct SvarPy: public PyObject{
                 name= var["__name__"].as<std::string>().c_str();
 
             if(var.exist("__doc__"))
-                doc = var["__doc__"].castAs<std::string>().c_str();
+                doc = var["__doc__"].as<std::string>().c_str();
 
 #if PY_MAJOR_VERSION<3
             pyModule=Py_InitModule3(name,nullptr,doc);
