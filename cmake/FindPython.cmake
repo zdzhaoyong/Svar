@@ -56,6 +56,12 @@ if(PYTHONLIBS_FOUND AND PYTHON_MODULE_EXTENSION)
     return()
 endif()
 
+if(MSVC)
+    set(Python_FOUND TRUE)
+    set(Python_INCLUDES C:/Users/dev/AppData/Local/Programs/Python/Python38/include)
+    set(Python_LIBS "C:/Users/dev/AppData/Local/Programs/Python/Python38/libs/python38.lib")
+endif()
+
 # Use the Python interpreter to find the libs.
 if(PythonLibsNew_FIND_REQUIRED)
     find_package(PythonInterp ${PythonLibsNew_FIND_VERSION} REQUIRED)

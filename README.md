@@ -8,6 +8,19 @@
 [![License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](./LICENSE)
 [![Version](https://img.shields.io/github/release/zdzhaoyong/Svar.svg)](https://github.com/zdzhaoyong/Svar/releases)
 
+Paper Introduction: https://arxiv.org/abs/2108.08464 , if you wanna use Svar in your research, please cite:
+
+```
+@misc{zhao2021svar,
+      title={Svar: A Tiny C++ Header Brings Unified Interface for Multiple programming Languages}, 
+      author={Yong Zhao and Pengcheng Zhao and Shibiao Xu and Lin Chen and Pengcheng Han and Shuhui Bu and Hongkai Jiang},
+      year={2021},
+      eprint={2108.08464},
+      archivePrefix={arXiv},
+      primaryClass={cs.PL}
+}
+```
+
 - [Why Svar](#why-svar)
 - [Compile and Install](#compile-and-install)
 - [Usages](#usages)
@@ -282,7 +295,7 @@ int sample_func(){
     Svar c_func=c_func_demo;
     c_func("I love Svar");
 
-    Svar lambda=Svar::lambda([](std::string arg){std::cout<<arg<<std::endl;});
+    Svar lambda=[](std::string arg){std::cout<<arg<<std::endl;};
     lambda("Using a lambda");
 
     Svar member_func(&SvarBuffer::md5);
