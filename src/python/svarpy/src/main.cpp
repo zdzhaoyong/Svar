@@ -24,7 +24,7 @@ std::string getBaseName(const std::string& path) {
 }
 
 
-PyObject* load(std::string pluginPath){
+PyObjectHolder load(std::string pluginPath){
     return SvarPy::getModule(svar.import(pluginPath),getBaseName(pluginPath).c_str());
 }
 

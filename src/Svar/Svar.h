@@ -1414,6 +1414,9 @@ enum value_t : std::uint8_t
     buffer_t,           ///< memory buffer with type, shape information
     function_t,         ///< function expressions
     svarclass_t,        ///< class expressions
+    property_t,         ///< class property
+    exception_t,        ///< svar exception
+    argument_t,         ///< svar argument
     others_t            ///< user defined types
 };
 
@@ -2194,21 +2197,21 @@ public:
 
     template <typename... Args>
     Class& construct(){
-        return def("__init__",[](Args... args){
+        return def_static("__init__",[](Args... args){
             return std::unique_ptr<C>(new C(args...));
         });
     }
 
     template <typename... Args>
     Class& unique_construct(){
-        return def("__init__",[](Args... args){
+        return def_static("__init__",[](Args... args){
             return std::unique_ptr<C>(new C(args...));
         });
     }
 
     template <typename... Args>
     Class& shared_construct(){
-        return def("__init__",[](Args... args){
+        return def_static("__init__",[](Args... args){
             return std::make_shared<C>(args...);
         });
     }
@@ -2803,18 +2806,23 @@ inline SvarClass::SvarClass(const std::string& name,std::type_index cpp_type,
     : __name__(name),_cpptype(cpp_type),
       _attr(Svar::object()),_parents(parents),_json_type(value_t::others_t){
 
-    std::map<std::type_index,value_t> lut={{typeid(void),undefined_t},
-                                           {typeid(nullptr),null_t},
-                                           {typeid(bool),boolean_t},
-                                           {typeid(int),value_t::integer_t},
-                                           {typeid(double),value_t::float_t},
-                                           {typeid(std::string),value_t::string_t},
-                                           {typeid(SvarArray),value_t::array_t},
-                                           {typeid(SvarObject),value_t::object_t},
-                                           {typeid(SvarDict),value_t::dict_t},
-                                           {typeid(SvarBuffer),value_t::buffer_t},
-                                           {typeid(SvarFunction),value_t::function_t},
-                                           {typeid(SvarClass),value_t::svarclass_t}};
+    std::map<std::type_index,value_t> lut =
+    {{typeid(void),undefined_t},
+     {typeid(nullptr),null_t},
+     {typeid(bool),boolean_t},
+     {typeid(int),value_t::integer_t},
+     {typeid(double),value_t::float_t},
+     {typeid(std::string),value_t::string_t},
+     {typeid(SvarArray),value_t::array_t},
+     {typeid(SvarObject),value_t::object_t},
+     {typeid(SvarDict),value_t::dict_t},
+     {typeid(SvarBuffer),value_t::buffer_t},
+     {typeid(SvarFunction),value_t::function_t},
+     {typeid(SvarClass),value_t::svarclass_t},
+     {typeid(SvarProperty),value_t::property_t},
+     {typeid(arg),value_t::argument_t},
+     {typeid(SvarExeption),value_t::exception_t}
+    };
     auto it=lut.find(cpp_type);
     if(it!=lut.end()) _json_type=it->second;
 }
@@ -2927,7 +2935,7 @@ template <>
 inline bool Svar::is<Svar>()const{return true;}
 
 inline bool Svar::isProperty() const{
-    return is<SvarClass::SvarProperty>();
+    return jsontype()==sv::property_t;
 }
 
 inline bool Svar::isObject() const{
