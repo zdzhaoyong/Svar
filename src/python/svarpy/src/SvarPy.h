@@ -408,13 +408,12 @@ struct SvarPy: public PyObject{
             lut[&PyLong_Type] =[](PyObject* o)->Svar{return (int)PyLong_AsLong(o);};
 
             lut[&PyUnicode_Type] =[](PyObject* obj)->Svar{
-                PyObject* buf=PyUnicode_AsUTF8String(obj);
+                PyObjectHolder buf(PyUnicode_AsUTF8String(obj),false);
                 char *buffer=nullptr;
                 ssize_t length=0;
 
-                if (SVAR_BYTES_AS_STRING_AND_SIZE(buf, &buffer, &length))
+                if (SVAR_BYTES_AS_STRING_AND_SIZE(buf.obj, &buffer, &length))
                     LOG(ERROR)<<("Unable to extract string contents! (invalid type)");
-                decref(buf);// important, prevent memory leak
                 return std::string(buffer, (size_t) length);
             };
 
@@ -438,8 +437,8 @@ struct SvarPy: public PyObject{
                 Py_ssize_t pos = 0;
 
                 while (PyDict_Next(obj, &pos, &key, &value)) {
-                    if(!PyUnicode_Check(obj)) continue;
-                    dict[fromPy(key).castAs<std::string>()] = fromPy(value);
+                    if(!PyUnicode_Check(key)) continue;
+                    dict[fromPy(key).unsafe_as<std::string>()] = fromPy(value);
                 }
                 return dict;
             };
