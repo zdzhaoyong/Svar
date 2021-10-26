@@ -59,7 +59,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='svar',
-    version='0.3.1',
+    version='0.3.2',
     author='Yong Zhao',
     author_email='zdzhaoyong@mail.nwpu.edu.cn',
     description='The Python interface for Svar plugins',

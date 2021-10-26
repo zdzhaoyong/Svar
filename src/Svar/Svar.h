@@ -88,7 +88,7 @@ typedef SSIZE_T ssize_t;
 #endif
 
 #define svar sv::Svar::instance()
-#define SVAR_VERSION 0x000301
+#define SVAR_VERSION 0x000302
 #define EXPORT_SVAR_INSTANCE extern "C" SVAR_EXPORT sv::Svar* svarInstance(){return &sv::Svar::instance();}
 #define REGISTER_SVAR_MODULE(MODULE_NAME) \
     class SVAR_MODULE_##MODULE_NAME{\
