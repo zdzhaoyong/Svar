@@ -12,7 +12,7 @@ TEST(SvarPy,PyMath)
 
    EXPECT_TRUE(math["sqrt"].isFunction());
 
-//   EXPECT_EQ(math["sqrt"](4),2); // FIXME: lead to segment fault when application shutdown?
+   EXPECT_EQ(math["sqrt"](4),2); // FIXME: lead to segment fault when application shutdown?
 }
 
 
@@ -22,7 +22,9 @@ TEST(SvarPy,PyOS)
    if(svarpy.isUndefined()) return;
 
    const Svar os = svarpy["import"]("os");
-//   std::cout<<svarpy["fromPy"](os)<<std::endl;
+#ifdef __linux__
+   EXPECT_EQ(os["getpid"](),(int)getpid());
+#endif
 
    EXPECT_TRUE(os["getpid"].isFunction());
 

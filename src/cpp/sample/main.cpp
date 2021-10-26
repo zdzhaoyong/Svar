@@ -156,6 +156,30 @@ int sample_module(Svar config){
     return 0;
 }
 
+int sample_svarpy(Svar config){
+    auto python=svar.import("svarpy");
+
+    {
+        const Svar sqlite3 = python["import"]("sqlite3");
+        std::cout<<"sqlite3:"<<sqlite3<<std::endl;
+
+        const Svar os = python["import"]("os");
+        std::cout<<"pid is :"<<os["getpid"]()<<std::endl;
+        os["mkdir"]("hello");
+        std::cout<<"mkdir: hello"<<std::endl;
+
+        const Svar hello = python["import"]("hello_svarpy");
+
+        std::cout<<"hello_svarpy:"<<hello<<std::endl;
+
+        if(hello.isUndefined()) return 0;
+
+        std::cout<<hello["obtain_pid"]()<<std::endl;
+        hello["say"]("hello svarpy");
+    }
+    return 0;
+}
+
 int sample(Svar config){
     bool json=config.arg("json",false,"run json sample");
     bool func=config.arg("func",false,"run function usage sample");
@@ -163,6 +187,7 @@ int sample(Svar config){
     bool svarclass=config.arg("svarclass",false,"run svar class sample");
     bool module=config.arg("module",false,"show how to use a svar module");
     bool instance=config.arg("instance",false,"use svar to hold values");
+    bool svarpy=config.arg("svarpy",false,"use svarpy to import python modules");
 
     if(config.get("help",false)) return config.help();
 
@@ -172,6 +197,7 @@ int sample(Svar config){
     if(svarclass) return sample_svarclass();
     if(module) return sample_module(config);
     if(instance) return sample_instance();
+    if(svarpy) return sample_svarpy(config);
 
     return 0;
 }

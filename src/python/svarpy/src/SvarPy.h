@@ -39,7 +39,7 @@ public:
     }
     ~PythonSpace(){
         PyGILState_Ensure();
-        Py_Finalize();
+//        Py_Finalize();
     }
 
     static const char* safe_c_str(std::string s){
@@ -117,7 +117,8 @@ struct SvarPy: public PyObject{
         return obj;
     }
 
-    static PyObjectHolder getPy(Svar src)// This is for python to use, every python func will perform decref
+    // The return holder should auto decref and release if not used
+    static PyObjectHolder getPy(Svar src)
     {
         switch (src.jsontype()) {
         case sv::undefined_t:
@@ -144,49 +145,49 @@ struct SvarPy: public PyObject{
             PyObject* obj=PyTuple_New(src.length());
             size_t index = 0;
             for (Svar& value : src.as<SvarArray>()._var) {
-                PyObject* value_ =SvarPy::getPy(value);
-                if (!value_)
+                PyObjectHolder value_ =SvarPy::getPy(value);
+                if (!value_.obj)
                 {
                     decref(obj);
-                    decref(value_);
                     return Py_None;
                 }
-                PyTuple_SetItem(obj, (ssize_t) index++, value_); // steals a reference
+                PyTuple_SetItem(obj, (ssize_t) index++, value_); // should own
             }
             return PyObjectHolder(obj,false);
         }
             break;
         case sv::object_t:{
-
-            PyObject* obj=PyTuple_New(src.length());
-            size_t index = 0;
-            for (Svar& value : src.as<SvarArray>()._var) {
-                PyObject* value_ =SvarPy::getPy(value);
-                if (!value_)
-                {
-                    decref(obj);
-                    decref(value_);
+            PyObject* dict=PyDict_New();
+            for (std::pair<std::string,Svar> kv : src) {
+                PyObject* key = PyUnicode_FromStringAndSize(kv.first.data(),kv.first.size());
+                PyObject* value = SvarPy::getPy(kv.second);
+                if (!key || !value){
+                    decref(dict);
+                    decref(key);
+                    decref(value);
                     return Py_None;
                 }
-                PyTuple_SetItem(obj, (ssize_t) index++, value_); // steals a reference
+                PyDict_SetItem(dict,key,value); // steal
+                decref(key);
+                decref(value);
             }
-            return PyObjectHolder(obj,false);
+            return PyObjectHolder(dict,false);
         }
             break;
         case sv::function_t:
             return PyObjectHolder(SvarPy::getPyFunction(src),false);
             break;
         case sv::svarclass_t:
-            return PyObjectHolder((PyObject*)SvarPy::getPyClass(src));
+            return PyObjectHolder((PyObject*)SvarPy::getPyClass(src),false);
             break;
         case sv::property_t:
-            return PyObjectHolder(SvarPy::getPyProperty(src));
+            return PyObjectHolder(SvarPy::getPyProperty(src),false);
             break;
         default:{
             if(src.is<PyObjectHolder>())
                 return src.as<PyObjectHolder>();
 
-            PyTypeObject* py_class = getPyClass(src.classObject());
+            PyTypeObject* py_class = getPyClass(src.classObject()); // steal
             PyObject *self = py_class->tp_alloc(py_class, 0);
             SvarPy* obj = reinterpret_cast<SvarPy*>(self);
             obj->var = new Svar(src);
@@ -218,7 +219,7 @@ struct SvarPy: public PyObject{
 
     static PyObject* getPyProperty(Svar src){
       SvarClass::SvarProperty& property=src.as<SvarClass::SvarProperty>();
-      auto py_args=getPy({property._fget,property._fset,property._doc});
+      PyObjectHolder py_args = getPy({property._fget,property._fset,property._doc});
       PyObject *result = PyObject_Call((PyObject*)&PyProperty_Type,
                                        py_args.obj,nullptr);
       if (!result){
@@ -413,6 +414,7 @@ struct SvarPy: public PyObject{
 
                 if (SVAR_BYTES_AS_STRING_AND_SIZE(buf, &buffer, &length))
                     LOG(ERROR)<<("Unable to extract string contents! (invalid type)");
+                decref(buf);// important, prevent memory leak
                 return std::string(buffer, (size_t) length);
             };
 
@@ -436,6 +438,7 @@ struct SvarPy: public PyObject{
                 Py_ssize_t pos = 0;
 
                 while (PyDict_Next(obj, &pos, &key, &value)) {
+                    if(!PyUnicode_Check(obj)) continue;
                     dict[fromPy(key).castAs<std::string>()] = fromPy(value);
                 }
                 return dict;
@@ -471,18 +474,24 @@ struct SvarPy: public PyObject{
 
             lut[&PyModule_Type] =[](PyObject* obj)->Svar{
                 obj=PyModule_GetDict(obj);
-                incref(obj);
                 std::map<std::string,Svar> dict;
                 PyObject *key, *value;
                 Py_ssize_t pos = 0;
 
                 while (PyDict_Next(obj, &pos, &key, &value)) {
+                    auto keyvar=fromPy(key);
+                    if(!keyvar.is<std::string>()){
+                        LOG(INFO)<<keyvar<<" not string but is "<<key->ob_type->tp_name<<std::endl;
+                        continue;
+                    }
                     std::string keyStr=fromPy(key).castAs<std::string>();
                     if(keyStr.find_first_of("_")==0) continue;
-                    if(PyModule_Check(value)) continue;
-                    dict.insert(make_pair(keyStr,
-                                          fromPy(value)));
+                    if(PyModule_Check(value))
+                        dict.insert(make_pair(keyStr,Svar(PyObjectHolder(obj))));
+                    else
+                        dict.insert(make_pair(keyStr,fromPy(value)));
                 }
+                decref(obj);
                 return dict;
             };
 
@@ -527,15 +536,12 @@ struct SvarPy: public PyObject{
             SvarPy* o=(SvarPy*)obj;
             if(!o->var)
             {
-               LOG(INFO)<<"var is null!";
                return Svar();
             }
             return *o->var;
         }
-        else
-            LOG(FATAL)<<"this is not svar holderable";
 
-        return Svar(PyObjectHolder(obj));// FIXME: Svar(PyObjectHolder(obj)) may lead to segment fault?
+        return Svar(PyObjectHolder(obj));// may lead to segment fault?
     }
 
     static PyObjectHolder getModule(Svar var,std::string name="svar"){

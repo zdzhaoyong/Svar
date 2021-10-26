@@ -96,11 +96,9 @@ REGISTER_SVAR_MODULE(python){
 
     sv::Class<sv::PyObjectHolder>("PyObjectHolder")
             .def("__str__",[](sv::PyObjectHolder& h)->std::string{
-        sv::PyThreadStateLock PyThreadLock;
-        PyObject* strObj=PyObject_Repr(h.obj);
-        if(!strObj) return "<PyObjectHolder>";
-        std::string str= sv::SvarPy::fromPy(strObj).as<std::string>();
-        return str;
+        std::stringstream sst;
+        sst<<"<PyObjectHolder "<<h.obj->ob_type->tp_name<<" at "<<h.obj<<">";
+        return sst.str();
     })
     .def("__getitem__",[](sv::PyObjectHolder& h,const Svar& name){
         sv::PyThreadStateLock PyThreadLock;
