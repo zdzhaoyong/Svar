@@ -523,11 +523,11 @@ struct SvarPy: public PyObject{
         }
 
         if (PyUnicode_Check(obj)) {
-            PyObject* buf=PyUnicode_AsUTF8String(obj);
+            PyObjectHolder buf(PyUnicode_AsUTF8String(obj),false);
             char *buffer=nullptr;
             ssize_t length=0;
 
-            if (SVAR_BYTES_AS_STRING_AND_SIZE(buf, &buffer, &length))
+            if (SVAR_BYTES_AS_STRING_AND_SIZE(buf.obj, &buffer, &length))
                 LOG(ERROR)<<("Unable to extract string contents! (invalid type)");
             return std::string(buffer, (size_t) length);
         }
