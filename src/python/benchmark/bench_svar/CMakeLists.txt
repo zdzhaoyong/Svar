@@ -4,7 +4,7 @@ include(../../../../cmake/PICMake.cmake)
 
 set(CMAKE_CXX_STANDARD 11)
 
-include_directories(../../..)
+include_directories(../../.. ../../svarpy/src)
 
 set(Python_ADDITIONAL_VERSIONS 3.7 3.6 3.5 3.4)
 

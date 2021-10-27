@@ -43,4 +43,6 @@ TEST(Svar,Alias){
     EXPECT_EQ(vecClone[0],i);
     i=9;
     EXPECT_NE(vecClone[0],i);
+
+    Svar mutex(std::mutex()); // support no copyable object after v0.3.3
 }

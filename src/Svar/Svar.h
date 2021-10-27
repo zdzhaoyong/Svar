@@ -1448,6 +1448,8 @@ public:
     /// Wrap anything with template caster for user customize, including STLs
     template <typename T>
     Svar(const T& var);
+    template <typename T>
+    Svar(detail::enable_if_t<!std::is_same<T,Svar>::value,T>&& var);
 
     /// Wrap an pointer use unique_ptr, should std::move since uncopyable
     template <typename T>
@@ -1815,7 +1817,7 @@ public:
         std::list<const SvarFunction*>& _stack;
     };
 
-    Svar Call(std::vector<Svar> argv)const{
+    Svar Call(std::vector<Svar>& argv)const{
         thread_local static std::list<const SvarFunction*> stack;
         ScopedStack scoped_stack(stack,this);
 
@@ -1831,7 +1833,7 @@ public:
                         continue;
                     }
 
-                    arg& a_ = a.as<arg>();
+                    const arg& a_ = a.as<arg>();
                     kwargs[a_.name] = a_.value;
                 }
                 int fixarg_n = overload->arg_types.size()-overload->kwargs.size()-1;
@@ -2994,17 +2996,14 @@ public:
     static Svar from(const Svar& var){
         if(var.is<T>()) return var;
 
-        Svar cl=var.classObject();
-        if(cl.isClass()){
-            SvarClass& srcClass=cl.as<SvarClass>();
-            Svar cvt=srcClass._attr["__"+SvarClass::Class<T>().name()+"__"];
-            if(cvt.isFunction()){
-                Svar ret=cvt(var);
-                if(ret.is<T>()) return ret;
-            }
+        SvarClass& srcClass=var.classObject();
+        Svar cvt=srcClass._attr["__"+SvarClass::Class<T>().name()+"__"];
+        if(cvt.isFunction()){
+            Svar ret=cvt(var);
+            if(ret.is<T>()) return ret;
         }
 
-        SvarClass& destClass=*SvarClass::instance<T>();
+        SvarClass& destClass=SvarClass::Class<T>();
         if(destClass.__init__.isFunction()){
             Svar ret=destClass.__init__(var);
             if(ret.is<T>()) return ret;
@@ -3023,10 +3022,19 @@ public:
     static detail::enable_if_t<!detail::is_callable<T1>::value,Svar> to(const T1& var){
         return Svar::create(var);
     }
+
+    template <typename T1>
+    static detail::enable_if_t<!detail::is_callable<T1>::value,Svar> to(T1&& var){
+        return Svar::create(std::move(var));
+    }
 };
 
 template <typename T>
 Svar::Svar(const T& var):Svar(caster<T>::to(var))
+{}
+
+template <typename T>
+Svar::Svar(detail::enable_if_t<!std::is_same<T,Svar>::value,T>&& var):Svar(caster<T>::to(std::move(var)))
 {}
 
 template <typename T>
@@ -3730,8 +3738,7 @@ inline Svar Svar::operator &(const Svar& rh)const
 DEF_SVAR_OPERATOR_IMPL(__and__)
 
 inline bool Svar::operator ==(const Svar& rh)const{
-    Svar clsobj=classObject();
-    Svar eq_func=clsobj.as<SvarClass>()["__eq__"];
+    Svar eq_func=classObject()["__eq__"];
     if(!eq_func.isFunction()) return _obj==rh.value();
     Svar ret=eq_func(*this,rh);
     assert(ret.is<bool>());
@@ -3739,8 +3746,7 @@ inline bool Svar::operator ==(const Svar& rh)const{
 }
 
 inline bool Svar::operator <(const Svar& rh)const{
-    Svar clsobj=classObject();
-    Svar lt_func=clsobj.as<SvarClass>()["__lt__"];
+    Svar lt_func=classObject()["__lt__"];
     if(!lt_func.isFunction()) return _obj==rh.value();
     Svar ret=lt_func(*this,rh);
     assert(ret.is<bool>());

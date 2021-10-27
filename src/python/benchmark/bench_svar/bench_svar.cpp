@@ -1,4 +1,4 @@
-#include <Svar/SvarPy.h>
+#include <SvarPy.h>
 
 using namespace sv;
 
@@ -6,6 +6,8 @@ class BenchClass
 {
 public:
     struct BenchClassData{int a;};
+    BenchClass(BenchClass&& r):data(std::move(r.data)){}
+    BenchClass(const BenchClass& r):data(std::move(r.data)){}
     BenchClass(int i=1)
         : data(i){}
 

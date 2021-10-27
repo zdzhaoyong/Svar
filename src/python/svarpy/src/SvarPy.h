@@ -178,17 +178,17 @@ struct SvarPy: public PyObject{
             return PyObjectHolder(SvarPy::getPyFunction(src),false);
             break;
         case sv::svarclass_t:
-            return PyObjectHolder((PyObject*)SvarPy::getPyClass(src),false);
+            return PyObjectHolder((PyObject*)SvarPy::getPyClass(src.as<SvarClass>()),false);
             break;
         case sv::property_t:
             return PyObjectHolder(SvarPy::getPyProperty(src),false);
             break;
         default:{
-            if(src.is<PyObjectHolder>())
+            if(src.is<PyObjectHolder>()) // 0.01s/100k
                 return src.as<PyObjectHolder>();
 
-            PyTypeObject* py_class = getPyClass(src.classObject()); // steal
-            PyObject *self = py_class->tp_alloc(py_class, 0);
+            PyTypeObject* py_class = getPyClass(src.classObject()); // steal 0.01s/100k
+            PyObject *self = py_class->tp_alloc(py_class, 0); // 0.02s/100k
             SvarPy* obj = reinterpret_cast<SvarPy*>(self);
             obj->var = new Svar(src);
             return PyObjectHolder(obj,false);
@@ -202,14 +202,19 @@ struct SvarPy: public PyObject{
         SvarFunction& svarFunc = func->as<SvarFunction>();
 
         try{
-            Svar svar_args = SvarPy::fromPy(args);
+            std::vector<Svar> svar_args;
+            int nargs=PyTuple_Size(args);
+            svar_args.reserve(nargs);
+            for(Py_ssize_t i=0;i<nargs;++i)
+                svar_args.push_back(fromPy(PyTuple_GetItem(args,i)));
             if(kwargs){
                 Svar svar_kwargs = SvarPy::fromPy(kwargs);
                 for(std::pair<std::string,Svar> kw : svar_kwargs)
                     svar_args.push_back(arg(kw.first)=kw.second);
             }
 
-            return SvarPy::getPy(svarFunc.Call(svar_args.as<SvarArray>()._var));
+            auto ret=svarFunc.Call(svar_args);// 0.1s/100k
+            return SvarPy::getPy(ret);// 0.02s/100k
         }
         catch(SvarExeption e){
             PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -266,12 +271,9 @@ struct SvarPy: public PyObject{
         return m_ptr;
     }
 
-    static PyTypeObject* getPyClass(Svar var){
-        SvarClass& cls  = var.as<SvarClass>();
-        const sv::Svar attr = cls._attr;
-        sv::Svar pytype = attr["PyTypeObject"];
-        if(pytype.is<PyTypeObject*>())
-            return pytype.as<PyTypeObject*>();
+    static PyTypeObject* getPyClass(SvarClass& cls){
+        if(cls.__setitem__.is<PyTypeObject*>())
+            return cls.__setitem__.as<PyTypeObject*>();
 
         auto heap_type = (PyHeapTypeObject *) PyType_Type.tp_alloc(&PyType_Type, 0);
         if (!heap_type){
@@ -291,6 +293,7 @@ struct SvarPy: public PyObject{
         type->tp_as_sequence = &heap_type->as_sequence;
         type->tp_as_mapping = &heap_type->as_mapping;
 
+        const SvarObject& attr = cls._attr.as<SvarObject>();
         if(attr["__buffer__"].isFunction()){
           type->tp_as_buffer= & heap_type->as_buffer;
           heap_type->as_buffer.bf_getbuffer=[](PyObject *obj, Py_buffer *view, int flags)->int{
@@ -367,7 +370,8 @@ struct SvarPy: public PyObject{
                 func_new._func  = [f,type](std::vector<Svar> args){
                     PyObject *self = type->tp_alloc(type, 0);
                     SvarPy* obj = reinterpret_cast<SvarPy*>(self);
-                    obj->var = new Svar(f.second.as<SvarFunction>().Call(std::vector<Svar>(args.begin()+1,args.end())));
+                    std::vector<Svar> argv(args.begin()+1,args.end());
+                    obj->var = new Svar(f.second.as<SvarFunction>().Call(argv));
                     return PyObjectHolder(obj,false);
                 };
                 PyObject_SetAttrString((PyObject*)type,"__new__",getPy(func_new));
@@ -378,9 +382,9 @@ struct SvarPy: public PyObject{
         }
 
         PyObject_SetAttrString((PyObject *) type, "__module__", SVAR_FROM_STRING("svar_builtins"));
-        cls._attr.set("PyTypeObject",type);
+        cls.__setitem__ = type;
 
-        PyObject* capsule=PyCapsule_New(new Svar(var),nullptr,[](PyObject *o) {
+        PyObject* capsule=PyCapsule_New(new Svar(&cls),nullptr,[](PyObject *o) {
             delete (Svar*)PyCapsule_GetPointer(o, nullptr);
         });
 
@@ -418,16 +422,19 @@ struct SvarPy: public PyObject{
             };
 
             lut[&PyList_Type] =[](PyObject* obj)->Svar{
-                std::vector<Svar> array(PyList_Size(obj));
-                for(Py_ssize_t i=0;i<array.size();++i)
-                    array[i]=fromPy(PyList_GetItem(obj,i));
+                std::vector<Svar> array;
+                int num=PyList_Size(obj);
+                array.reserve(num);
+                for(Py_ssize_t i=0;i<num;++i)
+                    array.push_back(fromPy(PyList_GetItem(obj,i)));
                 return Svar(array);
             };
 
             lut[&PyTuple_Type] =[](PyObject* obj)->Svar{
-                std::vector<Svar> array(PyTuple_Size(obj));
-                for(Py_ssize_t i=0;i<array.size();++i)
-                    array[i]=fromPy(PyTuple_GetItem(obj,i));
+                std::vector<Svar> array;
+                int num=PyTuple_Size(obj);
+                for(Py_ssize_t i=0;i<num;++i)
+                    array.push_back(fromPy(PyTuple_GetItem(obj,i)));
                 return Svar(array);
             };
 
