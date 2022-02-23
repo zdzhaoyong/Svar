@@ -1,8 +1,10 @@
 This is the soure code folder:
 
-* cpp : Including the svar binary application and the sample use of module
-* python: Including the svar bind things and sample use of a module
+* Svar   : The single c++ header of Svar, all you need for development
+* svar   : The svar binary application
 * modules: Some sample svar modules wrote with c++
-* Svar: The core c++ headers of Svar
+* python : Python binding interface
+* java   : Java JNI binding interface
+* nodejs : Node-js binding interface
 
 
