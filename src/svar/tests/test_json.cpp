@@ -11,6 +11,10 @@ TEST(JSON,Basic){
     var.set("b",false);
     var.set("l",Svar::array({1,2,3}));
     var.set("m",Svar::object({{"a",1},{"b",false}}));
+
+    EXPECT_TRUE(var.isObject());
+    EXPECT_TRUE(var["l"].isArray());
+
     std::string str=var.dump_json();
     std::cout<<str<<std::endl;
     Svar varCopy=Svar::parse_json(str);
@@ -109,4 +113,33 @@ TEST(JSON,Variable)
     auto mtx=svarMtx.castAs<std::shared_ptr<std::mutex>>();
     mtx->lock();
     mtx->unlock();
+}
+
+TEST(JSON,vector){
+    std::vector<int> a = {1,2,3};
+
+    Svar avec(a);
+    std::stringstream sst;
+    sst << avec;
+
+    for(Svar i:avec)
+       sst<<i;
+}
+
+TEST(JSON,list){
+    std::stringstream sst;
+    std::list<int>   l = {1,2,3};
+    sst<<Svar(l);
+}
+
+TEST(JSON,map){
+    std::stringstream sst;
+    std::map<std::string,int> m = {{"a",1},{"b",2}};
+    sst<<Svar(m);
+}
+
+TEST(JSON,unordered_map){
+    std::stringstream sst;
+    std::unordered_map<std::string,double> um= {{"a",1},{"b",2}};
+    sst<<Svar(um);
 }

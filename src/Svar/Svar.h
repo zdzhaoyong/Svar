@@ -3913,7 +3913,7 @@ public:
     }
 
     static Svar to(const std::vector<T>& var){
-        return std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
     }
 };
 
@@ -3952,7 +3952,7 @@ public:
     }
 
     static Svar to(const std::list<T>& var){
-        return std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
+        return (std::shared_ptr<SvarValue>)std::make_shared<SvarArray>(std::vector<Svar>(var.begin(),var.end()));
     }
 };
 
