@@ -1836,10 +1836,10 @@ public:
                     const arg& a_ = a.as<arg>();
                     kwargs[a_.name] = a_.value;
                 }
-                int fixarg_n = overload->arg_types.size()-overload->kwargs.size()-1;
+                unsigned int fixarg_n = overload->arg_types.size()-overload->kwargs.size()-1;
                 if(args.size() < fixarg_n) continue;// not enough
 
-                for(int i=args.size()-fixarg_n;i<overload->kwargs.size();i++)
+                for(unsigned int i=args.size()-fixarg_n;i<overload->kwargs.size();i++)
                 {
                     arg  def_a = overload->kwargs[i].as<arg>();
                     Svar val   = kwargs[def_a.name];
@@ -1861,7 +1861,7 @@ public:
             try{
                 return overload->_func(argv);
             }
-            catch(SvarExeption e){
+            catch(SvarExeption &e){
                 catches.push_back(e);
             }
             if(!overload->next.isFunction()) {
@@ -2008,18 +2008,18 @@ public:
 
     SvarClass& def_static(const std::string& name,const Svar& function, std::vector<Svar> extra={})
     {
-        return def(name,function,false);
+        return def(name,function,false,extra);
     }
 
     template <typename Func>
     SvarClass& def(const std::string& name,Func &&f, std::vector<Svar> extra={}){
-        return def(name,Svar::lambda(f),true);
+        return def(name,Svar::lambda(f),true,extra);
     }
 
     /// Construct a cpp_function from a lambda function (possibly with internal state)
     template <typename Func>
     SvarClass& def_static(const std::string& name,Func &&f, std::vector<Svar> extra={}){
-        return def(name,Svar::lambda(f),false);
+        return def(name,Svar::lambda(f),false,extra);
     }
 
     SvarClass& def_property(const std::string& name,
@@ -2103,7 +2103,7 @@ public:
                 }
                 return p[0].as<SvarClass>().Call(p[1](inst),function,args);
             }
-            catch(SvarExeption e){
+            catch(SvarExeption &e){
                 sst<<e.what();
                 continue;
             }
@@ -2491,7 +2491,7 @@ public:
         int total_groups = (_size+8)/64+1;
         int total_ints = total_groups*16;
         std::vector<uint32_t> vec(total_ints,0);
-        for(size_t i = 0; i < _size; i++)
+        for(unsigned int i = 0; i < _size; i++)
             vec[i>>2] |= (((const char*)_ptr)[i]) << ((i%4)*8);
         vec[_size>>2] |= 0x80 << (_size%4*8);
         uint64_t size = _size*8;
@@ -2538,7 +2538,7 @@ public:
       lut['h']=lut['H']=2;
       lut['i']=lut['I']=lut['f']=4;
       lut['d']=lut['g']=lut['q']=lut['Q']=8;
-      return lut[_format.front()];
+      return lut[static_cast<unsigned char>(_format.front())];
     }
 
     void*   _ptr;
@@ -2556,7 +2556,7 @@ public:
     virtual const void*     as(const TypeID& tp)const{if(tp==typeid(void)) return this;else return nullptr;}
     virtual SvarClass*     classObject()const;
     virtual size_t          length() const {return 0;}
-    virtual Svar            clone(int depth=0)const{return Svar();}
+    virtual Svar            clone(int)const{return Svar();}
 };
 
 template <typename T>
@@ -2567,7 +2567,7 @@ public:
 
     virtual const void*     as(const TypeID& tp)const{if(tp==typeid(T)) return &_var;else return nullptr;}
     virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
-    virtual Svar            clone(int depth=0)const{return _var;}
+    virtual Svar            clone(int)const{return _var;}
 //protected:// FIXME: this should not accessed by outside
     T _var;
 };
@@ -2586,7 +2586,7 @@ public:
 
     virtual TypeID          cpptype()const{return typeid(T);}
     virtual SvarClass*     classObject()const{return SvarClass::instance<T>();}
-    virtual Svar            clone(int depth=0)const{return _var;}
+    virtual Svar            clone(int)const{return _var;}
     virtual const void*     as(const TypeID& tp)const{
         if(tp==typeid(T)) return _var.get();
         else if(tp==typeid(std::shared_ptr<T>)) return &_var;
@@ -2770,7 +2770,7 @@ void SvarFunction::initialize(Func &&f, Return (*)(Args...), const Extra&... ext
 inline std::string SvarFunction::signature()const{
     std::stringstream sst;
     sst << name << "(";
-    int fixarg_n = arg_types.size()-kwargs.size();
+    unsigned int fixarg_n = arg_types.size()-kwargs.size();
     for(size_t i = 1;i < fixarg_n;i++){
         if(is_method && i==1)
             sst<< "self: ";
@@ -3331,7 +3331,7 @@ struct pagedostream{
         return ret;
     }
 
-    int                    page_size;
+    unsigned int page_size;
     bool         reverse;
     std::list<std::string> pages;
 };
@@ -3806,7 +3806,7 @@ inline Svar  Svar::loadFile(const std::string& file_path)
         while(std::getline(ifs,line)) sst<<line<<std::endl;
         return cls.call("load",sst.str());
     }
-    catch(SvarExeption e){
+    catch(SvarExeption &e){
         std::cerr<<e.what();
     }
     return Svar::Undefined();
@@ -4046,7 +4046,7 @@ public:
         return var;
     }
 
-    static Svar to(std::nullptr_t v){
+    static Svar to(std::nullptr_t){
         return Svar::Null();
     }
 };
@@ -4137,9 +4137,9 @@ private:
     Json(const std::string& str_input, JsonParse parse_strategy=STANDARD)
         :str(str_input),i(0),failed(false),strategy(parse_strategy){
         for(int i=0;i<128;i++) {invalidmask[i]=0;namemask[i]=0;}
-        for(char c='0';c<='9';c++) namemask[c]=1;
-        for(char c='A';c<='Z';c++) namemask[c]=2;
-        for(char c='a';c<'z';c++) namemask[c]=2;
+        for(unsigned char c='0';c<='9';c++) namemask[c]=1;
+        for(unsigned char c='A';c<='Z';c++) namemask[c]=2;
+        for(unsigned char c='a';c<'z';c++) namemask[c]=2;
         namemask['_']=2;
     }
 
@@ -4397,7 +4397,7 @@ private:
 
     std::string parse_name(){
         size_t start_i=i-1;
-        while(i<str.size()&&namemask[str[i]]>=1)++i;
+        while(i<str.size()&&namemask[static_cast<unsigned char>(str[i])]>=1)++i;
         std::string ret=str.substr(start_i,i-start_i);
         return ret;
     }
@@ -4410,7 +4410,7 @@ private:
         if (str.compare(i, expected.length(), expected) == 0) {
             i += expected.length();
             return res;
-        } else if (namemask[str[i++]]>=2){
+        } else if (namemask[static_cast<unsigned char>(str[i++])]>=2){
             return parse_name();
         }
         else{
@@ -4424,7 +4424,7 @@ private:
             return fail("exceeded maximum nesting depth");
         }
 
-        char ch = get_next_token();
+        unsigned char ch = get_next_token();
         if (failed)
             return Svar();
 
