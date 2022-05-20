@@ -4,7 +4,7 @@ include(cmake/PICMake.cmake)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(BUILD_PYTHON "build svarpy module to support call python from c++" ON)
+option(BUILD_PYTHON "build svarpy module to support call python from c++" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
