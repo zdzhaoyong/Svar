@@ -3536,6 +3536,12 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
       return false;
   };
 
+  auto isdouble=[](const std::string str){
+     char* p = nullptr;
+     double d = strtod(str.c_str(),&p);
+     return d != HUGE_VAL && *p == '\0';
+  };
+
   // parse main cmd
   std::vector<std::string> unParsed;
   int beginIdx = 1;
@@ -3561,7 +3567,7 @@ inline std::vector<std::string> Svar::parseMain(int argc, char** argv) {
       continue;
     }
     string str2 = argv[i + 1];
-    if (str2.front() == '-') {
+    if (str2.front() == '-' && !isdouble(str2)) {
       set(str, true,true);
       continue;
     }
