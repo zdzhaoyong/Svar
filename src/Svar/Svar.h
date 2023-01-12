@@ -58,6 +58,7 @@
 #include <list>
 #include <set>
 #include <map>
+#include <array>
 #include <unordered_map>
 #include <algorithm>
 #include <memory>
@@ -889,7 +890,7 @@ boundaries compute_boundaries(FloatType value)
                     ? diyfp(F, kMinExp)
                     : diyfp(F + kHiddenBit, static_cast<int>(E) - kBias);
 
-    const bool lower_boundary_is_closer = F == 0 and E > 1;
+    const bool lower_boundary_is_closer = (F == 0 && E > 1);
     const diyfp m_plus = diyfp(2 * v.f + 1, v.e - 1);
     const diyfp m_minus = lower_boundary_is_closer
                           ? diyfp(4 * v.f - 1, v.e - 2)  // (B)
@@ -1100,8 +1101,8 @@ inline void grisu2_round(char* buf, int len, std::uint64_t dist, std::uint64_t d
     assert(ten_k > 0);
 
     while (rest < dist
-            and delta - rest >= ten_k
-            and (rest + ten_k < dist or dist - rest > rest + ten_k - dist))
+            && delta - rest >= ten_k
+            && (rest + ten_k < dist || dist - rest > rest + ten_k - dist))
     {
         assert(buf[len - 1] != '0');
         buf[len - 1]--;
@@ -1328,7 +1329,7 @@ inline char* format_buffer(char* buf, int len, int decimal_exponent,
     // k is the length of the buffer (number of decimal digits)
     // n is the position of the decimal point relative to the start of the buffer.
 
-    if (k <= n and n <= max_exp)
+    if (k <= n && n <= max_exp)
     {
         // digits[000]
         // len <= max_exp + 2
@@ -1340,7 +1341,7 @@ inline char* format_buffer(char* buf, int len, int decimal_exponent,
         return buf + (n + 2);
     }
 
-    if (0 < n and n <= max_exp)
+    if (0 < n && n <= max_exp)
     {
         // dig.its
         // len <= max_digits10 + 1
@@ -1352,7 +1353,7 @@ inline char* format_buffer(char* buf, int len, int decimal_exponent,
         return buf + (k + 1);
     }
 
-    if (min_exp < n and n <= 0)
+    if (min_exp < n && n <= 0)
     {
         // 0.[000]digits
         // len <= 2 + (-min_exp - 1) + max_digits10
