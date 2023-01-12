@@ -3,7 +3,7 @@ import re
 import sys
 import platform
 import subprocess
-
+import shutil
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
@@ -56,6 +56,12 @@ class CMakeBuild(build_ext):
         print('cmake', ext.sourcedir, cmake_args)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        if platform.system() == "Windows":
+            build_tmp_abs_path = os.path.join(os.path.abspath(self.build_temp),"Release")
+            for root, dirs, files in os.walk(build_tmp_abs_path):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    shutil.copy(src_file, extdir)
 
 setup(
     name='svar',
